@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,6 +13,8 @@ Deno.serve(async (req) => {
   try {
     const url = new URL(req.url);
     const articleId = url.searchParams.get("id");
+
+    console.log("Article share request for ID:", articleId);
 
     if (!articleId) {
       return new Response("Missing article ID", {
@@ -31,6 +33,8 @@ Deno.serve(async (req) => {
       .eq("id", articleId)
       .eq("is_published", true)
       .maybeSingle();
+
+    console.log("Article fetch result:", { article: article?.title, error });
 
     if (error || !article) {
       // Redirect to homepage if article not found
@@ -95,6 +99,8 @@ Deno.serve(async (req) => {
     <p>Redirecting to <a href="${articleUrl}">${escapeHtml(article.title)}</a>...</p>
 </body>
 </html>`;
+
+    console.log("Returning HTML with OG tags for:", article.title);
 
     return new Response(html, {
       headers: {
