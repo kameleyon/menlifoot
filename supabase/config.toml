@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.translate-all-languages]
 verify_jwt = false
+
+[functions.article-share]
+verify_jwt = false

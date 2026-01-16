@@ -1,5 +1,5 @@
-# Route social media crawlers to Edge Function for article pages
-/articles/:id  https://tjotexujwnfltszqqovk.supabase.co/functions/v1/article-share?id=:id  200!  User-Agent=~(facebookexternalhit|Twitterbot|LinkedInBot|WhatsApp|Slackbot|TelegramBot|Discordbot|Applebot)
+# Proxy share links to Edge Function for social media previews
+/share/articles/:id  https://tjotexujwnfltszqqovk.supabase.co/functions/v1/article-share?id=:id  200
 
 # Netlify SPA fallback (React Router deep links)
 /*    /index.html   200
