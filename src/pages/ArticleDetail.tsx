@@ -415,7 +415,8 @@ const ArticleDetail = () => {
   const handleShare = () => {
     if (!article) return;
 
-    const shareUrl = window.location.href;
+    // Use /share/ prefix for social media crawlers to get proper OG tags
+    const shareUrl = `${window.location.origin}/share/articles/${article.id}`;
 
     // Use reliable textarea-based copy method
     const textArea = document.createElement('textarea');

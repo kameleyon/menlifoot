@@ -371,7 +371,8 @@ const ArticlesSection = () => {
     e.preventDefault();
     e.stopPropagation();
     
-    const shareUrl = `${window.location.origin}/articles/${article.id}`;
+    // Use /share/ prefix for social media crawlers to get proper OG tags
+    const shareUrl = `${window.location.origin}/share/articles/${article.id}`;
 
     // Always copy to clipboard first using the most reliable method
     const textArea = document.createElement('textarea');
