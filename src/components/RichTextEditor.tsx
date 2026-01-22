@@ -1,8 +1,6 @@
 import { useEditor, EditorContent, Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
-import Underline from '@tiptap/extension-underline';
-import Link from '@tiptap/extension-link';
 import TextAlign from '@tiptap/extension-text-align';
 import Image from '@tiptap/extension-image';
 import { 
@@ -48,6 +46,7 @@ interface RichTextEditorProps {
 
 const MenuBar = ({ editor }: { editor: Editor | null }) => {
   const [linkUrl, setLinkUrl] = useState('');
+  const [linkText, setLinkText] = useState('');
   const [linkPopoverOpen, setLinkPopoverOpen] = useState(false);
   const [imagePopoverOpen, setImagePopoverOpen] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
@@ -72,13 +71,28 @@ const MenuBar = ({ editor }: { editor: Editor | null }) => {
     
     if (hasSelection) {
       // Apply link to selected text
-      editor.chain().focus().setLink({ href: url, target: '_blank' }).run();
+      editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
     } else {
-      // Insert the URL as linked text
-      editor.chain().focus().insertContent(`<a href="${url}" target="_blank">${url}</a>`).run();
+      // Insert linked text (defaults to URL)
+      const text = linkText.trim() || url;
+      editor
+        .chain()
+        .focus()
+        .insertContent({
+          type: 'text',
+          text,
+          marks: [
+            {
+              type: 'link',
+              attrs: { href: url, target: '_blank', rel: 'noopener noreferrer' },
+            },
+          ],
+        })
+        .run();
     }
     
     setLinkUrl('');
+    setLinkText('');
     setLinkPopoverOpen(false);
   }, [editor, linkUrl]);
 
@@ -309,7 +323,7 @@ const MenuBar = ({ editor }: { editor: Editor | null }) => {
         <PopoverContent className="w-80 p-3" align="start">
           <div className="space-y-2">
             <label className="text-sm font-medium">Enter URL</label>
-            <p className="text-xs text-muted-foreground">Select text first, then add a link to embed it</p>
+            <p className="text-xs text-muted-foreground">For embeds (YouTube / X), paste the URL on its own line.</p>
             <div className="flex gap-2">
               <Input
                 value={linkUrl}
@@ -326,6 +340,21 @@ const MenuBar = ({ editor }: { editor: Editor | null }) => {
               <Button size="sm" onClick={setLink}>
                 Add
               </Button>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Display text (optional)</label>
+              <Input
+                value={linkText}
+                onChange={(e) => setLinkText(e.target.value)}
+                placeholder="Leave empty to show the URL"
+                className="mt-1 text-foreground"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    setLink();
+                  }
+                }}
+              />
             </div>
           </div>
         </PopoverContent>
@@ -457,27 +486,28 @@ export const RichTextEditor = ({ content, onChange, placeholder = 'Write your co
         heading: {
           levels: [1, 2, 3],
         },
+        // This StarterKit version already includes link + underline; configure here to avoid duplicates.
+        link: {
+          openOnClick: false,
+          autolink: true,
+          defaultProtocol: 'https',
+          HTMLAttributes: {
+            target: '_blank',
+            rel: 'noopener noreferrer',
+          },
+        },
+        underline: {},
       }),
       Placeholder.configure({
         placeholder,
-      }),
-      Underline,
-      Link.configure({
-        openOnClick: false,
-        autolink: true,
-        defaultProtocol: 'https',
-        HTMLAttributes: {
-          class: 'text-primary underline cursor-pointer',
-          target: '_blank',
-          rel: 'noopener noreferrer',
-        },
       }),
       TextAlign.configure({
         types: ['heading', 'paragraph'],
       }),
       Image.configure({
         inline: false,
-        allowBase64: true,
+        // Prevent base64 images being stored inside article HTML.
+        allowBase64: false,
         HTMLAttributes: {
           class: 'max-w-full h-auto rounded-lg my-4',
         },
@@ -486,7 +516,7 @@ export const RichTextEditor = ({ content, onChange, placeholder = 'Write your co
     content,
     editorProps: {
       attributes: {
-        class: 'prose prose-sm max-w-none min-h-[200px] p-4 focus:outline-none dark:prose-invert prose-headings:font-semibold prose-blockquote:border-l-primary prose-blockquote:text-muted-foreground prose-a:text-primary prose-a:underline [&_.ProseMirror-selectednode]:outline-primary [&_.ProseMirror-selectednode]:outline-2 [&_.ProseMirror-selectednode]:outline text-white/80',
+        class: 'prose prose-sm max-w-none min-h-[200px] p-4 focus:outline-none dark:prose-invert prose-headings:font-semibold prose-blockquote:border-l-primary prose-blockquote:text-muted-foreground prose-a:text-primary prose-a:underline [&_.ProseMirror-selectednode]:outline-primary [&_.ProseMirror-selectednode]:outline-2 [&_.ProseMirror-selectednode]:outline text-foreground/80',
       },
     },
     onUpdate: ({ editor }) => {
