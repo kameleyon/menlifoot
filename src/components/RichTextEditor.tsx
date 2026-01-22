@@ -4,6 +4,7 @@ import Placeholder from '@tiptap/extension-placeholder';
 import Underline from '@tiptap/extension-underline';
 import Link from '@tiptap/extension-link';
 import TextAlign from '@tiptap/extension-text-align';
+import Image from '@tiptap/extension-image';
 import { 
   Bold, 
   Italic, 
@@ -25,7 +26,8 @@ import {
   AlignRight,
   AlignJustify,
   Minus,
-  RemoveFormatting
+  RemoveFormatting,
+  ImagePlus
 } from 'lucide-react';
 import { Toggle } from '@/components/ui/toggle';
 import { Button } from '@/components/ui/button';
@@ -33,7 +35,9 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface RichTextEditorProps {
   content: string;
@@ -45,22 +49,86 @@ interface RichTextEditorProps {
 const MenuBar = ({ editor }: { editor: Editor | null }) => {
   const [linkUrl, setLinkUrl] = useState('');
   const [linkPopoverOpen, setLinkPopoverOpen] = useState(false);
+  const [imagePopoverOpen, setImagePopoverOpen] = useState(false);
+  const [imageUrl, setImageUrl] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const setLink = useCallback(() => {
     if (!editor) return;
     
-    if (linkUrl === '') {
+    if (linkUrl.trim() === '') {
       editor.chain().focus().extendMarkRange('link').unsetLink().run();
+      setLinkPopoverOpen(false);
       return;
     }
 
     // Add https:// if no protocol is specified
     const url = linkUrl.match(/^https?:\/\//) ? linkUrl : `https://${linkUrl}`;
     
-    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+    // First, check if there's selected text
+    const { from, to } = editor.state.selection;
+    const hasSelection = from !== to;
+    
+    if (hasSelection) {
+      // Apply link to selected text
+      editor.chain().focus().setLink({ href: url, target: '_blank' }).run();
+    } else {
+      // Insert the URL as linked text
+      editor.chain().focus().insertContent(`<a href="${url}" target="_blank">${url}</a>`).run();
+    }
+    
     setLinkUrl('');
     setLinkPopoverOpen(false);
   }, [editor, linkUrl]);
+
+  const handleImageUpload = useCallback(async (file: File) => {
+    if (!editor) return;
+    
+    setIsUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${crypto.randomUUID()}.${fileExt}`;
+      const filePath = `article-images/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('articles')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('articles')
+        .getPublicUrl(filePath);
+
+      editor.chain().focus().setImage({ src: urlData.publicUrl }).run();
+      toast.success('Image uploaded successfully');
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast.error('Failed to upload image');
+    } finally {
+      setIsUploading(false);
+      setImagePopoverOpen(false);
+    }
+  }, [editor]);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleImageUpload(file);
+    }
+  }, [handleImageUpload]);
+
+  const insertImageByUrl = useCallback(() => {
+    if (!editor || !imageUrl.trim()) return;
+    
+    const url = imageUrl.match(/^https?:\/\//) ? imageUrl : `https://${imageUrl}`;
+    editor.chain().focus().setImage({ src: url }).run();
+    setImageUrl('');
+    setImagePopoverOpen(false);
+  }, [editor, imageUrl]);
 
   if (!editor) return null;
 
@@ -233,19 +301,21 @@ const MenuBar = ({ editor }: { editor: Editor | null }) => {
             size="sm"
             pressed={editor.isActive('link')}
             aria-label="Add Link"
-            title="Add Link"
+            title="Add Link (select text first)"
           >
             <LinkIcon className="h-4 w-4" />
           </Toggle>
         </PopoverTrigger>
         <PopoverContent className="w-80 p-3" align="start">
           <div className="space-y-2">
-            <label className="text-sm font-medium">URL</label>
+            <label className="text-sm font-medium">Enter URL</label>
+            <p className="text-xs text-muted-foreground">Select text first, then add a link to embed it</p>
             <div className="flex gap-2">
               <Input
                 value={linkUrl}
                 onChange={(e) => setLinkUrl(e.target.value)}
                 placeholder="https://example.com"
+                className="text-foreground"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
@@ -271,6 +341,74 @@ const MenuBar = ({ editor }: { editor: Editor | null }) => {
           <Unlink className="h-4 w-4" />
         </Toggle>
       )}
+
+      <Separator orientation="vertical" className="mx-1 h-6" />
+
+      {/* Image */}
+      <Popover open={imagePopoverOpen} onOpenChange={setImagePopoverOpen}>
+        <PopoverTrigger asChild>
+          <Toggle
+            size="sm"
+            pressed={false}
+            aria-label="Add Image"
+            title="Add Image"
+          >
+            <ImagePlus className="h-4 w-4" />
+          </Toggle>
+        </PopoverTrigger>
+        <PopoverContent className="w-80 p-3" align="start">
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium">Upload Image</label>
+              <p className="text-xs text-muted-foreground mb-2">Upload from your device</p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="w-full"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+              >
+                {isUploading ? 'Uploading...' : 'Choose File'}
+              </Button>
+            </div>
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-popover px-2 text-muted-foreground">Or</span>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Image URL</label>
+              <div className="flex gap-2 mt-1">
+                <Input
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  placeholder="https://example.com/image.jpg"
+                  className="text-foreground"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      insertImageByUrl();
+                    }
+                  }}
+                />
+                <Button size="sm" onClick={insertImageByUrl}>
+                  Add
+                </Button>
+              </div>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
 
       <Separator orientation="vertical" className="mx-1 h-6" />
 
@@ -326,18 +464,29 @@ export const RichTextEditor = ({ content, onChange, placeholder = 'Write your co
       Underline,
       Link.configure({
         openOnClick: false,
+        autolink: true,
+        defaultProtocol: 'https',
         HTMLAttributes: {
           class: 'text-primary underline cursor-pointer',
+          target: '_blank',
+          rel: 'noopener noreferrer',
         },
       }),
       TextAlign.configure({
         types: ['heading', 'paragraph'],
       }),
+      Image.configure({
+        inline: false,
+        allowBase64: true,
+        HTMLAttributes: {
+          class: 'max-w-full h-auto rounded-lg my-4',
+        },
+      }),
     ],
     content,
     editorProps: {
       attributes: {
-        class: 'prose prose-sm max-w-none min-h-[200px] p-4 focus:outline-none dark:prose-invert prose-headings:font-semibold prose-blockquote:border-l-primary prose-blockquote:text-muted-foreground prose-a:text-primary prose-a:underline',
+        class: 'prose prose-sm max-w-none min-h-[200px] p-4 focus:outline-none dark:prose-invert prose-headings:font-semibold prose-blockquote:border-l-primary prose-blockquote:text-muted-foreground prose-a:text-primary prose-a:underline [&_.ProseMirror-selectednode]:outline-primary [&_.ProseMirror-selectednode]:outline-2 [&_.ProseMirror-selectednode]:outline text-white/80',
       },
     },
     onUpdate: ({ editor }) => {
