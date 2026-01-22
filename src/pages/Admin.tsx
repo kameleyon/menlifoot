@@ -127,6 +127,8 @@ const ARTICLE_CATEGORIES = [
   'MLS',
   'Tactics',
   'Opinion',
+  'Did You Know?',
+  'Flashback',
 ];
 
 // Common keyword suggestions for football articles
