@@ -1,4 +1,14 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+
+declare global {
+  interface Window {
+    twttr?: {
+      widgets: {
+        load: (element?: HTMLElement | null) => void;
+      };
+    };
+  }
+}
 
 type Props = {
   html: string;
@@ -126,59 +136,57 @@ const getTweetId = (rawUrl: string): string | null => {
 };
 
 const XEmbed = ({ url }: { url: string }) => {
-  const id = getTweetId(url);
-  const iframeRef = React.useRef<HTMLIFrameElement>(null);
-  const [height, setHeight] = React.useState(400);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      // Twitter embed sends resize messages
-      if (event.origin !== "https://platform.twitter.com") return;
-      
-      try {
-        const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
-        if (data["twttr.embed"]?.id === id && data["twttr.embed"]?.height) {
-          setHeight(data["twttr.embed"].height);
-        }
-      } catch {
-        // ignore parse errors
+    const loadTwitterWidget = () => {
+      // If Twitter widgets already loaded, just render this embed
+      if (window.twttr?.widgets) {
+        window.twttr.widgets.load(containerRef.current);
+        setIsLoading(false);
+        return;
       }
+
+      // Check if script is already being loaded
+      const existingScript = document.querySelector('script[src="https://platform.twitter.com/widgets.js"]');
+      if (existingScript) {
+        // Wait for it to load
+        existingScript.addEventListener('load', () => {
+          window.twttr?.widgets.load(containerRef.current);
+          setIsLoading(false);
+        });
+        return;
+      }
+
+      // Load the Twitter widgets.js script
+      const script = document.createElement('script');
+      script.src = 'https://platform.twitter.com/widgets.js';
+      script.async = true;
+      script.charset = 'utf-8';
+      script.onload = () => {
+        window.twttr?.widgets.load(containerRef.current);
+        setIsLoading(false);
+      };
+      document.body.appendChild(script);
     };
 
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, [id]);
-
-  if (!id) {
-    return (
-      <div className="not-prose my-6 p-4">
-        <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80 break-all">
-          {url}
-        </a>
-      </div>
-    );
-  }
-
-  // Official iframe-based embed with maxwidth for better display
-  const src = `https://platform.twitter.com/embed/Tweet.html?id=${encodeURIComponent(id)}&theme=dark&dnt=true&frame=false&hideCard=false&hideThread=false&maxWidth=550`;
+    // Small delay to ensure DOM is ready
+    const timer = setTimeout(loadTwitterWidget, 100);
+    return () => clearTimeout(timer);
+  }, [url]);
 
   return (
-    <div className="not-prose my-6 flex justify-center">
-      <iframe
-        ref={iframeRef}
-        title="X post"
-        src={src}
-        style={{ 
-          border: 'none', 
-          width: '100%',
-          maxWidth: '550px',
-          height: `${height}px`,
-          overflow: 'hidden'
-        }}
-        loading="lazy"
-        allow="clipboard-write; encrypted-media; picture-in-picture"
-        scrolling="no"
-      />
+    <div ref={containerRef} className="not-prose my-6 flex justify-center">
+      <blockquote 
+        className="twitter-tweet" 
+        data-theme="dark"
+        data-dnt="true"
+      >
+        <a href={url}>
+          {isLoading ? 'Loading tweet...' : ''}
+        </a>
+      </blockquote>
     </div>
   );
 };
