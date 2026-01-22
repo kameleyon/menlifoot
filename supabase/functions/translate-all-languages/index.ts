@@ -198,8 +198,8 @@ serve(async (req) => {
     const results: Record<string, any> = {};
     const errors: string[] = [];
 
-    // Translate to each target language sequentially to avoid rate limits
-    for (const targetLang of targetLanguages) {
+    // Translate to all target languages in PARALLEL for speed
+    const translationPromises = targetLanguages.map(async (targetLang) => {
       try {
         console.log(`Translating to ${targetLang}...`);
         
@@ -232,20 +232,20 @@ serve(async (req) => {
         if (upsertError) {
           console.error(`Error saving ${targetLang} translation:`, upsertError);
           errors.push(`Failed to save ${targetLang} translation`);
+          results[targetLang] = 'failed';
         } else {
           console.log(`Successfully translated and saved ${targetLang}`);
           results[targetLang] = 'success';
         }
-
-        // Small delay between translations to avoid rate limits
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
       } catch (error) {
         console.error(`Error translating to ${targetLang}:`, error);
         errors.push(`Failed to translate to ${targetLang}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         results[targetLang] = 'failed';
       }
-    }
+    });
+
+    // Wait for all translations to complete in parallel
+    await Promise.all(translationPromises);
 
     return new Response(JSON.stringify({ 
       success: errors.length === 0,
