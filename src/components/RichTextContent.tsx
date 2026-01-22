@@ -42,7 +42,40 @@ const getYouTubeEmbedSrc = (rawUrl: string): string | null => {
 const isXUrl = (rawUrl: string) => {
   if (!isSafeHttpUrl(rawUrl)) return false;
   const url = new URL(rawUrl);
-  return url.hostname === "x.com" || url.hostname === "twitter.com";
+  return (
+    url.hostname === "x.com" ||
+    url.hostname === "www.x.com" ||
+    url.hostname === "twitter.com" ||
+    url.hostname === "www.twitter.com"
+  );
+};
+
+const getInstagramEmbedSrc = (rawUrl: string): string | null => {
+  if (!isSafeHttpUrl(rawUrl)) return null;
+  const url = new URL(rawUrl);
+  if (!url.hostname.includes("instagram.com")) return null;
+
+  // Supported:
+  // - https://www.instagram.com/p/{shortcode}/
+  // - https://www.instagram.com/reel/{shortcode}/
+  // - https://www.instagram.com/tv/{shortcode}/
+  const match = url.pathname.match(/^\/(p|reel|tv)\/([^/]+)/);
+  if (!match?.[1] || !match?.[2]) return null;
+  const type = match[1];
+  const shortcode = match[2];
+  return `https://www.instagram.com/${type}/${shortcode}/embed`;
+};
+
+const getFacebookEmbedSrc = (rawUrl: string): string | null => {
+  if (!isSafeHttpUrl(rawUrl)) return null;
+  const url = new URL(rawUrl);
+
+  // Accept common FB hostnames
+  const host = url.hostname.replace(/^www\./, "");
+  if (host !== "facebook.com" && host !== "fb.com" && host !== "fb.watch") return null;
+
+  // Use Facebook's plugin embed (works for many post URLs)
+  return `https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(rawUrl)}&show_text=true&width=500`;
 };
 
 const YouTubeEmbed = ({ url }: { url: string }) => {
@@ -114,6 +147,41 @@ const XEmbed = ({ url }: { url: string }) => {
   );
 };
 
+const InstagramEmbed = ({ url }: { url: string }) => {
+  const src = getInstagramEmbedSrc(url);
+  if (!src) return null;
+
+  return (
+    <div className="not-prose my-6 overflow-hidden rounded-xl border border-border bg-card/40">
+      <iframe
+        title="Instagram embed"
+        src={src}
+        className="w-full h-[720px]"
+        loading="lazy"
+        allowFullScreen
+      />
+    </div>
+  );
+};
+
+const FacebookEmbed = ({ url }: { url: string }) => {
+  const src = getFacebookEmbedSrc(url);
+  if (!src) return null;
+
+  return (
+    <div className="not-prose my-6 overflow-hidden rounded-xl border border-border bg-card/40">
+      <iframe
+        title="Facebook post embed"
+        src={src}
+        className="w-full h-[680px]"
+        loading="lazy"
+        allow="encrypted-media; picture-in-picture; clipboard-write"
+        allowFullScreen
+      />
+    </div>
+  );
+};
+
 const isEmbedParagraph = (p: Element): string | null => {
   const meaningfulNodes = Array.from(p.childNodes).filter((n) => {
     if (n.nodeType === Node.TEXT_NODE) return (n.textContent ?? "").trim().length > 0;
@@ -156,6 +224,8 @@ const renderNode = (node: ChildNode, key: string): React.ReactNode => {
     if (href) {
       if (getYouTubeEmbedSrc(href)) return <YouTubeEmbed key={key} url={href} />;
       if (isXUrl(href)) return <XEmbed key={key} url={href} />;
+      if (getInstagramEmbedSrc(href)) return <InstagramEmbed key={key} url={href} />;
+      if (getFacebookEmbedSrc(href)) return <FacebookEmbed key={key} url={href} />;
     }
   }
 
