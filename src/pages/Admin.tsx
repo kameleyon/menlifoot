@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Plus, Trash2, Edit2, LogOut, ArrowLeft, Youtube, Music2, FileText, Calendar, Image, Users, Shield, ShieldOff, Ban, UserCheck, Languages, RefreshCw, X, Tag } from 'lucide-react';
+import { Plus, Trash2, Edit2, LogOut, ArrowLeft, Youtube, Music2, FileText, Calendar, Image, Users, Shield, ShieldOff, Ban, UserCheck, Languages, RefreshCw, X, Tag, Eye } from 'lucide-react';
+import { ArticlePreviewDialog } from '@/components/ArticlePreviewDialog';
 import menlifootBall from '@/assets/menlifoot-ball.png';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -194,6 +195,7 @@ const Admin = () => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [retranslatingId, setRetranslatingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [usersLoading, setUsersLoading] = useState(false);
   const [keywordInput, setKeywordInput] = useState('');
   const [showKeywordSuggestions, setShowKeywordSuggestions] = useState(false);
@@ -446,8 +448,7 @@ const Admin = () => {
     }
   };
 
-  const handleArticleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleArticleSubmit = async () => {
     setIsLoading(true);
 
     // Use custom keywords if provided, otherwise auto-generate
@@ -503,6 +504,7 @@ const Admin = () => {
         );
       }
 
+      setIsPreviewOpen(false);
       setIsArticleDialogOpen(false);
       setEditingArticle(null);
       resetArticleForm();
@@ -1140,13 +1142,31 @@ const Admin = () => {
 
                     <div className="flex gap-3 pt-4">
                       <Button type="button" variant="outline" onClick={() => setIsArticleDialogOpen(false)} className="flex-1">Cancel</Button>
-                      <Button type="submit" variant="gold" disabled={isLoading} className="flex-1">
-                        {isLoading ? 'Saving...' : editingArticle ? 'Update' : 'Add Article'}
+                      <Button 
+                        type="button" 
+                        variant="gold" 
+                        disabled={!articleFormData.title || !articleFormData.content}
+                        onClick={() => setIsPreviewOpen(true)}
+                        className="flex-1"
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        Preview & Save
                       </Button>
                     </div>
                   </form>
                 </DialogContent>
               </Dialog>
+
+              {/* Article Preview Dialog */}
+              <ArticlePreviewDialog
+                open={isPreviewOpen}
+                onOpenChange={setIsPreviewOpen}
+                article={articleFormData}
+                onEdit={() => setIsPreviewOpen(false)}
+                onPublish={handleArticleSubmit}
+                isLoading={isLoading}
+                isEditing={!!editingArticle}
+              />
 
               <div className="glass-card p-6">
                 <h2 className="text-xl font-display font-semibold mb-4">Articles ({articles.length})</h2>

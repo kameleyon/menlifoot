@@ -641,9 +641,9 @@ export const RichTextEditor = ({ content, onChange, placeholder = 'Write your co
       CharacterCount.configure({ limit: maxLength }),
     ],
     content,
-    editorProps: {
+  editorProps: {
       attributes: {
-        class: 'prose prose-sm max-w-none min-h-[200px] p-4 focus:outline-none dark:prose-invert prose-headings:font-semibold prose-blockquote:border-l-primary prose-blockquote:text-muted-foreground prose-a:text-primary prose-a:underline [&_.ProseMirror-selectednode]:outline-primary [&_.ProseMirror-selectednode]:outline-2 [&_.ProseMirror-selectednode]:outline text-foreground/80 [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:p-2 [&_th]:border [&_th]:border-border [&_th]:p-2 [&_th]:bg-muted/50',
+        class: 'prose prose-sm max-w-none h-[300px] overflow-y-auto p-4 focus:outline-none dark:prose-invert prose-headings:font-semibold prose-headings:text-foreground/90 prose-blockquote:border-l-primary prose-blockquote:text-muted-foreground prose-a:text-primary prose-a:underline [&_.ProseMirror-selectednode]:outline-primary [&_.ProseMirror-selectednode]:outline-2 [&_.ProseMirror-selectednode]:outline text-foreground/80 [&_strong]:text-foreground/90 [&_b]:text-foreground/90 [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:p-2 [&_th]:border [&_th]:border-border [&_th]:p-2 [&_th]:bg-muted/50',
       },
     },
     onUpdate: ({ editor }) => {
@@ -661,9 +661,11 @@ export const RichTextEditor = ({ content, onChange, placeholder = 'Write your co
   const wordCount = editor?.storage.characterCount?.words() ?? 0;
 
   return (
-    <div className={cn('border border-input rounded-lg overflow-hidden bg-background', className)}>
+    <div className={cn('border border-input rounded-lg overflow-hidden bg-background flex flex-col', className)}>
       <MenuBar editor={editor} />
-      <EditorContent editor={editor} />
+      <div className="flex-1 overflow-hidden">
+        <EditorContent editor={editor} className="h-full [&>.tiptap]:h-full" />
+      </div>
       <div className="flex justify-between items-center px-3 py-2 border-t border-border bg-muted/20 text-xs text-muted-foreground">
         <span>{wordCount} words</span>
         <span>
