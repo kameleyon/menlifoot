@@ -116,17 +116,23 @@ const YouTubeIframeEmbed = ({ src }: { src: string }) => {
 };
 
 const XEmbed = ({ url }: { url: string }) => {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  
   useEffect(() => {
+    const loadTwitterWidget = () => {
+      // @ts-expect-error - injected by widgets.js
+      if (window.twttr?.widgets) {
+        // @ts-expect-error - injected by widgets.js
+        window.twttr.widgets.load(containerRef.current);
+      }
+    };
+
     const scriptId = "twitter-widgets";
     const existing = document.getElementById(scriptId) as HTMLScriptElement | null;
 
-    const load = () => {
-      // @ts-expect-error - injected by widgets.js
-      window.twttr?.widgets?.load?.();
-    };
-
     if (existing) {
-      load();
+      // Script already loaded, just reload widgets
+      setTimeout(loadTwitterWidget, 100);
       return;
     }
 
@@ -134,14 +140,18 @@ const XEmbed = ({ url }: { url: string }) => {
     script.id = scriptId;
     script.async = true;
     script.src = "https://platform.twitter.com/widgets.js";
-    script.onload = load;
+    script.onload = () => {
+      setTimeout(loadTwitterWidget, 100);
+    };
     document.body.appendChild(script);
   }, [url]);
 
   return (
-    <div className="not-prose my-6 overflow-hidden rounded-xl border border-border bg-card/40 p-4">
-      <blockquote className="twitter-tweet">
-        <a href={url} target="_blank" rel="noopener noreferrer" />
+    <div ref={containerRef} className="not-prose my-6 overflow-hidden rounded-xl border border-border bg-card/40 p-4">
+      <blockquote className="twitter-tweet" data-theme="dark">
+        <a href={url} target="_blank" rel="noopener noreferrer">
+          Loading tweet...
+        </a>
       </blockquote>
     </div>
   );
