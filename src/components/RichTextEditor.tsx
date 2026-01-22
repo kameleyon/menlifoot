@@ -17,6 +17,7 @@ import TaskItem from '@tiptap/extension-task-item';
 import Youtube from '@tiptap/extension-youtube';
 import FontFamily from '@tiptap/extension-font-family';
 import CharacterCount from '@tiptap/extension-character-count';
+import Link from '@tiptap/extension-link';
 import { 
   Bold, 
   Italic, 
@@ -169,18 +170,73 @@ const MenuBar = ({ editor }: { editor: Editor | null }) => {
     setLinkPopoverOpen(false);
   }, [editor, linkUrl, linkText]);
 
+  const compressImage = useCallback(async (file: File, maxSizeMB = 2): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const img = document.createElement('img');
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      img.onload = () => {
+        let { width, height } = img;
+        const maxDimension = 1920;
+        
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = (height / width) * maxDimension;
+            width = maxDimension;
+          } else {
+            width = (width / height) * maxDimension;
+            height = maxDimension;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        let quality = 0.9;
+        const tryCompress = () => {
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) return reject(new Error('Compression failed'));
+              
+              if (blob.size > maxSizeMB * 1024 * 1024 && quality > 0.1) {
+                quality -= 0.1;
+                tryCompress();
+              } else {
+                const compressedFile = new File([blob], file.name, { type: 'image/jpeg' });
+                resolve(compressedFile);
+              }
+            },
+            'image/jpeg',
+            quality
+          );
+        };
+        tryCompress();
+      };
+      
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
+  }, []);
+
   const handleImageUpload = useCallback(async (file: File) => {
     if (!editor) return;
     
     setIsUploading(true);
     try {
-      const fileExt = file.name.split('.').pop();
+      // Compress image if larger than 2MB
+      const processedFile = file.size > 2 * 1024 * 1024 
+        ? await compressImage(file, 2)
+        : file;
+      
+      const fileExt = 'jpg';
       const fileName = `${crypto.randomUUID()}.${fileExt}`;
       const filePath = `article-images/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('articles')
-        .upload(filePath, file);
+        .upload(filePath, processedFile);
 
       if (uploadError) throw uploadError;
 
@@ -192,12 +248,12 @@ const MenuBar = ({ editor }: { editor: Editor | null }) => {
       toast.success('Image uploaded successfully');
     } catch (error) {
       console.error('Error uploading image:', error);
-      toast.error('Failed to upload image');
+      toast.error('Failed to upload image. Try a smaller file.');
     } finally {
       setIsUploading(false);
       setImagePopoverOpen(false);
     }
-  }, [editor]);
+  }, [editor, compressImage]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -603,16 +659,17 @@ export const RichTextEditor = ({ content, onChange, placeholder = 'Write your co
         heading: {
           levels: [1, 2, 3, 4, 5, 6],
         },
-        link: {
-          openOnClick: false,
-          autolink: true,
-          defaultProtocol: 'https',
-          HTMLAttributes: {
-            target: '_blank',
-            rel: 'noopener noreferrer',
-          },
+        link: false, // Disable StarterKit's link, use separate Link extension
+      }),
+      Link.configure({
+        openOnClick: false,
+        autolink: true,
+        defaultProtocol: 'https',
+        HTMLAttributes: {
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          class: 'text-primary underline hover:text-primary/80',
         },
-        underline: {},
       }),
       Placeholder.configure({ placeholder }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
@@ -641,9 +698,9 @@ export const RichTextEditor = ({ content, onChange, placeholder = 'Write your co
       CharacterCount.configure({ limit: maxLength }),
     ],
     content,
-  editorProps: {
+    editorProps: {
       attributes: {
-        class: 'prose prose-sm max-w-none h-[300px] overflow-y-auto p-4 focus:outline-none dark:prose-invert prose-headings:font-semibold prose-headings:text-foreground/90 prose-blockquote:border-l-primary prose-blockquote:text-muted-foreground prose-a:text-primary prose-a:underline [&_.ProseMirror-selectednode]:outline-primary [&_.ProseMirror-selectednode]:outline-2 [&_.ProseMirror-selectednode]:outline text-foreground/80 [&_strong]:text-foreground/90 [&_b]:text-foreground/90 [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:p-2 [&_th]:border [&_th]:border-border [&_th]:p-2 [&_th]:bg-muted/50',
+        class: 'prose prose-sm max-w-none h-[300px] overflow-y-auto p-4 focus:outline-none dark:prose-invert prose-headings:font-semibold prose-headings:text-foreground/90 prose-blockquote:border-l-primary prose-blockquote:text-muted-foreground [&_.ProseMirror-selectednode]:outline-primary [&_.ProseMirror-selectednode]:outline-2 [&_.ProseMirror-selectednode]:outline [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:p-2 [&_th]:border [&_th]:border-border [&_th]:p-2 [&_th]:bg-muted/50',
       },
     },
     onUpdate: ({ editor }) => {

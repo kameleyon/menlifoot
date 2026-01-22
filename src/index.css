@@ -139,6 +139,26 @@
   }
 }
 
+/* TipTap Editor Styles */
+.tiptap {
+  color: hsl(var(--foreground) / 0.8);
+}
+
+.tiptap strong,
+.tiptap b {
+  color: hsl(var(--foreground)) !important;
+  font-weight: 700;
+}
+
+.tiptap a {
+  color: hsl(var(--primary)) !important;
+  text-decoration: underline;
+}
+
+.tiptap a:hover {
+  color: hsl(var(--primary) / 0.8) !important;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
