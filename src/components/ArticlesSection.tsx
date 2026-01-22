@@ -50,7 +50,8 @@ const CATEGORIES = [
   'World Cup',
   'Analysis',
   'Did You Know?',
-  'Flashback'
+  'Flashback',
+  'Football Business'
 ];
 
 type SortOption = 'latest' | 'oldest' | 'popular';
