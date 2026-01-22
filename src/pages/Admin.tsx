@@ -129,6 +129,7 @@ const ARTICLE_CATEGORIES = [
   'Opinion',
   'Did You Know?',
   'Flashback',
+  'Football Business',
 ];
 
 // Common keyword suggestions for football articles
