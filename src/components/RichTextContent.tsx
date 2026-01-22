@@ -127,9 +127,31 @@ const getTweetId = (rawUrl: string): string | null => {
 
 const XEmbed = ({ url }: { url: string }) => {
   const id = getTweetId(url);
+  const iframeRef = React.useRef<HTMLIFrameElement>(null);
+  const [height, setHeight] = React.useState(400);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Twitter embed sends resize messages
+      if (event.origin !== "https://platform.twitter.com") return;
+      
+      try {
+        const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+        if (data["twttr.embed"]?.id === id && data["twttr.embed"]?.height) {
+          setHeight(data["twttr.embed"].height);
+        }
+      } catch {
+        // ignore parse errors
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [id]);
+
   if (!id) {
     return (
-      <div className="not-prose my-6 overflow-hidden rounded-xl border border-border bg-card/40 p-4">
+      <div className="not-prose my-6 p-4">
         <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80 break-all">
           {url}
         </a>
@@ -137,16 +159,22 @@ const XEmbed = ({ url }: { url: string }) => {
     );
   }
 
-  // Official iframe-based embed (more reliable than widgets.js in many environments)
-  const src = `https://platform.twitter.com/embed/Tweet.html?id=${encodeURIComponent(id)}&theme=dark&dnt=true`;
+  // Official iframe-based embed with maxwidth for better display
+  const src = `https://platform.twitter.com/embed/Tweet.html?id=${encodeURIComponent(id)}&theme=dark&dnt=true&frame=false&hideCard=false&hideThread=false&maxWidth=550`;
 
   return (
-    <div className="not-prose my-6">
+    <div className="not-prose my-6 flex justify-center">
       <iframe
+        ref={iframeRef}
         title="X post"
         src={src}
-        className="w-full min-h-[500px]"
-        style={{ border: 'none', height: 'auto' }}
+        style={{ 
+          border: 'none', 
+          width: '100%',
+          maxWidth: '550px',
+          height: `${height}px`,
+          overflow: 'hidden'
+        }}
         loading="lazy"
         allow="clipboard-write; encrypted-media; picture-in-picture"
         scrolling="no"
