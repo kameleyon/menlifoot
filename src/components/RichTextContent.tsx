@@ -65,6 +65,23 @@ const YouTubeEmbed = ({ url }: { url: string }) => {
   );
 };
 
+const YouTubeIframeEmbed = ({ src }: { src: string }) => {
+  return (
+    <div className="not-prose my-6 overflow-hidden rounded-xl border border-border bg-card/40">
+      <div className="aspect-video w-full">
+        <iframe
+          title="YouTube embed"
+          src={src}
+          className="h-full w-full"
+          loading="lazy"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+        />
+      </div>
+    </div>
+  );
+};
+
 const XEmbed = ({ url }: { url: string }) => {
   useEffect(() => {
     const scriptId = "twitter-widgets";
@@ -122,6 +139,18 @@ const renderNode = (node: ChildNode, key: string): React.ReactNode => {
   const el = node as Element;
   const tag = el.tagName.toLowerCase();
 
+  // Handle TipTap YouTube embeds (div with data-youtube-video)
+  if (tag === "div" && el.hasAttribute("data-youtube-video")) {
+    const iframe = el.querySelector("iframe");
+    if (iframe) {
+      const src = iframe.getAttribute("src") ?? "";
+      if (src.includes("youtube.com/embed") || src.includes("youtube-nocookie.com/embed")) {
+        return <YouTubeIframeEmbed key={key} src={src} />;
+      }
+    }
+  }
+
+  // Detect embed paragraph (single link that's a video URL)
   if (tag === "p") {
     const href = isEmbedParagraph(el);
     if (href) {
@@ -133,6 +162,20 @@ const renderNode = (node: ChildNode, key: string): React.ReactNode => {
   const children = Array.from(el.childNodes)
     .map((child, i) => renderNode(child, `${key}-${i}`))
     .filter(Boolean);
+
+  // Extract style attribute for inline styles (color, background, font-family)
+  const style: React.CSSProperties = {};
+  const inlineStyle = el.getAttribute("style");
+  if (inlineStyle) {
+    const colorMatch = inlineStyle.match(/color:\s*([^;]+)/);
+    if (colorMatch) style.color = colorMatch[1].trim();
+    const bgMatch = inlineStyle.match(/background-color:\s*([^;]+)/);
+    if (bgMatch) style.backgroundColor = bgMatch[1].trim();
+    const fontMatch = inlineStyle.match(/font-family:\s*([^;]+)/);
+    if (fontMatch) style.fontFamily = fontMatch[1].trim();
+  }
+
+  const hasStyle = Object.keys(style).length > 0;
 
   switch (tag) {
     case "p":
@@ -147,29 +190,110 @@ const renderNode = (node: ChildNode, key: string): React.ReactNode => {
     case "h1":
     case "h2":
     case "h3":
+    case "h4":
+    case "h5":
+    case "h6":
     case "code":
     case "pre":
     case "span":
+    case "sup":
+    case "sub":
+    case "mark":
+      return React.createElement(tag, { key, ...(hasStyle ? { style } : {}) }, children);
+    
+    // Task list items
+    case "input": {
+      const type = el.getAttribute("type");
+      if (type === "checkbox") {
+        const checked = el.hasAttribute("checked");
+        return (
+          <input
+            key={key}
+            type="checkbox"
+            checked={checked}
+            readOnly
+            className="mr-2 rounded border-border"
+          />
+        );
+      }
+      return null;
+    }
+    case "label":
+      return <label key={key} className="flex items-start gap-2">{children}</label>;
+    
+    // Tables
+    case "table":
+      return (
+        <table key={key} className="w-full border-collapse my-4">
+          {children}
+        </table>
+      );
+    case "thead":
+    case "tbody":
+    case "tfoot":
       return React.createElement(tag, { key }, children);
+    case "tr":
+      return <tr key={key}>{children}</tr>;
+    case "th":
+      return (
+        <th key={key} className="border border-border p-2 bg-muted/50 font-semibold text-left">
+          {children}
+        </th>
+      );
+    case "td":
+      return (
+        <td key={key} className="border border-border p-2">
+          {children}
+        </td>
+      );
+    case "colgroup":
+    case "col":
+      return null; // Skip column definitions
+    
     case "br":
       return <br key={key} />;
     case "hr":
-      return <hr key={key} />;
+      return <hr key={key} className="my-6 border-border" />;
+    
     case "a": {
       const href = el.getAttribute("href") ?? "";
       if (!isSafeHttpUrl(href)) return <span key={key}>{children}</span>;
       return (
-        <a key={key} href={href} target="_blank" rel="noopener noreferrer">
+        <a key={key} href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">
           {children}
         </a>
       );
     }
+    
     case "img": {
       const src = el.getAttribute("src") ?? "";
       if (!isSafeHttpUrl(src)) return null;
       const alt = el.getAttribute("alt") ?? "";
-      return <img key={key} src={src} alt={alt} loading="lazy" />;
+      return (
+        <img
+          key={key}
+          src={src}
+          alt={alt}
+          loading="lazy"
+          className="max-w-full h-auto rounded-lg my-4"
+        />
+      );
     }
+    
+    case "iframe": {
+      const src = el.getAttribute("src") ?? "";
+      if (src.includes("youtube.com/embed") || src.includes("youtube-nocookie.com/embed")) {
+        return <YouTubeIframeEmbed key={key} src={src} />;
+      }
+      // Block other iframes for security
+      return null;
+    }
+    
+    case "div": {
+      // Pass through divs (may contain embeds, task lists, etc.)
+      return <div key={key}>{children}</div>;
+    }
+    
     default:
       return <React.Fragment key={key}>{children}</React.Fragment>;
   }

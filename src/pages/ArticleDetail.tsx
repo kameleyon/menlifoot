@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import ReactMarkdown from "react-markdown";
+import { RichTextContent } from "@/components/RichTextContent";
 
 interface Article {
   id: string;
@@ -588,9 +588,11 @@ const ArticleDetail = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="prose prose-lg prose-invert max-w-none prose-p:text-foreground prose-headings:text-foreground prose-strong:text-foreground prose-a:text-primary"
           >
-            <ReactMarkdown>{displayArticle?.content || article.content}</ReactMarkdown>
+            <RichTextContent 
+              html={displayArticle?.content || article.content} 
+              className="prose prose-lg prose-invert max-w-none prose-p:text-foreground prose-headings:text-foreground prose-strong:text-foreground prose-a:text-primary"
+            />
           </motion.div>
 
           {/* Keywords - filtered for quality */}
