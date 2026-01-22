@@ -141,13 +141,15 @@ const XEmbed = ({ url }: { url: string }) => {
   const src = `https://platform.twitter.com/embed/Tweet.html?id=${encodeURIComponent(id)}&theme=dark&dnt=true`;
 
   return (
-    <div className="not-prose my-6 overflow-hidden rounded-xl border border-border bg-card/40">
+    <div className="not-prose my-6">
       <iframe
         title="X post"
         src={src}
-        className="w-full h-[560px]"
+        className="w-full min-h-[500px]"
+        style={{ border: 'none', height: 'auto' }}
         loading="lazy"
         allow="clipboard-write; encrypted-media; picture-in-picture"
+        scrolling="no"
       />
     </div>
   );
