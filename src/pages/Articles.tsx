@@ -48,6 +48,8 @@ const CATEGORY_VALUES = [
   "MLS",
   "Tactics",
   "Opinion",
+  "Did You Know?",
+  "Flashback",
 ] as const;
 
 type CategoryValue = (typeof CATEGORY_VALUES)[number];
@@ -65,6 +67,8 @@ const CATEGORY_LABEL_KEYS: Record<CategoryValue, string> = {
   MLS: "articles.cat.mls",
   Tactics: "articles.cat.tactics",
   Opinion: "articles.cat.opinion",
+  "Did You Know?": "articles.cat.didYouKnow",
+  Flashback: "articles.cat.flashback",
 };
 
 const getCategoryLabel = (t: (key: string) => string, category: string) => {

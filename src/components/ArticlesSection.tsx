@@ -48,7 +48,9 @@ const CATEGORIES = [
   'La Liga',
   'Serie A',
   'World Cup',
-  'Analysis'
+  'Analysis',
+  'Did You Know?',
+  'Flashback'
 ];
 
 type SortOption = 'latest' | 'oldest' | 'popular';
