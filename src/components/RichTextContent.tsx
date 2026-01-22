@@ -258,9 +258,12 @@ const renderNode = (node: ChildNode, key: string): React.ReactNode => {
     case "a": {
       const href = el.getAttribute("href") ?? "";
       if (!isSafeHttpUrl(href)) return <span key={key}>{children}</span>;
+      // If link has no visible text content, display the URL itself
+      const hasContent = children.length > 0 && children.some(c => c !== null && c !== '');
+      const displayContent = hasContent ? children : href;
       return (
-        <a key={key} href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">
-          {children}
+        <a key={key} href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80 break-all">
+          {displayContent}
         </a>
       );
     }
