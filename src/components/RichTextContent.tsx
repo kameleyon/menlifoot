@@ -127,7 +127,7 @@ const getTweetId = (rawUrl: string): string | null => {
 
 const XEmbed = ({ url }: { url: string }) => {
   const id = getTweetId(url);
-  const [height, setHeight] = React.useState(700);
+  const [height, setHeight] = React.useState(750);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
