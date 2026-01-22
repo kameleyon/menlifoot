@@ -115,44 +115,40 @@ const YouTubeIframeEmbed = ({ src }: { src: string }) => {
   );
 };
 
+const getTweetId = (rawUrl: string): string | null => {
+  if (!isSafeHttpUrl(rawUrl)) return null;
+  const url = new URL(rawUrl);
+  // supports:
+  // - https://twitter.com/{user}/status/{id}
+  // - https://x.com/{user}/status/{id}
+  const match = url.pathname.match(/\/status\/(\d+)/);
+  return match?.[1] ?? null;
+};
+
 const XEmbed = ({ url }: { url: string }) => {
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  
-  useEffect(() => {
-    const loadTwitterWidget = () => {
-      // @ts-expect-error - injected by widgets.js
-      if (window.twttr?.widgets) {
-        // @ts-expect-error - injected by widgets.js
-        window.twttr.widgets.load(containerRef.current);
-      }
-    };
+  const id = getTweetId(url);
+  if (!id) {
+    return (
+      <div className="not-prose my-6 overflow-hidden rounded-xl border border-border bg-card/40 p-4">
+        <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80 break-all">
+          {url}
+        </a>
+      </div>
+    );
+  }
 
-    const scriptId = "twitter-widgets";
-    const existing = document.getElementById(scriptId) as HTMLScriptElement | null;
-
-    if (existing) {
-      // Script already loaded, just reload widgets
-      setTimeout(loadTwitterWidget, 100);
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.id = scriptId;
-    script.async = true;
-    script.src = "https://platform.twitter.com/widgets.js";
-    script.onload = () => {
-      setTimeout(loadTwitterWidget, 100);
-    };
-    document.body.appendChild(script);
-  }, [url]);
+  // Official iframe-based embed (more reliable than widgets.js in many environments)
+  const src = `https://platform.twitter.com/embed/Tweet.html?id=${encodeURIComponent(id)}&theme=dark&dnt=true`;
 
   return (
-    <div ref={containerRef} className="not-prose my-6 overflow-hidden rounded-xl border border-border bg-card/40 p-4">
-      <blockquote className="twitter-tweet" data-theme="dark">
-        <a href={url} target="_blank" rel="noopener noreferrer">
-          Loading tweet...
-        </a>
-      </blockquote>
+    <div className="not-prose my-6 overflow-hidden rounded-xl border border-border bg-card/40">
+      <iframe
+        title="X post"
+        src={src}
+        className="w-full h-[560px]"
+        loading="lazy"
+        allow="clipboard-write; encrypted-media; picture-in-picture"
+      />
     </div>
   );
 };
