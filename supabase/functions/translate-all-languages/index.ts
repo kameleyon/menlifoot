@@ -82,8 +82,10 @@ ${keywords && keywords.length > 0 ? `Keywords: ${keywords.join(', ')}` : ''}`;
   const data = await response.json();
   const translatedText = data.choices[0].message.content;
   
-  // Parse the JSON response
+  // Parse the JSON response with robust cleanup
   let cleanedText = translatedText.trim();
+  
+  // Remove markdown code blocks
   if (cleanedText.startsWith('```json')) {
     cleanedText = cleanedText.slice(7);
   } else if (cleanedText.startsWith('```')) {
@@ -92,15 +94,69 @@ ${keywords && keywords.length > 0 ? `Keywords: ${keywords.join(', ')}` : ''}`;
   if (cleanedText.endsWith('```')) {
     cleanedText = cleanedText.slice(0, -3);
   }
+  cleanedText = cleanedText.trim();
   
-  const translated = JSON.parse(cleanedText.trim());
+  // Try to extract JSON object if there's extra text
+  const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    cleanedText = jsonMatch[0];
+  }
+  
+  let translated;
+  try {
+    translated = JSON.parse(cleanedText);
+  } catch (parseError) {
+    console.error(`JSON parse error for ${toLanguage}, attempting repair...`);
+    
+    // Try to fix common JSON issues
+    try {
+      // Fix unescaped quotes in content by using a more lenient approach
+      // Extract each field individually using regex
+      const extractField = (fieldName: string, isArray = false): string | string[] | null => {
+        const regex = isArray 
+          ? new RegExp(`"${fieldName}"\\s*:\\s*(\\[.*?\\])`, 's')
+          : new RegExp(`"${fieldName}"\\s*:\\s*("(?:[^"\\\\]|\\\\.)*"|null)`, 's');
+        const match = cleanedText.match(regex);
+        if (match && match[1]) {
+          try {
+            return JSON.parse(match[1]);
+          } catch {
+            return isArray ? [] : match[1].replace(/^"|"$/g, '');
+          }
+        }
+        return null;
+      };
+      
+      // Try to parse with escaped content
+      let repairedText = cleanedText
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t');
+      
+      translated = JSON.parse(repairedText);
+    } catch (repairError) {
+      console.error(`JSON repair failed for ${toLanguage}, using fallback extraction`);
+      
+      // Last resort: extract using simple regex patterns
+      const titleMatch = cleanedText.match(/"title"\s*:\s*"([^"]+)"/);
+      const contentMatch = cleanedText.match(/"content"\s*:\s*"([\s\S]*?)(?:"\s*,\s*"(?:keywords|subtitle|summary)"|"\s*\})/);
+      
+      translated = {
+        title: titleMatch ? titleMatch[1] : title,
+        subtitle: subtitle,
+        summary: summary,
+        content: contentMatch ? contentMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"') : content,
+        keywords: keywords
+      };
+    }
+  }
   
   return {
     title: translated.title || title,
-    subtitle: translated.subtitle || subtitle,
-    summary: translated.summary || summary,
+    subtitle: translated.subtitle ?? subtitle,
+    summary: translated.summary ?? summary,
     content: translated.content || content,
-    keywords: translated.keywords || keywords
+    keywords: Array.isArray(translated.keywords) ? translated.keywords : keywords
   };
 }
 
