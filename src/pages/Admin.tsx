@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { RichTextEditor } from '@/components/RichTextEditor';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -1041,13 +1042,11 @@ const Admin = () => {
 
                     <div className="space-y-2">
                       <Label htmlFor="article-content">Content *</Label>
-                      <Textarea
-                        id="article-content"
-                        value={articleFormData.content}
-                        onChange={(e) => setArticleFormData(prev => ({ ...prev, content: e.target.value }))}
+                      <RichTextEditor
+                        content={articleFormData.content}
+                        onChange={(content) => setArticleFormData(prev => ({ ...prev, content }))}
                         placeholder="Write your article content here..."
-                        rows={8}
-                        required
+                        className="min-h-[250px]"
                       />
                     </div>
 
