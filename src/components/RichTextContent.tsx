@@ -127,18 +127,17 @@ const getTweetId = (rawUrl: string): string | null => {
 
 const XEmbed = ({ url }: { url: string }) => {
   const id = getTweetId(url);
-  const iframeRef = React.useRef<HTMLIFrameElement>(null);
-  const [height, setHeight] = React.useState(400);
+  const [height, setHeight] = React.useState(650);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      // Twitter embed sends resize messages
       if (event.origin !== "https://platform.twitter.com") return;
       
       try {
         const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
-        if (data["twttr.embed"]?.id === id && data["twttr.embed"]?.height) {
-          setHeight(data["twttr.embed"].height);
+        // Accept any Twitter embed height message (removed strict ID check)
+        if (data["twttr.embed"]?.height) {
+          setHeight(Math.max(data["twttr.embed"].height, 400));
         }
       } catch {
         // ignore parse errors
@@ -147,7 +146,7 @@ const XEmbed = ({ url }: { url: string }) => {
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [id]);
+  }, []);
 
   if (!id) {
     return (
@@ -159,13 +158,11 @@ const XEmbed = ({ url }: { url: string }) => {
     );
   }
 
-  // Official iframe-based embed with maxwidth for better display
   const src = `https://platform.twitter.com/embed/Tweet.html?id=${encodeURIComponent(id)}&theme=dark&dnt=true&frame=false&hideCard=false&hideThread=false&maxWidth=550`;
 
   return (
     <div className="not-prose my-6 flex justify-center">
       <iframe
-        ref={iframeRef}
         title="X post"
         src={src}
         style={{ 
