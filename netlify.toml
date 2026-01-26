@@ -1,3 +1,7 @@
 [[edge_functions]]
   function = "bot-proxy"
   path = "/articles/*"
+
+[[edge_functions]]
+  function = "bot-proxy"
+  path = "/share/articles/*"
