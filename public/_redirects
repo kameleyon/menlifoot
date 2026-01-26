@@ -1,5 +1,2 @@
-# Proxy share links to Edge Function for social media previews
-/share/articles/:id  https://tjotexujwnfltszqqovk.supabase.co/functions/v1/article-share?id=:id  200
-
 # Netlify SPA fallback (React Router deep links)
 /*    /index.html   200
