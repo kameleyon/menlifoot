@@ -10,12 +10,18 @@ import SplashIntro from "@/components/SplashIntro";
 import { CartProvider } from "@/contexts/CartContext";
 
 const Index = () => {
-  const [showContent, setShowContent] = useState(false);
+  const hasSeenSplash = sessionStorage.getItem('menlifoot_splash_seen') === 'true';
+  const [showContent, setShowContent] = useState(hasSeenSplash);
 
   return (
     <CartProvider>
       <div className="min-h-screen bg-background overflow-x-hidden">
-        <SplashIntro onComplete={() => setShowContent(true)} />
+        {!hasSeenSplash && (
+          <SplashIntro onComplete={() => {
+            sessionStorage.setItem('menlifoot_splash_seen', 'true');
+            setShowContent(true);
+          }} />
+        )}
         
         {showContent && (
           <>
