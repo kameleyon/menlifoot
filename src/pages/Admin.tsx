@@ -92,12 +92,12 @@ const convertToEmbedUrl = (url: string, platform: string): string => {
     }
   } else if (platform === 'youtube') {
     // Convert YouTube URLs to embed format
-    // https://www.youtube.com/watch?v=xxx -> https://www.youtube.com/embed/xxx
-    // https://youtu.be/xxx -> https://www.youtube.com/embed/xxx
     let videoId = '';
     if (url.includes('youtube.com/watch')) {
       const urlParams = new URL(url).searchParams;
       videoId = urlParams.get('v') || '';
+    } else if (url.includes('youtube.com/shorts/')) {
+      videoId = url.split('youtube.com/shorts/')[1]?.split('?')[0]?.split('/')[0] || '';
     } else if (url.includes('youtu.be/')) {
       videoId = url.split('youtu.be/')[1]?.split('?')[0] || '';
     }
@@ -110,7 +110,7 @@ const convertToEmbedUrl = (url: string, platform: string): string => {
 
 const detectPlatform = (url: string): 'spotify' | 'youtube' | null => {
   if (url.includes('spotify.com')) return 'spotify';
-  if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
+  if (url.includes('youtube.com') || url.includes('youtu.be') || url.includes('youtube.com/shorts')) return 'youtube';
   return null;
 };
 
