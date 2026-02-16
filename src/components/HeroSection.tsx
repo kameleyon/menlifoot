@@ -114,11 +114,11 @@ const HeroSection = () => {
                     const isShort = latestPodcast.original_url?.includes('/shorts/');
                     const embedSrc = autoplay ? `${latestPodcast.embed_url}${latestPodcast.embed_url.includes('?') ? '&' : '?'}autoplay=1` : latestPodcast.embed_url;
                     return isShort ? (
-                      <div className="relative w-full overflow-hidden rounded-xl" style={{ paddingBottom: '56.25%' }}>
+                      <div className="relative w-full overflow-hidden rounded-xl bg-background" style={{ paddingBottom: '56.25%' }}>
                         <iframe
                           src={embedSrc}
-                          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-xl"
-                          style={{ width: '100%', height: '177%' }}
+                          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 border-0"
+                          style={{ width: '56.25%', height: '100%' }}
                           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                           allowFullScreen
                           loading="lazy"
