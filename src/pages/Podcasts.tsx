@@ -14,6 +14,7 @@ interface Podcast {
   description: string | null;
   platform: string;
   embed_url: string;
+  original_url: string;
   episode_number: number | null;
   duration: string | null;
   published_at: string | null;
@@ -157,25 +158,30 @@ const Podcasts = () => {
                     </div>
 
                     {/* Embed Player */}
-                    <div className="aspect-video rounded-lg overflow-hidden bg-surface">
-                      {selectedPodcast.platform === 'youtube' ? (
-                        <iframe
-                          src={selectedPodcast.embed_url}
-                          title={selectedPodcast.title}
-                          className="w-full h-full"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                        />
-                      ) : (
-                        <iframe
-                          src={selectedPodcast.embed_url}
-                          title={selectedPodcast.title}
-                          className="w-full h-full"
-                          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                          loading="lazy"
-                        />
-                      )}
-                    </div>
+                    {(() => {
+                      const isShort = selectedPodcast.original_url?.includes('/shorts/') || false;
+                      return (
+                        <div className={`${isShort ? 'aspect-[9/16] max-w-[320px] mx-auto' : 'aspect-video'} rounded-lg overflow-hidden bg-surface`}>
+                          {selectedPodcast.platform === 'youtube' ? (
+                            <iframe
+                              src={selectedPodcast.embed_url}
+                              title={selectedPodcast.title}
+                              className="w-full h-full"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                            />
+                          ) : (
+                            <iframe
+                              src={selectedPodcast.embed_url}
+                              title={selectedPodcast.title}
+                              className="w-full h-full"
+                              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                              loading="lazy"
+                            />
+                          )}
+                        </div>
+                      );
+                    })()}
                   </motion.div>
                 )}
               </div>
