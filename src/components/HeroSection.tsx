@@ -110,16 +110,24 @@ const HeroSection = () => {
                     title={latestPodcast.title}
                   />
                 ) : latestPodcast.platform === 'youtube' ? (
-                  <iframe
-                    src={autoplay ? `${latestPodcast.embed_url}${latestPodcast.embed_url.includes('?') ? '&' : '?'}autoplay=1` : latestPodcast.embed_url}
-                    width="100%"
-                    height="152"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                    loading="lazy"
-                    className="rounded-xl"
-                    title={latestPodcast.title}
-                  />
+                  (() => {
+                    const isShort = latestPodcast.original_url?.includes('/shorts/');
+                    const embedSrc = autoplay ? `${latestPodcast.embed_url}${latestPodcast.embed_url.includes('?') ? '&' : '?'}autoplay=1` : latestPodcast.embed_url;
+                    return (
+                      <div className={`${isShort ? 'aspect-[9/16] max-w-[200px]' : 'aspect-video'} rounded-xl overflow-hidden`}>
+                        <iframe
+                          src={embedSrc}
+                          width="100%"
+                          height="100%"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                          loading="lazy"
+                          className="rounded-xl"
+                          title={latestPodcast.title}
+                        />
+                      </div>
+                    );
+                  })()
                 ) : null}
               </motion.div>
             )}
