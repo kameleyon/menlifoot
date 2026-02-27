@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Trophy } from "lucide-react";
+import { ArrowLeft, Trophy, Share2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import QuizGame from "@/components/QuizGame";
 import Navbar from "@/components/Navbar";
 
@@ -29,6 +30,7 @@ const QuizPlay = () => {
   const { id } = useParams<{ id: string }>();
   const { t, language } = useLanguage();
   const { user } = useAuth();
+  const { toast } = useToast();
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [displayTitle, setDisplayTitle] = useState("");
   const [displayDescription, setDisplayDescription] = useState<string | null>(null);
@@ -93,6 +95,28 @@ const QuizPlay = () => {
     setGameState("start");
   };
 
+  const quizUrl = `${window.location.origin}/quizzes/${id}`;
+
+  const shareQuiz = async () => {
+    const text = displayTitle;
+    if (navigator.share) {
+      try { await navigator.share({ title: text, url: quizUrl }); } catch {}
+    } else {
+      await navigator.clipboard.writeText(quizUrl);
+      toast({ title: t('quiz.linkCopied') || 'Link copied!', duration: 2000 });
+    }
+  };
+
+  const shareScore = async () => {
+    const text = `⚽ ${displayTitle}\n🏆 ${score}/${items.length} — ${Math.floor(timeTaken / 60)}:${(timeTaken % 60).toString().padStart(2, '0')}\n${t('quiz.shareChallenge') || 'Can you beat my score?'}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: displayTitle, text, url: quizUrl }); } catch {}
+    } else {
+      await navigator.clipboard.writeText(`${text}\n${quizUrl}`);
+      toast({ title: t('quiz.linkCopied') || 'Link copied!', duration: 2000 });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -146,9 +170,15 @@ const QuizPlay = () => {
               <span>⏱ {Math.floor(quiz.time_limit_seconds / 60)}:{(quiz.time_limit_seconds % 60).toString().padStart(2, '0')} {t('quiz.minutes') || 'minutes'}</span>
               <span>📝 {items.length} {t('quiz.answers') || 'answers'}</span>
             </div>
-            <Button variant="gold" size="lg" onClick={() => setGameState("playing")}>
-              {t('quiz.startQuiz') || 'Start Quiz'}
-            </Button>
+            <div className="flex items-center justify-center gap-3">
+              <Button variant="gold" size="lg" onClick={() => setGameState("playing")}>
+                {t('quiz.startQuiz') || 'Start Quiz'}
+              </Button>
+              <Button variant="outline" size="lg" onClick={shareQuiz} className="gap-2">
+                <Share2 className="h-4 w-4" />
+                {t('quiz.share') || 'Share'}
+              </Button>
+            </div>
           </motion.div>
         )}
 
@@ -205,8 +235,12 @@ const QuizPlay = () => {
               </table>
             </div>
 
-            <div className="flex items-center justify-center gap-4">
-              <Button variant="gold" onClick={handleRestart}>
+            <div className="flex items-center justify-center gap-4 flex-wrap">
+              <Button variant="gold" onClick={shareScore} className="gap-2">
+                <Share2 className="h-4 w-4" />
+                {t('quiz.shareScore') || 'Share Score'}
+              </Button>
+              <Button variant="outline" onClick={handleRestart}>
                 {t('quiz.playAgain') || 'Play Again'}
               </Button>
               <Link to="/quizzes">
