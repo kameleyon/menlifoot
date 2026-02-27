@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Plus, Trash2, Edit2, ChevronDown, ChevronUp, Upload, FileText } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Plus, Trash2, Edit2, ChevronDown, ChevronUp, Upload, X, Image, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,14 +12,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
 
 interface Quiz {
   id: string;
@@ -41,41 +34,46 @@ interface QuizItem {
   sort_order: number;
 }
 
+interface InlineItem {
+  key: string; // local key for React
+  display_value: string;
+  answer: string;
+  acceptable_answers: string;
+  hint: string;
+}
+
+const createEmptyItem = (): InlineItem => ({
+  key: crypto.randomUUID(),
+  display_value: "",
+  answer: "",
+  acceptable_answers: "",
+  hint: "",
+});
+
 const QuizAdmin = ({ userId }: { userId: string | undefined }) => {
   const { toast } = useToast();
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
-  const [isQuizDialogOpen, setIsQuizDialogOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
-  const [expandedQuizId, setExpandedQuizId] = useState<string | null>(null);
-  const [quizItems, setQuizItems] = useState<Record<string, QuizItem[]>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Quiz form
-  const [quizForm, setQuizForm] = useState({
-    title: "",
-    description: "",
-    thumbnail_url: "",
-    time_limit_seconds: 300,
-    is_published: false,
-  });
+  // All-in-one form state
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [thumbnailUrl, setThumbnailUrl] = useState("");
+  const [timeLimit, setTimeLimit] = useState(300);
+  const [isPublished, setIsPublished] = useState(false);
+  const [items, setItems] = useState<InlineItem[]>([createEmptyItem()]);
 
-  // Single item form
-  const [isItemDialogOpen, setIsItemDialogOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<QuizItem | null>(null);
-  const [itemFormQuizId, setItemFormQuizId] = useState<string>("");
-  const [itemForm, setItemForm] = useState({
-    answer: "",
-    acceptable_answers: "",
-    hint: "",
-    display_value: "",
-    sort_order: 0,
-  });
-
-  // Bulk import
-  const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false);
-  const [bulkQuizId, setBulkQuizId] = useState<string>("");
+  // Bulk paste
+  const [showBulkPaste, setShowBulkPaste] = useState(false);
   const [bulkText, setBulkText] = useState("");
-  const [bulkParsed, setBulkParsed] = useState<{ display_value: string; answer: string; acceptable: string }[]>([]);
+
+  // Expand quiz in list to see existing items
+  const [expandedQuizId, setExpandedQuizId] = useState<string | null>(null);
+  const [existingItems, setExistingItems] = useState<Record<string, QuizItem[]>>({});
 
   useEffect(() => {
     fetchQuizzes();
@@ -96,59 +94,193 @@ const QuizAdmin = ({ userId }: { userId: string | undefined }) => {
       .eq("quiz_id", quizId)
       .order("sort_order");
     if (!error) {
-      setQuizItems((prev) => ({ ...prev, [quizId]: data || [] }));
+      setExistingItems((prev) => ({ ...prev, [quizId]: data || [] }));
     }
   };
 
-  const handleToggleExpand = (quizId: string) => {
-    if (expandedQuizId === quizId) {
-      setExpandedQuizId(null);
-    } else {
-      setExpandedQuizId(quizId);
-      if (!quizItems[quizId]) fetchQuizItems(quizId);
-    }
+  const resetForm = () => {
+    setTitle("");
+    setDescription("");
+    setThumbnailUrl("");
+    setTimeLimit(300);
+    setIsPublished(false);
+    setItems([createEmptyItem()]);
+    setShowBulkPaste(false);
+    setBulkText("");
+    setEditingQuiz(null);
   };
 
-  const resetQuizForm = () => {
-    setQuizForm({ title: "", description: "", thumbnail_url: "", time_limit_seconds: 300, is_published: false });
+  const openNewQuiz = () => {
+    resetForm();
+    setIsFormOpen(true);
   };
 
-  const handleEditQuiz = (quiz: Quiz) => {
+  const openEditQuiz = async (quiz: Quiz) => {
     setEditingQuiz(quiz);
-    setQuizForm({
-      title: quiz.title,
-      description: quiz.description || "",
-      thumbnail_url: quiz.thumbnail_url || "",
-      time_limit_seconds: quiz.time_limit_seconds,
-      is_published: quiz.is_published,
-    });
-    setIsQuizDialogOpen(true);
+    setTitle(quiz.title);
+    setDescription(quiz.description || "");
+    setThumbnailUrl(quiz.thumbnail_url || "");
+    setTimeLimit(quiz.time_limit_seconds);
+    setIsPublished(quiz.is_published);
+    setShowBulkPaste(false);
+    setBulkText("");
+
+    // Load existing items into inline form
+    const { data } = await supabase
+      .from("quiz_items")
+      .select("*")
+      .eq("quiz_id", quiz.id)
+      .order("sort_order");
+
+    if (data && data.length > 0) {
+      setItems(
+        data.map((item) => ({
+          key: item.id,
+          display_value: item.display_value || "",
+          answer: item.answer,
+          acceptable_answers: (item.acceptable_answers || []).join(", "),
+          hint: item.hint || "",
+        }))
+      );
+    } else {
+      setItems([createEmptyItem()]);
+    }
+
+    setIsFormOpen(true);
   };
 
-  const handleQuizSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Thumbnail upload
+  const handleThumbnailUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    const ext = file.name.split(".").pop();
+    const path = `quiz-thumbnails/${Date.now()}.${ext}`;
+
+    const { error } = await supabase.storage.from("article-images").upload(path, file);
+    if (error) {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+      setUploading(false);
+      return;
+    }
+    const { data: urlData } = supabase.storage.from("article-images").getPublicUrl(path);
+    setThumbnailUrl(urlData.publicUrl);
+    setUploading(false);
+  };
+
+  // Inline item management
+  const addItem = () => {
+    setItems((prev) => [...prev, createEmptyItem()]);
+  };
+
+  const removeItem = (key: string) => {
+    setItems((prev) => prev.filter((i) => i.key !== key));
+  };
+
+  const updateItem = (key: string, field: keyof InlineItem, value: string) => {
+    setItems((prev) =>
+      prev.map((i) => (i.key === key ? { ...i, [field]: value } : i))
+    );
+  };
+
+  // Bulk paste
+  const handleBulkPaste = () => {
+    const lines = bulkText.split("\n").filter((l) => l.trim());
+    const newItems: InlineItem[] = lines.map((line) => {
+      const parts = line.includes("\t")
+        ? line.split("\t").map((s) => s.trim())
+        : line.split(",").map((s) => s.trim());
+
+      return {
+        key: crypto.randomUUID(),
+        display_value: parts.length >= 2 ? parts[0] : "",
+        answer: parts.length >= 2 ? parts[1] : parts[0],
+        acceptable_answers: parts.length >= 3 ? parts.slice(2).join(", ") : "",
+        hint: "",
+      };
+    });
+
+    // Replace empty single row or append
+    if (items.length === 1 && !items[0].answer) {
+      setItems(newItems);
+    } else {
+      setItems((prev) => [...prev, ...newItems]);
+    }
+    setBulkText("");
+    setShowBulkPaste(false);
+    toast({ title: `${newItems.length} items added` });
+  };
+
+  // Submit
+  const handleSubmit = async () => {
+    if (!title.trim()) {
+      toast({ title: "Title is required", variant: "destructive" });
+      return;
+    }
+
+    const validItems = items.filter((i) => i.answer.trim());
+    if (validItems.length === 0) {
+      toast({ title: "Add at least one answer", variant: "destructive" });
+      return;
+    }
+
     setIsLoading(true);
-    const data = {
-      title: quizForm.title,
-      description: quizForm.description || null,
-      thumbnail_url: quizForm.thumbnail_url || null,
-      time_limit_seconds: quizForm.time_limit_seconds,
-      is_published: quizForm.is_published,
-      created_by: userId || null,
-    };
+
     try {
+      const quizData = {
+        title: title.trim(),
+        description: description.trim() || null,
+        thumbnail_url: thumbnailUrl || null,
+        time_limit_seconds: timeLimit,
+        is_published: isPublished,
+        created_by: userId || null,
+      };
+
+      let quizId: string;
+
       if (editingQuiz) {
-        const { error } = await supabase.from("quizzes").update(data).eq("id", editingQuiz.id);
+        const { error } = await supabase.from("quizzes").update(quizData).eq("id", editingQuiz.id);
         if (error) throw error;
-        toast({ title: "Success", description: "Quiz updated!" });
+        quizId = editingQuiz.id;
+
+        // Delete old items and re-insert
+        await supabase.from("quiz_items").delete().eq("quiz_id", quizId);
       } else {
-        const { error } = await supabase.from("quizzes").insert([data]);
+        const { data, error } = await supabase.from("quizzes").insert([quizData]).select("id").single();
         if (error) throw error;
-        toast({ title: "Success", description: "Quiz created!" });
+        quizId = data.id;
       }
-      setIsQuizDialogOpen(false);
-      setEditingQuiz(null);
-      resetQuizForm();
+
+      // Insert all items
+      const itemsData = validItems.map((item, idx) => {
+        const acceptableArr = item.acceptable_answers
+          .split(",")
+          .map((s) => s.trim())
+          .flatMap((a) => a.split("|").map((s) => s.trim()))
+          .filter(Boolean);
+
+        return {
+          quiz_id: quizId,
+          answer: item.answer.trim(),
+          display_value: item.display_value.trim() || null,
+          acceptable_answers: acceptableArr.length > 0 ? acceptableArr : null,
+          hint: item.hint.trim() || null,
+          sort_order: idx + 1,
+        };
+      });
+
+      const { error: itemsError } = await supabase.from("quiz_items").insert(itemsData);
+      if (itemsError) throw itemsError;
+
+      toast({
+        title: "Success",
+        description: editingQuiz
+          ? `Quiz updated with ${validItems.length} items`
+          : `Quiz created with ${validItems.length} items`,
+      });
+
+      setIsFormOpen(false);
+      resetForm();
       fetchQuizzes();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -163,7 +295,7 @@ const QuizAdmin = ({ userId }: { userId: string | undefined }) => {
     if (error) {
       toast({ title: "Error", description: "Failed to delete quiz.", variant: "destructive" });
     } else {
-      toast({ title: "Deleted", description: "Quiz removed." });
+      toast({ title: "Deleted" });
       fetchQuizzes();
     }
   };
@@ -176,292 +308,233 @@ const QuizAdmin = ({ userId }: { userId: string | undefined }) => {
     if (!error) fetchQuizzes();
   };
 
-  // Single item
-  const resetItemForm = () => {
-    setItemForm({ answer: "", acceptable_answers: "", hint: "", display_value: "", sort_order: 0 });
-  };
-
-  const openAddItem = (quizId: string) => {
-    setItemFormQuizId(quizId);
-    setEditingItem(null);
-    const items = quizItems[quizId] || [];
-    setItemForm({ answer: "", acceptable_answers: "", hint: "", display_value: "", sort_order: items.length + 1 });
-    setIsItemDialogOpen(true);
-  };
-
-  const openEditItem = (item: QuizItem) => {
-    setItemFormQuizId(item.quiz_id);
-    setEditingItem(item);
-    setItemForm({
-      answer: item.answer,
-      acceptable_answers: (item.acceptable_answers || []).join(", "),
-      hint: item.hint || "",
-      display_value: item.display_value || "",
-      sort_order: item.sort_order,
-    });
-    setIsItemDialogOpen(true);
-  };
-
-  const handleItemSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    const acceptableArr = itemForm.acceptable_answers.split(",").map((s) => s.trim()).filter(Boolean);
-    const data = {
-      quiz_id: itemFormQuizId,
-      answer: itemForm.answer,
-      acceptable_answers: acceptableArr.length > 0 ? acceptableArr : null,
-      hint: itemForm.hint || null,
-      display_value: itemForm.display_value || null,
-      sort_order: itemForm.sort_order,
-    };
-    try {
-      if (editingItem) {
-        const { error } = await supabase.from("quiz_items").update(data).eq("id", editingItem.id);
-        if (error) throw error;
-        toast({ title: "Success", description: "Item updated!" });
-      } else {
-        const { error } = await supabase.from("quiz_items").insert([data]);
-        if (error) throw error;
-        toast({ title: "Success", description: "Item added!" });
-      }
-      setIsItemDialogOpen(false);
-      setEditingItem(null);
-      resetItemForm();
-      fetchQuizItems(itemFormQuizId);
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleDeleteItem = async (item: QuizItem) => {
-    if (!confirm("Delete this item?")) return;
-    const { error } = await supabase.from("quiz_items").delete().eq("id", item.id);
-    if (!error) {
-      toast({ title: "Deleted" });
-      fetchQuizItems(item.quiz_id);
-    }
-  };
-
-  // Bulk import
-  const openBulkImport = (quizId: string) => {
-    setBulkQuizId(quizId);
-    setBulkText("");
-    setBulkParsed([]);
-    setIsBulkDialogOpen(true);
-  };
-
-  const parseBulkText = (text: string) => {
-    setBulkText(text);
-    const lines = text.split("\n").filter((l) => l.trim());
-    const parsed = lines.map((line) => {
-      // Support formats:
-      // "85, Cristiano Ronaldo" or "85, Cristiano Ronaldo, CR7|Ronaldo"
-      // or tab-separated: "85\tCristiano Ronaldo"
-      const parts = line.includes("\t")
-        ? line.split("\t").map((s) => s.trim())
-        : line.split(",").map((s) => s.trim());
-
-      if (parts.length >= 3) {
-        return { display_value: parts[0], answer: parts[1], acceptable: parts.slice(2).join(", ") };
-      } else if (parts.length === 2) {
-        return { display_value: parts[0], answer: parts[1], acceptable: "" };
-      } else {
-        return { display_value: "", answer: parts[0], acceptable: "" };
-      }
-    });
-    setBulkParsed(parsed);
-  };
-
-  const handleBulkImport = async () => {
-    if (bulkParsed.length === 0) return;
-    setIsLoading(true);
-    const existingItems = quizItems[bulkQuizId] || [];
-    const startOrder = existingItems.length;
-
-    const items = bulkParsed.map((p, idx) => {
-      const acceptableArr = p.acceptable.split(",").map((s) => s.trim()).filter(Boolean);
-      // Also split by | for alternatives
-      const finalAcceptable = acceptableArr.flatMap((a) => a.split("|").map((s) => s.trim())).filter(Boolean);
-      return {
-        quiz_id: bulkQuizId,
-        answer: p.answer,
-        display_value: p.display_value || null,
-        acceptable_answers: finalAcceptable.length > 0 ? finalAcceptable : null,
-        hint: null,
-        sort_order: startOrder + idx + 1,
-      };
-    });
-
-    try {
-      const { error } = await supabase.from("quiz_items").insert(items);
-      if (error) throw error;
-      toast({ title: "Success", description: `${items.length} items imported!` });
-      setIsBulkDialogOpen(false);
-      fetchQuizItems(bulkQuizId);
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } finally {
-      setIsLoading(false);
+  const handleToggleExpand = (quizId: string) => {
+    if (expandedQuizId === quizId) {
+      setExpandedQuizId(null);
+    } else {
+      setExpandedQuizId(quizId);
+      if (!existingItems[quizId]) fetchQuizItems(quizId);
     }
   };
 
   return (
     <div>
-      {/* Quiz Dialog */}
-      <Dialog
-        open={isQuizDialogOpen}
-        onOpenChange={(open) => {
-          setIsQuizDialogOpen(open);
-          if (!open) { setEditingQuiz(null); resetQuizForm(); }
-        }}
-      >
-        <DialogTrigger asChild>
-          <Button variant="gold" className="mb-6">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Quiz
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{editingQuiz ? "Edit Quiz" : "New Quiz"}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleQuizSubmit} className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <Label>Title *</Label>
-              <Input value={quizForm.title} onChange={(e) => setQuizForm((p) => ({ ...p, title: e.target.value }))} required />
-            </div>
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Textarea value={quizForm.description} onChange={(e) => setQuizForm((p) => ({ ...p, description: e.target.value }))} rows={3} />
-            </div>
-            <div className="space-y-2">
-              <Label>Thumbnail URL</Label>
-              <Input value={quizForm.thumbnail_url} onChange={(e) => setQuizForm((p) => ({ ...p, thumbnail_url: e.target.value }))} />
-            </div>
-            <div className="space-y-2">
-              <Label>Time Limit (seconds)</Label>
-              <Input type="number" value={quizForm.time_limit_seconds} onChange={(e) => setQuizForm((p) => ({ ...p, time_limit_seconds: parseInt(e.target.value) || 300 }))} />
-            </div>
-            <div className="flex items-center gap-3">
-              <Switch checked={quizForm.is_published} onCheckedChange={(v) => setQuizForm((p) => ({ ...p, is_published: v }))} />
-              <Label>Published</Label>
-            </div>
-            <Button type="submit" variant="gold" className="w-full" disabled={isLoading}>
-              {isLoading ? "Saving..." : editingQuiz ? "Update Quiz" : "Create Quiz"}
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <Button variant="gold" className="mb-6" onClick={openNewQuiz}>
+        <Plus className="h-4 w-4 mr-2" />
+        Create Quiz
+      </Button>
 
-      {/* Single Item Dialog */}
-      <Dialog
-        open={isItemDialogOpen}
-        onOpenChange={(open) => {
-          setIsItemDialogOpen(open);
-          if (!open) { setEditingItem(null); resetItemForm(); }
-        }}
-      >
-        <DialogContent className="sm:max-w-lg">
+      {/* Full-page quiz editor dialog */}
+      <Dialog open={isFormOpen} onOpenChange={(open) => { if (!open) { setIsFormOpen(false); resetForm(); } }}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingItem ? "Edit Item" : "Add Item"}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleItemSubmit} className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <Label>Answer *</Label>
-              <Input value={itemForm.answer} onChange={(e) => setItemForm((p) => ({ ...p, answer: e.target.value }))} placeholder="e.g. Cristiano Ronaldo" required />
-            </div>
-            <div className="space-y-2">
-              <Label>Acceptable Answers (comma-separated)</Label>
-              <Input value={itemForm.acceptable_answers} onChange={(e) => setItemForm((p) => ({ ...p, acceptable_answers: e.target.value }))} placeholder="e.g. CR7, Ronaldo" />
-            </div>
-            <div className="space-y-2">
-              <Label>Display Value (e.g. stat number)</Label>
-              <Input value={itemForm.display_value} onChange={(e) => setItemForm((p) => ({ ...p, display_value: e.target.value }))} placeholder="e.g. 85" />
-            </div>
-            <div className="space-y-2">
-              <Label>Hint</Label>
-              <Input value={itemForm.hint} onChange={(e) => setItemForm((p) => ({ ...p, hint: e.target.value }))} placeholder="Optional hint for logged-in users" />
-            </div>
-            <div className="space-y-2">
-              <Label>Sort Order</Label>
-              <Input type="number" value={itemForm.sort_order} onChange={(e) => setItemForm((p) => ({ ...p, sort_order: parseInt(e.target.value) || 0 }))} />
-            </div>
-            <Button type="submit" variant="gold" className="w-full" disabled={isLoading}>
-              {isLoading ? "Saving..." : editingItem ? "Update Item" : "Add Item"}
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Bulk Import Dialog */}
-      <Dialog open={isBulkDialogOpen} onOpenChange={setIsBulkDialogOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5" />
-              Bulk Import Items
+            <DialogTitle className="text-xl">
+              {editingQuiz ? "Edit Quiz" : "Create New Quiz"}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 mt-4">
+
+          <div className="space-y-6 mt-4">
+            {/* Title / Question */}
             <div className="space-y-2">
-              <Label>Paste your data (one item per line)</Label>
-              <p className="text-xs text-muted-foreground">
-                Format: <code className="bg-muted px-1.5 py-0.5 rounded text-primary">value, answer</code> or <code className="bg-muted px-1.5 py-0.5 rounded text-primary">value, answer, alt1|alt2</code>
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Example for CL appearances quiz:
-              </p>
-              <pre className="text-xs bg-muted rounded-lg p-3 text-foreground overflow-x-auto">
-{`85, Cristiano Ronaldo, CR7|Ronaldo
-77, Lionel Messi, Messi|Leo Messi
-76, Thomas Muller, Müller|Mueller`}
-              </pre>
-              <Textarea
-                value={bulkText}
-                onChange={(e) => parseBulkText(e.target.value)}
-                rows={10}
-                placeholder="Paste your data here..."
-                className="font-mono text-sm"
+              <Label className="text-base font-semibold">Quiz Question / Title *</Label>
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. Can you name the 20 players with the most CL knockout appearances?"
+                className="text-base"
               />
             </div>
 
-            {bulkParsed.length > 0 && (
+            {/* Description */}
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Optional description or rules..."
+                rows={2}
+              />
+            </div>
+
+            {/* Thumbnail */}
+            <div className="space-y-2">
+              <Label>Thumbnail Image</Label>
+              <div className="flex items-center gap-3">
+                {thumbnailUrl ? (
+                  <div className="relative w-32 h-20 rounded-lg overflow-hidden border border-border">
+                    <img src={thumbnailUrl} alt="Thumbnail" className="w-full h-full object-cover" />
+                    <button
+                      onClick={() => setThumbnailUrl("")}
+                      className="absolute top-1 right-1 bg-background/80 rounded-full p-0.5"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-32 h-20 rounded-lg border-2 border-dashed border-border hover:border-primary/50 flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-primary transition-colors"
+                    disabled={uploading}
+                  >
+                    <Image className="h-5 w-5" />
+                    <span className="text-xs">{uploading ? "Uploading..." : "Upload"}</span>
+                  </button>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleThumbnailUpload}
+                />
+                <span className="text-xs text-muted-foreground">or paste URL:</span>
+                <Input
+                  value={thumbnailUrl}
+                  onChange={(e) => setThumbnailUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="flex-1"
+                />
+              </div>
+            </div>
+
+            {/* Timer */}
+            <div className="flex items-center gap-4">
               <div className="space-y-2">
-                <Label>Preview ({bulkParsed.length} items)</Label>
-                <div className="border border-border rounded-lg overflow-hidden max-h-60 overflow-y-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted sticky top-0">
-                      <tr>
-                        <th className="px-3 py-2 text-left text-muted-foreground font-medium">#</th>
-                        <th className="px-3 py-2 text-left text-muted-foreground font-medium">Value</th>
-                        <th className="px-3 py-2 text-left text-muted-foreground font-medium">Answer</th>
-                        <th className="px-3 py-2 text-left text-muted-foreground font-medium">Alternatives</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {bulkParsed.map((row, idx) => (
-                        <tr key={idx} className="border-t border-border/30">
-                          <td className="px-3 py-1.5 text-muted-foreground">{idx + 1}</td>
-                          <td className="px-3 py-1.5 font-medium text-primary">{row.display_value || "—"}</td>
-                          <td className="px-3 py-1.5 text-foreground">{row.answer}</td>
-                          <td className="px-3 py-1.5 text-muted-foreground text-xs">{row.acceptable || "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <Label>Timer (minutes)</Label>
+                <Input
+                  type="number"
+                  value={Math.floor(timeLimit / 60)}
+                  onChange={(e) => setTimeLimit((parseInt(e.target.value) || 5) * 60)}
+                  className="w-24"
+                  min={1}
+                  max={30}
+                />
+              </div>
+              <div className="flex items-center gap-3 pt-6">
+                <Switch checked={isPublished} onCheckedChange={setIsPublished} />
+                <Label>Publish immediately</Label>
+              </div>
+            </div>
+
+            {/* Answers Section */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-semibold">
+                  Answers ({items.filter((i) => i.answer.trim()).length} items)
+                </Label>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowBulkPaste(!showBulkPaste)}
+                  >
+                    <Upload className="h-3 w-3 mr-1" />
+                    Bulk Paste
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={addItem}>
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add Row
+                  </Button>
                 </div>
               </div>
-            )}
 
+              {/* Bulk paste area */}
+              {showBulkPaste && (
+                <div className="bg-muted/30 rounded-lg p-4 space-y-3 border border-border/50">
+                  <p className="text-xs text-muted-foreground">
+                    Paste one item per line: <code className="bg-muted px-1 py-0.5 rounded text-primary">value, answer, alt1|alt2</code>
+                  </p>
+                  <pre className="text-xs bg-muted rounded p-2 text-foreground">
+{`85, Cristiano Ronaldo, CR7|Ronaldo
+77, Lionel Messi, Messi|Leo Messi`}
+                  </pre>
+                  <Textarea
+                    value={bulkText}
+                    onChange={(e) => setBulkText(e.target.value)}
+                    rows={6}
+                    placeholder="Paste your data here..."
+                    className="font-mono text-sm"
+                  />
+                  <Button variant="gold" size="sm" onClick={handleBulkPaste} disabled={!bulkText.trim()}>
+                    Add to List
+                  </Button>
+                </div>
+              )}
+
+              {/* Header row */}
+              <div className="grid grid-cols-[50px_80px_1fr_1fr_1fr_40px] gap-2 text-xs text-muted-foreground font-medium px-1">
+                <span>#</span>
+                <span>Value</span>
+                <span>Answer *</span>
+                <span>Alternatives</span>
+                <span>Hint</span>
+                <span></span>
+              </div>
+
+              {/* Item rows */}
+              <div className="space-y-1.5 max-h-[40vh] overflow-y-auto pr-1">
+                {items.map((item, idx) => (
+                  <div
+                    key={item.key}
+                    className="grid grid-cols-[50px_80px_1fr_1fr_1fr_40px] gap-2 items-center"
+                  >
+                    <span className="text-sm text-muted-foreground text-center font-medium">
+                      {idx + 1}
+                    </span>
+                    <Input
+                      value={item.display_value}
+                      onChange={(e) => updateItem(item.key, "display_value", e.target.value)}
+                      placeholder="85"
+                      className="h-9 text-sm"
+                    />
+                    <Input
+                      value={item.answer}
+                      onChange={(e) => updateItem(item.key, "answer", e.target.value)}
+                      placeholder="Cristiano Ronaldo"
+                      className="h-9 text-sm"
+                    />
+                    <Input
+                      value={item.acceptable_answers}
+                      onChange={(e) => updateItem(item.key, "acceptable_answers", e.target.value)}
+                      placeholder="CR7, Ronaldo"
+                      className="h-9 text-sm"
+                    />
+                    <Input
+                      value={item.hint}
+                      onChange={(e) => updateItem(item.key, "hint", e.target.value)}
+                      placeholder="Hint..."
+                      className="h-9 text-sm"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive"
+                      onClick={() => removeItem(item.key)}
+                      disabled={items.length === 1}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              <Button variant="outline" size="sm" onClick={addItem} className="w-full border-dashed">
+                <Plus className="h-3 w-3 mr-1" /> Add Another Row
+              </Button>
+            </div>
+
+            {/* Submit */}
             <Button
               variant="gold"
-              className="w-full"
-              disabled={isLoading || bulkParsed.length === 0}
-              onClick={handleBulkImport}
+              className="w-full text-base h-12"
+              onClick={handleSubmit}
+              disabled={isLoading}
             >
-              {isLoading ? "Importing..." : `Import ${bulkParsed.length} Items`}
+              {isLoading
+                ? "Saving..."
+                : editingQuiz
+                ? `Update Quiz (${items.filter((i) => i.answer.trim()).length} items)`
+                : `Create Quiz (${items.filter((i) => i.answer.trim()).length} items)`}
             </Button>
           </div>
         </DialogContent>
@@ -475,6 +548,9 @@ const QuizAdmin = ({ userId }: { userId: string | undefined }) => {
         {quizzes.map((quiz) => (
           <div key={quiz.id} className="glass-card rounded-xl overflow-hidden">
             <div className="flex items-center gap-3 p-4">
+              {quiz.thumbnail_url && (
+                <img src={quiz.thumbnail_url} alt="" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+              )}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <h3 className="font-semibold text-foreground truncate">{quiz.title}</h3>
@@ -485,12 +561,15 @@ const QuizAdmin = ({ userId }: { userId: string | undefined }) => {
                 {quiz.description && (
                   <p className="text-sm text-muted-foreground truncate">{quiz.description}</p>
                 )}
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  ⏱ {Math.floor(quiz.time_limit_seconds / 60)} min
+                </p>
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 <Button variant="ghost" size="icon" onClick={() => handleTogglePublish(quiz)} className="h-8 w-8">
                   <Switch checked={quiz.is_published} className="pointer-events-none" />
                 </Button>
-                <Button variant="ghost" size="icon" onClick={() => handleEditQuiz(quiz)} className="h-8 w-8">
+                <Button variant="ghost" size="icon" onClick={() => openEditQuiz(quiz)} className="h-8 w-8">
                   <Edit2 className="h-4 w-4" />
                 </Button>
                 <Button variant="ghost" size="icon" onClick={() => handleDeleteQuiz(quiz.id)} className="h-8 w-8 text-destructive">
@@ -502,37 +581,26 @@ const QuizAdmin = ({ userId }: { userId: string | undefined }) => {
               </div>
             </div>
 
-            {/* Expanded items */}
             {expandedQuizId === quiz.id && (
               <div className="border-t border-border/30 p-4 bg-muted/10">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-medium text-muted-foreground">Quiz Items ({quizItems[quiz.id]?.length || 0})</h4>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => openBulkImport(quiz.id)}>
-                      <Upload className="h-3 w-3 mr-1" /> Bulk Import
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => openAddItem(quiz.id)}>
-                      <Plus className="h-3 w-3 mr-1" /> Add Item
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  {(quizItems[quiz.id] || []).map((item, idx) => (
+                <h4 className="text-sm font-medium text-muted-foreground mb-2">
+                  Items ({existingItems[quiz.id]?.length || 0})
+                </h4>
+                <div className="space-y-1">
+                  {(existingItems[quiz.id] || []).map((item, idx) => (
                     <div key={item.id} className="flex items-center gap-3 bg-card rounded-lg px-3 py-2 text-sm">
                       <span className="text-muted-foreground w-6 text-center">{idx + 1}</span>
                       {item.display_value && (
-                        <span className="bg-primary/20 text-primary text-xs font-bold px-2 py-0.5 rounded min-w-[40px] text-center">{item.display_value}</span>
+                        <span className="bg-primary/20 text-primary text-xs font-bold px-2 py-0.5 rounded min-w-[40px] text-center">
+                          {item.display_value}
+                        </span>
                       )}
                       <span className="flex-1 font-medium text-foreground">{item.answer}</span>
                       {item.acceptable_answers && item.acceptable_answers.length > 0 && (
-                        <span className="text-muted-foreground text-xs">({item.acceptable_answers.join(", ")})</span>
+                        <span className="text-muted-foreground text-xs">
+                          ({item.acceptable_answers.join(", ")})
+                        </span>
                       )}
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditItem(item)}>
-                        <Edit2 className="h-3 w-3" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteItem(item)}>
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
                     </div>
                   ))}
                 </div>
