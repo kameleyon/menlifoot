@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -23,6 +23,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isEditor, setIsEditor] = useState(false);
   const [loading, setLoading] = useState(true);
   const [adminLoading, setAdminLoading] = useState(true);
+  // Once initial auth check completes, never show loading again
+  const initialAuthDone = useRef(false);
 
   const checkUserRoles = async (userId: string) => {
     const { data, error } = await supabase
@@ -38,7 +40,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const roles = data?.map(r => r.role) || [];
     return {
       isAdmin: roles.includes('admin'),
-      isEditor: roles.includes('editor') || roles.includes('admin') // admins can also edit
+      isEditor: roles.includes('editor') || roles.includes('admin')
     };
   };
 
@@ -46,7 +48,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let isMounted = true;
 
     const initializeAuth = async () => {
-      // Get existing session first
       const { data: { session } } = await supabase.auth.getSession();
       
       if (isMounted) {
@@ -58,16 +59,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (isMounted) {
             setIsAdmin(adminStatus);
             setIsEditor(editorStatus);
-            setAdminLoading(false);
           }
-        } else {
-          setAdminLoading(false);
         }
+        setAdminLoading(false);
         setLoading(false);
+        initialAuthDone.current = true;
       }
     };
 
-    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!isMounted) return;
@@ -76,27 +75,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Only trigger loading on initial load or sign in, not background token refreshes
-          if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
-            setAdminLoading(true);
-          }
-          // Use setTimeout to avoid Supabase deadlock
+          // After initial auth, silently refresh roles in background - never set loading
           setTimeout(async () => {
             if (isMounted) {
               const { isAdmin: adminStatus, isEditor: editorStatus } = await checkUserRoles(session.user.id);
               if (isMounted) {
                 setIsAdmin(adminStatus);
                 setIsEditor(editorStatus);
-                setAdminLoading(false);
+                // Only clear loading for initial auth flow
+                if (!initialAuthDone.current) {
+                  setAdminLoading(false);
+                  setLoading(false);
+                  initialAuthDone.current = true;
+                }
               }
             }
           }, 0);
         } else {
           setIsAdmin(false);
           setIsEditor(false);
-          setAdminLoading(false);
+          if (!initialAuthDone.current) {
+            setAdminLoading(false);
+            setLoading(false);
+            initialAuthDone.current = true;
+          }
         }
-        setLoading(false);
       }
     );
 
@@ -109,6 +112,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    // Reset loading states for fresh sign-in
+    initialAuthDone.current = false;
+    setAdminLoading(true);
+    setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error };
   };
@@ -126,13 +133,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    // Clear local state first to ensure UI updates immediately
     setUser(null);
     setSession(null);
     setIsAdmin(false);
     setIsEditor(false);
+    initialAuthDone.current = false;
     
-    // Then attempt to sign out from Supabase (may fail if session already expired)
     try {
       await supabase.auth.signOut({ scope: 'local' });
     } catch (error) {
