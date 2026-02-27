@@ -369,6 +369,19 @@ const QuizAdmin = ({ userId }: { userId: string | undefined }) => {
           : `Quiz created with ${validItems.length} items`,
       });
 
+      // Trigger translation in background
+      supabase.functions.invoke("translate-quiz", {
+        body: {
+          quizId,
+          title: title.trim(),
+          description: description.trim() || null,
+          originalLanguage: "en",
+        },
+      }).then(({ error: tErr }) => {
+        if (tErr) console.error("Quiz translation error:", tErr);
+        else toast({ title: "Translations complete" });
+      });
+
       if (!editingQuiz) clearDraft();
       setIsFormOpen(false);
       resetForm();
