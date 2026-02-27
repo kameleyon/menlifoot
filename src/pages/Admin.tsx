@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import QuizAdmin from '@/components/QuizAdmin';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Plus, Trash2, Edit2, LogOut, ArrowLeft, Youtube, Music2, FileText, Calendar, Image, Users, Shield, ShieldOff, Ban, UserCheck, Languages, RefreshCw, X, Tag, Eye, Trophy } from 'lucide-react';
 import { ArticlePreviewDialog } from '@/components/ArticlePreviewDialog';
@@ -165,6 +165,14 @@ const generateKeywords = (title: string, content: string, category: string): str
     .map(([word]) => word);
 };
 
+type AdminTab = 'podcasts' | 'articles' | 'quizzes' | 'users';
+
+const ADMIN_TAB_STORAGE_KEY = 'admin_active_tab_v1';
+const DEFAULT_ADMIN_TAB: AdminTab = 'podcasts';
+
+const isValidAdminTab = (value: string | null): value is AdminTab =>
+  value === 'podcasts' || value === 'articles' || value === 'quizzes' || value === 'users';
+
 const Admin = () => {
   const [podcasts, setPodcasts] = useState<Podcast[]>([]);
   const [articles, setArticles] = useState<Article[]>([]);
@@ -207,6 +215,18 @@ const Admin = () => {
   const { toast } = useToast();
   const { user, isAdmin, isEditor, loading, adminLoading, signOut } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<AdminTab>(() => {
+    if (typeof window === 'undefined') return DEFAULT_ADMIN_TAB;
+    const stored = localStorage.getItem(ADMIN_TAB_STORAGE_KEY);
+    return isValidAdminTab(stored) ? stored : DEFAULT_ADMIN_TAB;
+  });
+
+  const handleAdminTabChange = (value: string) => {
+    if (!isValidAdminTab(value)) return;
+    if (value === 'users' && !isAdmin) return;
+    setActiveTab(value);
+  };
 
   // Check if user can access admin panel (admin or editor)
   const canAccessPanel = isAdmin || isEditor;
@@ -223,6 +243,38 @@ const Admin = () => {
       navigate('/');
     }
   }, [user, canAccessPanel, loading, adminLoading, navigate, toast]);
+
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab');
+    if (!isValidAdminTab(tabFromUrl)) return;
+
+    if (tabFromUrl === 'users' && !isAdmin) {
+      setActiveTab(DEFAULT_ADMIN_TAB);
+      return;
+    }
+
+    if (tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [searchParams, isAdmin, activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'users' && !isAdmin) {
+      setActiveTab(DEFAULT_ADMIN_TAB);
+      return;
+    }
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(ADMIN_TAB_STORAGE_KEY, activeTab);
+    }
+
+    const currentTabParam = searchParams.get('tab');
+    if (currentTabParam !== activeTab) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.set('tab', activeTab);
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [activeTab, isAdmin, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (canAccessPanel) {
@@ -748,7 +800,7 @@ const Admin = () => {
           </div>
 
           {/* Tabs */}
-          <Tabs defaultValue="podcasts" className="w-full">
+          <Tabs value={activeTab} onValueChange={handleAdminTabChange} className="w-full">
             <TabsList className="mb-6">
               <TabsTrigger value="podcasts" className="flex items-center gap-2">
                 <Music2 className="h-4 w-4" />

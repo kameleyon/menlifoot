@@ -130,7 +130,10 @@ const QuizAdmin = ({ userId }: { userId: string | undefined }) => {
   useEffect(() => {
     fetchQuizzes();
     const savedDraft = getSavedDraft();
-    if (savedDraft) applyDraft(savedDraft);
+    if (savedDraft) {
+      applyDraft(savedDraft);
+      setIsFormOpen(true);
+    }
     setHasHydratedDraft(true);
   }, []);
 
