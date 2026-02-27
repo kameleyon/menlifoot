@@ -42,6 +42,19 @@ interface InlineItem {
   hint: string;
 }
 
+const QUIZ_DRAFT_STORAGE_KEY = "quiz_admin_draft_v1";
+
+interface QuizDraft {
+  title: string;
+  description: string;
+  thumbnailUrl: string;
+  timeLimit: number;
+  isPublished: boolean;
+  items: InlineItem[];
+  showBulkPaste: boolean;
+  bulkText: string;
+}
+
 const createEmptyItem = (): InlineItem => ({
   key: crypto.randomUUID(),
   display_value: "",
@@ -70,14 +83,85 @@ const QuizAdmin = ({ userId }: { userId: string | undefined }) => {
   // Bulk paste
   const [showBulkPaste, setShowBulkPaste] = useState(false);
   const [bulkText, setBulkText] = useState("");
+  const [hasHydratedDraft, setHasHydratedDraft] = useState(false);
 
   // Expand quiz in list to see existing items
   const [expandedQuizId, setExpandedQuizId] = useState<string | null>(null);
   const [existingItems, setExistingItems] = useState<Record<string, QuizItem[]>>({});
 
+  const getSavedDraft = (): QuizDraft | null => {
+    try {
+      const raw = localStorage.getItem(QUIZ_DRAFT_STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as QuizDraft;
+      if (!Array.isArray(parsed.items)) return null;
+      return {
+        ...parsed,
+        items: parsed.items.length > 0
+          ? parsed.items.map((item) => ({
+              key: item.key || crypto.randomUUID(),
+              display_value: item.display_value || "",
+              answer: item.answer || "",
+              acceptable_answers: item.acceptable_answers || "",
+              hint: item.hint || "",
+            }))
+          : [createEmptyItem()],
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  const applyDraft = (draft: QuizDraft) => {
+    setTitle(draft.title || "");
+    setDescription(draft.description || "");
+    setThumbnailUrl(draft.thumbnailUrl || "");
+    setTimeLimit(draft.timeLimit || 300);
+    setIsPublished(Boolean(draft.isPublished));
+    setItems(draft.items.length > 0 ? draft.items : [createEmptyItem()]);
+    setShowBulkPaste(Boolean(draft.showBulkPaste));
+    setBulkText(draft.bulkText || "");
+  };
+
+  const clearDraft = () => {
+    localStorage.removeItem(QUIZ_DRAFT_STORAGE_KEY);
+  };
+
   useEffect(() => {
     fetchQuizzes();
+    const savedDraft = getSavedDraft();
+    if (savedDraft) applyDraft(savedDraft);
+    setHasHydratedDraft(true);
   }, []);
+
+  useEffect(() => {
+    if (!hasHydratedDraft || editingQuiz || !isFormOpen) return;
+
+    const draft: QuizDraft = {
+      title,
+      description,
+      thumbnailUrl,
+      timeLimit,
+      isPublished,
+      items,
+      showBulkPaste,
+      bulkText,
+    };
+
+    localStorage.setItem(QUIZ_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+  }, [
+    hasHydratedDraft,
+    editingQuiz,
+    isFormOpen,
+    title,
+    description,
+    thumbnailUrl,
+    timeLimit,
+    isPublished,
+    items,
+    showBulkPaste,
+    bulkText,
+  ]);
 
   const fetchQuizzes = async () => {
     const { data, error } = await supabase
@@ -111,7 +195,13 @@ const QuizAdmin = ({ userId }: { userId: string | undefined }) => {
   };
 
   const openNewQuiz = () => {
-    resetForm();
+    const savedDraft = getSavedDraft();
+    if (savedDraft) {
+      setEditingQuiz(null);
+      applyDraft(savedDraft);
+    } else {
+      resetForm();
+    }
     setIsFormOpen(true);
   };
 
@@ -279,6 +369,7 @@ const QuizAdmin = ({ userId }: { userId: string | undefined }) => {
           : `Quiz created with ${validItems.length} items`,
       });
 
+      if (!editingQuiz) clearDraft();
       setIsFormOpen(false);
       resetForm();
       fetchQuizzes();
