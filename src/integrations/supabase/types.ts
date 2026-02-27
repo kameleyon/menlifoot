@@ -228,6 +228,121 @@ export type Database = {
         }
         Relationships: []
       }
+      quiz_attempts: {
+        Row: {
+          completed_at: string
+          id: string
+          quiz_id: string
+          score: number
+          time_taken_seconds: number
+          total_items: number
+          user_id: string | null
+        }
+        Insert: {
+          completed_at?: string
+          id?: string
+          quiz_id: string
+          score?: number
+          time_taken_seconds?: number
+          total_items?: number
+          user_id?: string | null
+        }
+        Update: {
+          completed_at?: string
+          id?: string
+          quiz_id?: string
+          score?: number
+          time_taken_seconds?: number
+          total_items?: number
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_attempts_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: false
+            referencedRelation: "quizzes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quiz_items: {
+        Row: {
+          acceptable_answers: string[] | null
+          answer: string
+          created_at: string
+          display_value: string | null
+          hint: string | null
+          id: string
+          quiz_id: string
+          sort_order: number
+        }
+        Insert: {
+          acceptable_answers?: string[] | null
+          answer: string
+          created_at?: string
+          display_value?: string | null
+          hint?: string | null
+          id?: string
+          quiz_id: string
+          sort_order?: number
+        }
+        Update: {
+          acceptable_answers?: string[] | null
+          answer?: string
+          created_at?: string
+          display_value?: string | null
+          hint?: string | null
+          id?: string
+          quiz_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_items_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: false
+            referencedRelation: "quizzes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quizzes: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_published: boolean
+          thumbnail_url: string | null
+          time_limit_seconds: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_published?: boolean
+          thumbnail_url?: string | null
+          time_limit_seconds?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_published?: boolean
+          thumbnail_url?: string | null
+          time_limit_seconds?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

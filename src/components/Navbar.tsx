@@ -43,6 +43,7 @@ const Navbar = () => {
     { name: t('nav.home'), href: "/" },
     { name: t('nav.podcast'), href: "/podcasts" },
     { name: t('nav.articles'), href: "/articles" },
+    { name: t('nav.quiz'), href: "/quizzes" },
     { name: t('nav.askMenlifoot'), href: "#chat" },
     { name: t('nav.editorial'), href: "editorial", isDialog: true },
     // { name: t('nav.store'), href: "#store" },
