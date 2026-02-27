@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Trophy } from "lucide-react";
@@ -27,9 +27,11 @@ interface QuizItem {
 
 const QuizPlay = () => {
   const { id } = useParams<{ id: string }>();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { user } = useAuth();
   const [quiz, setQuiz] = useState<Quiz | null>(null);
+  const [displayTitle, setDisplayTitle] = useState("");
+  const [displayDescription, setDisplayDescription] = useState<string | null>(null);
   const [items, setItems] = useState<QuizItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [gameState, setGameState] = useState<"start" | "playing" | "finished">("start");
@@ -43,19 +45,37 @@ const QuizPlay = () => {
         supabase.from("quizzes").select("*").eq("id", id).single(),
         supabase.from("quiz_items").select("*").eq("quiz_id", id).order("sort_order"),
       ]);
-      if (quizRes.data) setQuiz(quizRes.data);
+      if (quizRes.data) {
+        setQuiz(quizRes.data);
+        setDisplayTitle(quizRes.data.title);
+        setDisplayDescription(quizRes.data.description);
+
+        // Fetch translation if not English
+        if (language !== "en") {
+          const { data: trans } = await supabase
+            .from("quiz_translations")
+            .select("title, description")
+            .eq("quiz_id", id)
+            .eq("language", language)
+            .maybeSingle();
+
+          if (trans) {
+            setDisplayTitle(trans.title);
+            setDisplayDescription(trans.description);
+          }
+        }
+      }
       if (itemsRes.data) setItems(itemsRes.data);
       setLoading(false);
     };
     fetchQuiz();
-  }, [id]);
+  }, [id, language]);
 
   const handleFinish = useCallback(async (finalScore: number, totalTime: number) => {
     setScore(finalScore);
     setTimeTaken(totalTime);
     setGameState("finished");
 
-    // Save attempt
     if (quiz) {
       await supabase.from("quiz_attempts").insert({
         quiz_id: quiz.id,
@@ -102,13 +122,11 @@ const QuizPlay = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
       <div className="container mx-auto px-4 pt-24 pb-12 max-w-4xl">
-        {/* Back button */}
         <Link to="/quizzes" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors">
           <ArrowLeft className="h-4 w-4" />
           {t('quiz.browseQuizzes') || 'Browse Quizzes'}
         </Link>
 
-        {/* Start Modal */}
         {gameState === "start" && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -117,11 +135,11 @@ const QuizPlay = () => {
           >
             <Trophy className="h-16 w-16 text-primary mx-auto mb-6" />
             <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
-              {quiz.title}
+              {displayTitle}
             </h1>
-            {quiz.description && (
+            {displayDescription && (
               <p className="text-muted-foreground text-lg mb-6 max-w-xl mx-auto">
-                {quiz.description}
+                {displayDescription}
               </p>
             )}
             <div className="flex items-center justify-center gap-6 mb-8 text-sm text-muted-foreground">
@@ -134,16 +152,10 @@ const QuizPlay = () => {
           </motion.div>
         )}
 
-        {/* Game */}
         {gameState === "playing" && (
-          <QuizGame
-            quiz={quiz}
-            items={items}
-            onFinish={handleFinish}
-          />
+          <QuizGame quiz={quiz} items={items} onFinish={handleFinish} />
         )}
 
-        {/* Results */}
         {gameState === "finished" && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -162,7 +174,6 @@ const QuizPlay = () => {
               </p>
             </div>
 
-            {/* Results table */}
             <div className="rounded-xl overflow-hidden border border-border/50 mb-8">
               <table className="w-full">
                 <thead>
@@ -178,10 +189,7 @@ const QuizPlay = () => {
                   {items.map((item, idx) => {
                     const found = (item as any)._found;
                     return (
-                      <tr
-                        key={item.id}
-                        className={found ? "bg-primary/15" : "bg-muted/20"}
-                      >
+                      <tr key={item.id} className={found ? "bg-primary/15" : "bg-muted/20"}>
                         <td className="px-4 py-3 text-sm font-medium text-muted-foreground">{idx + 1}</td>
                         <td className="px-4 py-3 text-sm font-medium text-foreground flex items-center gap-2">
                           {found && <span className="text-primary">✓</span>}

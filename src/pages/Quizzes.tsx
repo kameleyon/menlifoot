@@ -16,9 +16,17 @@ interface Quiz {
   time_limit_seconds: number;
 }
 
+interface QuizTranslation {
+  quiz_id: string;
+  language: string;
+  title: string;
+  description: string | null;
+}
+
 const Quizzes = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [translations, setTranslations] = useState<Record<string, QuizTranslation>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,11 +37,34 @@ const Quizzes = () => {
         .eq("is_published", true)
         .order("created_at", { ascending: false });
 
-      if (!error) setQuizzes(data || []);
+      if (!error && data) {
+        setQuizzes(data);
+
+        // Fetch translations for current language if not English
+        if (language !== "en" && data.length > 0) {
+          const { data: transData } = await supabase
+            .from("quiz_translations")
+            .select("quiz_id, language, title, description")
+            .eq("language", language)
+            .in("quiz_id", data.map((q) => q.id));
+
+          if (transData) {
+            const map: Record<string, QuizTranslation> = {};
+            transData.forEach((t) => (map[t.quiz_id] = t));
+            setTranslations(map);
+          }
+        } else {
+          setTranslations({});
+        }
+      }
       setLoading(false);
     };
     fetchQuizzes();
-  }, []);
+  }, [language]);
+
+  const getTitle = (quiz: Quiz) => translations[quiz.id]?.title || quiz.title;
+  const getDescription = (quiz: Quiz) =>
+    translations[quiz.id]?.description ?? quiz.description;
 
   return (
     <div className="min-h-screen bg-background">
@@ -84,7 +115,7 @@ const Quizzes = () => {
                         <div className="aspect-video overflow-hidden">
                           <img
                             src={quiz.thumbnail_url}
-                            alt={quiz.title}
+                            alt={getTitle(quiz)}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                           />
                         </div>
@@ -95,11 +126,11 @@ const Quizzes = () => {
                       )}
                       <div className="p-5">
                         <h3 className="font-display text-lg font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-2 mb-2">
-                          {quiz.title}
+                          {getTitle(quiz)}
                         </h3>
-                        {quiz.description && (
+                        {getDescription(quiz) && (
                           <p className="text-muted-foreground text-sm line-clamp-2 mb-3">
-                            {quiz.description}
+                            {getDescription(quiz)}
                           </p>
                         )}
                         <div className="flex items-center justify-between">
