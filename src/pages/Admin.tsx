@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
+import QuizAdmin from '@/components/QuizAdmin';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Plus, Trash2, Edit2, LogOut, ArrowLeft, Youtube, Music2, FileText, Calendar, Image, Users, Shield, ShieldOff, Ban, UserCheck, Languages, RefreshCw, X, Tag, Eye } from 'lucide-react';
+import { Plus, Trash2, Edit2, LogOut, ArrowLeft, Youtube, Music2, FileText, Calendar, Image, Users, Shield, ShieldOff, Ban, UserCheck, Languages, RefreshCw, X, Tag, Eye, Trophy } from 'lucide-react';
 import { ArticlePreviewDialog } from '@/components/ArticlePreviewDialog';
 import menlifootBall from '@/assets/menlifoot-ball.png';
 import { Button } from '@/components/ui/button';
@@ -757,6 +758,10 @@ const Admin = () => {
                 <FileText className="h-4 w-4" />
                 <span className="hidden sm:inline">Articles</span>
               </TabsTrigger>
+              <TabsTrigger value="quizzes" className="flex items-center gap-2">
+                <Trophy className="h-4 w-4" />
+                <span className="hidden sm:inline">Quizzes</span>
+              </TabsTrigger>
               {isAdmin && (
                 <TabsTrigger value="users" className="flex items-center gap-2">
                   <Users className="h-4 w-4" />
@@ -1261,6 +1266,11 @@ const Admin = () => {
                   </div>
                 )}
               </div>
+            </TabsContent>
+
+            {/* Quizzes Tab */}
+            <TabsContent value="quizzes">
+              <QuizAdmin userId={user?.id} />
             </TabsContent>
 
             {/* Users Tab - Admin Only */}
