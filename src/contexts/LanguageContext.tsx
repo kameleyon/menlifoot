@@ -215,6 +215,10 @@ const translations: Record<Language, Record<string, string>> = {
     'quiz.results': 'Results',
     'quiz.timeTaken': 'Time',
     'quiz.playAgain': 'Play Again',
+    'quiz.share': 'Share',
+    'quiz.shareScore': 'Share Score',
+    'quiz.shareChallenge': 'Can you beat my score?',
+    'quiz.linkCopied': 'Link copied!',
 
     // Common
     'common.back': 'Back',
@@ -424,6 +428,10 @@ const translations: Record<Language, Record<string, string>> = {
     'quiz.results': 'Résultats',
     'quiz.timeTaken': 'Temps',
     'quiz.playAgain': 'Rejouer',
+    'quiz.share': 'Partager',
+    'quiz.shareScore': 'Partager le score',
+    'quiz.shareChallenge': 'Tu peux battre mon score ?',
+    'quiz.linkCopied': 'Lien copié !',
 
     // Common
     'common.back': 'Retour',
@@ -633,6 +641,10 @@ const translations: Record<Language, Record<string, string>> = {
     'quiz.results': 'Resultados',
     'quiz.timeTaken': 'Tiempo',
     'quiz.playAgain': 'Jugar de Nuevo',
+    'quiz.share': 'Compartir',
+    'quiz.shareScore': 'Compartir Puntuación',
+    'quiz.shareChallenge': '¿Puedes superar mi puntuación?',
+    'quiz.linkCopied': '¡Enlace copiado!',
 
     // Common
     'common.back': 'Volver',
@@ -842,6 +854,10 @@ const translations: Record<Language, Record<string, string>> = {
     'quiz.results': 'Rezilta',
     'quiz.timeTaken': 'Tan',
     'quiz.playAgain': 'Jwe Ankò',
+    'quiz.share': 'Pataje',
+    'quiz.shareScore': 'Pataje Rezilta',
+    'quiz.shareChallenge': 'Èske ou ka bat rezilta mwen an?',
+    'quiz.linkCopied': 'Lyen kopye!',
 
     // Common
     'common.back': 'Retounen',
