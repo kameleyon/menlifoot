@@ -167,7 +167,6 @@ const generateKeywords = (title: string, content: string, category: string): str
 
 type AdminTab = 'podcasts' | 'articles' | 'quizzes' | 'users';
 
-const ADMIN_TAB_STORAGE_KEY = 'admin_active_tab_v1';
 const DEFAULT_ADMIN_TAB: AdminTab = 'podcasts';
 
 const isValidAdminTab = (value: string | null): value is AdminTab =>
@@ -216,11 +215,7 @@ const Admin = () => {
   const { user, isAdmin, isEditor, loading, adminLoading, signOut } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState<AdminTab>(() => {
-    if (typeof window === 'undefined') return DEFAULT_ADMIN_TAB;
-    const stored = localStorage.getItem(ADMIN_TAB_STORAGE_KEY);
-    return isValidAdminTab(stored) ? stored : DEFAULT_ADMIN_TAB;
-  });
+  const [activeTab, setActiveTab] = useState<AdminTab>(DEFAULT_ADMIN_TAB);
 
   const handleAdminTabChange = (value: string) => {
     if (!isValidAdminTab(value)) return;
@@ -246,10 +241,18 @@ const Admin = () => {
 
   useEffect(() => {
     const tabFromUrl = searchParams.get('tab');
-    if (!isValidAdminTab(tabFromUrl)) return;
+
+    if (!isValidAdminTab(tabFromUrl)) {
+      if (activeTab !== DEFAULT_ADMIN_TAB) {
+        setActiveTab(DEFAULT_ADMIN_TAB);
+      }
+      return;
+    }
 
     if (tabFromUrl === 'users' && !isAdmin) {
-      setActiveTab(DEFAULT_ADMIN_TAB);
+      if (activeTab !== DEFAULT_ADMIN_TAB) {
+        setActiveTab(DEFAULT_ADMIN_TAB);
+      }
       return;
     }
 
@@ -262,10 +265,6 @@ const Admin = () => {
     if (activeTab === 'users' && !isAdmin) {
       setActiveTab(DEFAULT_ADMIN_TAB);
       return;
-    }
-
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(ADMIN_TAB_STORAGE_KEY, activeTab);
     }
 
     const currentTabParam = searchParams.get('tab');
