@@ -76,10 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Only trigger loading on initial load or sign in, not background token refreshes
-          if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
-            setAdminLoading(true);
-          }
+          setAdminLoading(true);
           // Use setTimeout to avoid Supabase deadlock
           setTimeout(async () => {
             if (isMounted) {
