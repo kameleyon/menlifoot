@@ -1268,8 +1268,8 @@ const Admin = () => {
               </div>
             </TabsContent>
 
-            {/* Quizzes Tab */}
-            <TabsContent value="quizzes">
+            {/* Quizzes Tab - forceMount to preserve form state */}
+            <TabsContent value="quizzes" forceMount className="data-[state=inactive]:hidden">
               <QuizAdmin userId={user?.id} />
             </TabsContent>
 
