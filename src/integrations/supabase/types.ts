@@ -237,6 +237,45 @@ export type Database = {
         }
         Relationships: []
       }
+      order_status: {
+        Row: {
+          carrier: string | null
+          created_at: string
+          environment: string
+          id: string
+          notes: string | null
+          status: string
+          stripe_session_id: string
+          tracking_number: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          carrier?: string | null
+          created_at?: string
+          environment?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          stripe_session_id: string
+          tracking_number?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          carrier?: string | null
+          created_at?: string
+          environment?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          stripe_session_id?: string
+          tracking_number?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       podcasts: {
         Row: {
           created_at: string
