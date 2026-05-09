@@ -258,7 +258,7 @@ const JerseyCard = ({ product }: { product: (typeof products)[number] }) => {
                 <div
                   className="absolute left-1/2 -translate-x-1/2 text-center pointer-events-none select-none"
                   style={{
-                    top: "42%",
+                    top: "34%",
                     fontFamily: "'Oswald', sans-serif",
                     fontWeight: 700,
                     fontSize: "clamp(40px, 18vw, 96px)",
