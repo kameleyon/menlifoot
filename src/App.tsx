@@ -18,6 +18,7 @@ import Quizzes from "./pages/Quizzes";
 import QuizPlay from "./pages/QuizPlay";
 import NotFound from "./pages/NotFound";
 import CheckoutReturn from "./pages/CheckoutReturn";
+import Unsubscribe from "./pages/Unsubscribe";
 import { PaymentTestModeBanner } from "./components/PaymentTestModeBanner";
 
 const queryClient = new QueryClient();
@@ -35,6 +36,7 @@ const App = () => (
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/checkout/return" element={<CheckoutReturn />} />
+                <Route path="/unsubscribe" element={<Unsubscribe />} />
                 <Route path="/news" element={<News />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/admin" element={<Admin />} />
