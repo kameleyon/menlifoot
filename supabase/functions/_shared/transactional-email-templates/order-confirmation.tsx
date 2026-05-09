@@ -188,7 +188,7 @@ const container: React.CSSProperties = {
   margin: '0 auto',
   padding: '24px 16px',
 }
-const logo: React.CSSProperties = { display: 'block', margin: '0 auto 12px', borderRadius: '50%' }
+const logo: React.CSSProperties = { display: 'block', margin: '0 auto 12px',  }
 const header: React.CSSProperties = {
   textAlign: 'center',
   padding: '24px 0',
