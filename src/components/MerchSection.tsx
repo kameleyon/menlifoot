@@ -62,7 +62,7 @@ const JerseyCard = ({ product }: { product: (typeof products)[number] }) => {
       price: PREORDER_PRICE,
       image: product.front,
     });
-    toast.success("Pre-order added to cart");
+    toast.success("Added to cart", { duration: 1500, position: "top-center" });
     openCart();
   };
 
