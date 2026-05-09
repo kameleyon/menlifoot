@@ -127,10 +127,12 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("send-order-confirmation error:", err);
+    const message = err instanceof Error ? err.message : "Unknown error";
+    const isRateLimit = /rate limit/i.test(message);
     return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : "Unknown error" }),
+      JSON.stringify({ error: message, fallback: isRateLimit }),
       {
-        status: 500,
+        status: isRateLimit ? 200 : 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       },
     );
