@@ -1280,6 +1280,15 @@ const Admin = () => {
               <QuizAdmin userId={user?.id} />
             </TabsContent>
 
+            {/* Orders Tab - Admin Only */}
+            {isAdmin && (
+              <TabsContent value="orders">
+                <div className="glass-card p-6">
+                  <OrdersAdmin />
+                </div>
+              </TabsContent>
+            )}
+
             {/* Users Tab - Admin Only */}
             {isAdmin && (
               <TabsContent value="users">
