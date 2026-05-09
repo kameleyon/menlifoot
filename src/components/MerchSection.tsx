@@ -1,7 +1,14 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ShoppingBag } from "lucide-react";
+import { ShoppingBag, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
 import jerseyBlackFront from "@/assets/jersey-black-front.jpeg";
@@ -19,7 +26,9 @@ const GENDERS: { value: Gender; label: string }[] = [
 ];
 const SIZES: Size[] = ["S", "M", "L", "XL"];
 
-const PRICE = 75;
+const PREORDER_PRICE = 75;
+const RETAIL_PRICE = 95;
+const PREORDER_DEADLINE = "May 30, 2026";
 
 const products = [
   {
@@ -49,95 +58,113 @@ const JerseyCard = ({ product }: { product: (typeof products)[number] }) => {
       id: lineId,
       productId: product.id,
       name: product.name,
-      variant: `${genderLabel} · ${size}`,
-      price: PRICE,
+      variant: `${genderLabel} · ${size} · Pre-order`,
+      price: PREORDER_PRICE,
       image: product.front,
     });
-    toast.success("Added to cart");
+    toast.success("Pre-order added to cart");
     openCart();
   };
 
   return (
-    <div className="glass-card overflow-hidden hover-lift">
-      <div className="relative aspect-square overflow-hidden bg-surface p-4 group">
+    <div className="glass-card overflow-hidden hover-lift border border-border/60">
+      <div className="relative aspect-square overflow-hidden bg-surface group">
         <img
           src={view === "front" ? product.front : product.back}
           alt={`${product.name} ${view}`}
-          className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
+          className="w-full h-full object-contain p-6 transition-transform duration-700 group-hover:scale-105"
         />
-        <div className="absolute top-3 left-3 flex gap-1 bg-background/70 backdrop-blur rounded-full p-1">
+        <div className="absolute top-4 left-4 flex gap-1 bg-background/80 backdrop-blur-md rounded-full p-1 border border-border/40">
           {(["front", "back"] as const).map((v) => (
             <button
               key={v}
               onClick={() => setView(v)}
-              className={`text-xs uppercase tracking-wider px-3 py-1 rounded-full transition-colors ${
+              className={`text-[10px] uppercase tracking-[0.15em] px-3 py-1 rounded-full transition-colors ${
                 view === v
                   ? "bg-primary text-primary-foreground"
-                  : "text-foreground/70 hover:text-foreground"
+                  : "text-foreground/60 hover:text-foreground"
               }`}
             >
               {v}
             </button>
           ))}
         </div>
+        <div className="absolute top-4 right-4 inline-flex items-center gap-1 bg-primary text-primary-foreground text-[10px] uppercase tracking-[0.15em] px-2.5 py-1 rounded-full font-semibold">
+          <Sparkles className="h-3 w-3" />
+          Pre-order
+        </div>
       </div>
 
-      <div className="p-5 space-y-4">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="font-display uppercase tracking-wide text-foreground text-lg leading-tight">
+      <div className="p-6 space-y-5">
+        <div>
+          <h3
+            className="font-light tracking-wide text-foreground text-xl leading-tight uppercase"
+            style={{ fontFamily: "'Oswald', sans-serif" }}
+          >
             {product.name}
           </h3>
-          <span className="text-lg font-bold text-primary whitespace-nowrap">
-            ${PRICE.toFixed(2)} CAD
-          </span>
+          <div className="flex items-baseline gap-2 mt-2">
+            <span className="text-2xl font-bold text-primary">
+              ${PREORDER_PRICE}
+            </span>
+            <span className="text-sm text-muted-foreground line-through">
+              ${RETAIL_PRICE}
+            </span>
+            <span className="text-xs text-muted-foreground uppercase tracking-wider">
+              CAD
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Pre-order price until {PREORDER_DEADLINE}
+          </p>
         </div>
 
-        <div>
-          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
-            Fit
-          </p>
-          <div className="flex gap-2">
-            {GENDERS.map((g) => (
-              <button
-                key={g.value}
-                onClick={() => setGender(g.value)}
-                className={`flex-1 text-xs uppercase tracking-wider py-2 rounded-md border transition-colors ${
-                  gender === g.value
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border text-foreground/70 hover:border-primary/50"
-                }`}
-              >
-                {g.label}
-              </button>
-            ))}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-1.5 block">
+              Fit
+            </label>
+            <Select value={gender} onValueChange={(v) => setGender(v as Gender)}>
+              <SelectTrigger className="bg-background/50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {GENDERS.map((g) => (
+                  <SelectItem key={g.value} value={g.value}>
+                    {g.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <label className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-1.5 block">
+              Size
+            </label>
+            <Select value={size} onValueChange={(v) => setSize(v as Size)}>
+              <SelectTrigger className="bg-background/50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SIZES.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
-        <div>
-          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
-            Size
-          </p>
-          <div className="flex gap-2">
-            {SIZES.map((s) => (
-              <button
-                key={s}
-                onClick={() => setSize(s)}
-                className={`flex-1 text-sm font-semibold py-2 rounded-md border transition-colors ${
-                  size === s
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border text-foreground/70 hover:border-primary/50"
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <Button variant="gold" className="w-full" onClick={handleAdd}>
+        <Button variant="gold" className="w-full" size="lg" onClick={handleAdd}>
           <ShoppingBag className="h-4 w-4 mr-2" />
-          Add to cart
+          Pre-order — ${PREORDER_PRICE} CAD
         </Button>
+
+        <p className="text-[11px] text-muted-foreground text-center leading-relaxed">
+          Shipping calculated at checkout · Ships from Canada worldwide
+        </p>
       </div>
     </div>
   );
@@ -154,17 +181,23 @@ const MerchSection = () => {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-16"
+          className="text-center mb-12"
         >
           <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/30 bg-primary/5 text-primary text-xs uppercase tracking-wider mb-4">
-            <ShoppingBag className="h-3 w-3" />
-            Official Store
+            <Sparkles className="h-3 w-3" />
+            Limited Pre-order
           </span>
-          <h2 className="font-display text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-4">
-            <span className="text-gradient-gold">Menlifoot</span> Jerseys
+          <h2
+            className="text-4xl md:text-5xl lg:text-6xl font-light tracking-wider mb-4 text-gradient-gold uppercase"
+            style={{ fontFamily: "'Oswald', sans-serif" }}
+          >
+            Menlifoot <span>Jerseys</span>
           </h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Wear the colors. Carry the culture. Available in male, female and kid fits.
+            Wear the colors. Carry the culture. Pre-order at{" "}
+            <span className="text-primary font-semibold">$75 CAD</span> until{" "}
+            {PREORDER_DEADLINE} — retail price{" "}
+            <span className="line-through">$95 CAD</span>.
           </p>
         </motion.div>
 
@@ -187,3 +220,4 @@ const MerchSection = () => {
 };
 
 export default MerchSection;
+
