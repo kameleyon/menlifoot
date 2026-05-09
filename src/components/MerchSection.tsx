@@ -15,9 +15,11 @@ import { toast } from "sonner";
 import jerseyBlackCombo from "@/assets/jersey-black-combo.jpeg";
 import jerseyBlackFront from "@/assets/jersey-black-front.jpeg";
 import jerseyBlackBack from "@/assets/jersey-black-back.jpeg";
+import jerseyBlackBackBlank from "@/assets/jersey-black-back-blank.jpeg";
 import jerseyWhiteCombo from "@/assets/jersey-white-combo.jpeg";
 import jerseyWhiteFront from "@/assets/jersey-white-front.jpeg";
 import jerseyWhiteBack from "@/assets/jersey-white-back.jpeg";
+import jerseyWhiteBackBlank from "@/assets/jersey-white-back-blank.jpeg";
 
 type Gender = "male" | "female" | "kid";
 type Size = "S" | "M" | "L" | "XL";
@@ -39,12 +41,16 @@ const products = [
     name: "Menlifoot Jersey — Black",
     image: jerseyBlackFront,
     images: [jerseyBlackCombo, jerseyBlackFront, jerseyBlackBack],
+    backBlank: jerseyBlackBackBlank,
+    isDark: true,
   },
   {
     id: "jersey-white",
     name: "Menlifoot Jersey — White",
     image: jerseyWhiteFront,
     images: [jerseyWhiteCombo, jerseyWhiteFront, jerseyWhiteBack],
+    backBlank: jerseyWhiteBackBlank,
+    isDark: false,
   },
 ];
 
@@ -219,10 +225,58 @@ const JerseyCard = ({ product }: { product: (typeof products)[number] }) => {
             </div>
           </div>
           {(customName || customNumber) && (
-            <p className="text-[11px] text-muted-foreground">
-              Preview: <span className="text-primary font-semibold tracking-wider">{customName || "—"}</span>{" "}
-              <span className="text-primary font-semibold">#{customNumber || "—"}</span>
-            </p>
+            <div className="space-y-2">
+              <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground text-center">
+                Back preview — confirm before adding
+              </p>
+              <div className="relative mx-auto w-full max-w-[260px] aspect-[3/4] rounded-md overflow-hidden bg-surface border border-border/40">
+                <img
+                  src={product.backBlank}
+                  alt={`${product.name} back preview`}
+                  className="absolute inset-0 w-full h-full object-contain"
+                  draggable={false}
+                />
+                {/* Name (upper back) */}
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 text-center pointer-events-none select-none"
+                  style={{
+                    top: "26%",
+                    fontFamily: "'Oswald', sans-serif",
+                    fontWeight: 600,
+                    letterSpacing: "0.18em",
+                    fontSize: "clamp(10px, 4.2vw, 22px)",
+                    color: product.isDark ? "hsl(45, 75%, 55%)" : "hsl(40, 60%, 35%)",
+                    textShadow: product.isDark
+                      ? "0 1px 0 rgba(0,0,0,0.4)"
+                      : "0 1px 0 rgba(0,0,0,0.15)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {customName || "\u00A0"}
+                </div>
+                {/* Number (center back) */}
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 text-center pointer-events-none select-none"
+                  style={{
+                    top: "42%",
+                    fontFamily: "'Oswald', sans-serif",
+                    fontWeight: 700,
+                    fontSize: "clamp(40px, 18vw, 96px)",
+                    lineHeight: 1,
+                    color: product.isDark ? "hsl(45, 75%, 55%)" : "hsl(40, 60%, 35%)",
+                    textShadow: product.isDark
+                      ? "0 2px 0 rgba(0,0,0,0.4)"
+                      : "0 2px 0 rgba(0,0,0,0.15)",
+                  }}
+                >
+                  {customNumber || "\u00A0"}
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground text-center">
+                <span className="text-primary font-semibold tracking-wider">{customName || "—"}</span>{" "}
+                <span className="text-primary font-semibold">#{customNumber || "—"}</span>
+              </p>
+            </div>
           )}
         </div>
 
