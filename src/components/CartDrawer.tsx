@@ -111,6 +111,8 @@ const CartDrawer = () => {
         )}
       </SheetContent>
     </Sheet>
+    <CheckoutDialog open={checkoutOpen} onOpenChange={setCheckoutOpen} />
+    </>
   );
 };
 
