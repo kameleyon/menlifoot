@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { ShoppingBag, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -49,16 +50,31 @@ const JerseyCard = ({ product }: { product: (typeof products)[number] }) => {
   const [view, setView] = useState<"front" | "back">("front");
   const [gender, setGender] = useState<Gender>("male");
   const [size, setSize] = useState<Size>("M");
+  const [customName, setCustomName] = useState("");
+  const [customNumber, setCustomNumber] = useState("");
   const { addToCart, openCart } = useCart();
 
+  const handleNameChange = (v: string) => {
+    // Letters, spaces, hyphens, apostrophes; uppercased; max 12
+    const cleaned = v.toUpperCase().replace(/[^A-Z\s'-]/g, "").slice(0, 12);
+    setCustomName(cleaned);
+  };
+  const handleNumberChange = (v: string) => {
+    const cleaned = v.replace(/[^0-9]/g, "").slice(0, 2);
+    setCustomNumber(cleaned);
+  };
+
   const handleAdd = () => {
-    const lineId = `${product.id}-${gender}-${size}`;
+    const name = customName.trim();
+    const number = customNumber.trim();
+    const lineId = `${product.id}-${gender}-${size}-${name || "noname"}-${number || "nonum"}`;
     const genderLabel = GENDERS.find((g) => g.value === gender)?.label ?? gender;
+    const customPart = name || number ? ` · ${name || "—"} #${number || "—"}` : "";
     addToCart({
       id: lineId,
       productId: product.id,
       name: product.name,
-      variant: `${genderLabel} · ${size} · Pre-order`,
+      variant: `${genderLabel} · ${size} · Pre-order${customPart}`,
       price: PREORDER_PRICE,
       image: product.front,
     });
