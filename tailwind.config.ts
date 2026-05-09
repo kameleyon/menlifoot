@@ -134,6 +134,12 @@ export default {
           "25%": { transform: "translateY(-8px) rotate(5deg)" },
           "75%": { transform: "translateY(-4px) rotate(-3deg)" },
         },
+        "jersey-carousel": {
+          "0%, 22%": { transform: "translateX(0%)" },
+          "33%, 55%": { transform: "translateX(-33.3333%)" },
+          "66%, 88%": { transform: "translateX(-66.6666%)" },
+          "100%": { transform: "translateX(0%)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -150,6 +156,7 @@ export default {
         "intro-text": "intro-text 1s ease-out forwards",
         "spin-slow": "spin-slow 8s linear infinite",
         "bounce-subtle": "bounce-subtle 2s ease-in-out infinite",
+        "jersey-carousel": "jersey-carousel 12s ease-in-out infinite",
       },
     },
   },
