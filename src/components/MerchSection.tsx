@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { ShoppingBag, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -49,16 +50,31 @@ const JerseyCard = ({ product }: { product: (typeof products)[number] }) => {
   const [view, setView] = useState<"front" | "back">("front");
   const [gender, setGender] = useState<Gender>("male");
   const [size, setSize] = useState<Size>("M");
+  const [customName, setCustomName] = useState("");
+  const [customNumber, setCustomNumber] = useState("");
   const { addToCart, openCart } = useCart();
 
+  const handleNameChange = (v: string) => {
+    // Letters, spaces, hyphens, apostrophes; uppercased; max 12
+    const cleaned = v.toUpperCase().replace(/[^A-Z\s'-]/g, "").slice(0, 12);
+    setCustomName(cleaned);
+  };
+  const handleNumberChange = (v: string) => {
+    const cleaned = v.replace(/[^0-9]/g, "").slice(0, 2);
+    setCustomNumber(cleaned);
+  };
+
   const handleAdd = () => {
-    const lineId = `${product.id}-${gender}-${size}`;
+    const name = customName.trim();
+    const number = customNumber.trim();
+    const lineId = `${product.id}-${gender}-${size}-${name || "noname"}-${number || "nonum"}`;
     const genderLabel = GENDERS.find((g) => g.value === gender)?.label ?? gender;
+    const customPart = name || number ? ` · ${name || "—"} #${number || "—"}` : "";
     addToCart({
       id: lineId,
       productId: product.id,
       name: product.name,
-      variant: `${genderLabel} · ${size} · Pre-order`,
+      variant: `${genderLabel} · ${size} · Pre-order${customPart}`,
       price: PREORDER_PRICE,
       image: product.front,
     });
@@ -155,6 +171,50 @@ const JerseyCard = ({ product }: { product: (typeof products)[number] }) => {
               </SelectContent>
             </Select>
           </div>
+        </div>
+
+        <div className="space-y-3 rounded-lg border border-border/50 bg-background/30 p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-[0.15em] text-primary font-semibold">
+              Customize the back
+            </span>
+            <span className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+              Optional
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2">
+              <label className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-1.5 block">
+                Name
+              </label>
+              <Input
+                value={customName}
+                onChange={(e) => handleNameChange(e.target.value)}
+                placeholder="RICHARD"
+                maxLength={12}
+                className="bg-background/50 uppercase tracking-wider"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-1.5 block">
+                Number
+              </label>
+              <Input
+                value={customNumber}
+                onChange={(e) => handleNumberChange(e.target.value)}
+                placeholder="10"
+                inputMode="numeric"
+                maxLength={2}
+                className="bg-background/50 text-center"
+              />
+            </div>
+          </div>
+          {(customName || customNumber) && (
+            <p className="text-[11px] text-muted-foreground">
+              Preview: <span className="text-primary font-semibold tracking-wider">{customName || "—"}</span>{" "}
+              <span className="text-primary font-semibold">#{customNumber || "—"}</span>
+            </p>
+          )}
         </div>
 
         <Button variant="gold" className="w-full" size="lg" onClick={handleAdd}>
