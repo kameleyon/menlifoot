@@ -133,7 +133,6 @@ Deno.serve(async (req) => {
       ui_mode: "embedded_page",
       return_url: body.returnUrl,
       ...(body.customerEmail && { customer_email: body.customerEmail }),
-      automatic_tax: { enabled: true },
       shipping_address_collection: {
         allowed_countries: SHIP_TO_COUNTRIES as any,
       },
