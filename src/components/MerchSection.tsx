@@ -43,7 +43,7 @@ const products = [
 ];
 
 const JerseyCard = ({ product }: { product: (typeof products)[number] }) => {
-  const [view, setView] = useState<"front" | "back">("front");
+  const [paused, setPaused] = useState(false);
   const [gender, setGender] = useState<Gender>("male");
   const [size, setSize] = useState<Size>("M");
   const [customName, setCustomName] = useState("");
@@ -51,7 +51,6 @@ const JerseyCard = ({ product }: { product: (typeof products)[number] }) => {
   const { addToCart, openCart } = useCart();
 
   const handleNameChange = (v: string) => {
-    // Letters, spaces, hyphens, apostrophes; uppercased; max 12
     const cleaned = v.toUpperCase().replace(/[^A-Z\s'-]/g, "").slice(0, 12);
     setCustomName(cleaned);
   };
@@ -72,7 +71,7 @@ const JerseyCard = ({ product }: { product: (typeof products)[number] }) => {
       name: product.name,
       variant: `${genderLabel} · ${size} · Pre-order${customPart}`,
       price: PREORDER_PRICE,
-      image: product.front,
+      image: product.image,
     });
     toast.success("Added to cart", { duration: 1500, position: "top-center" });
     openCart();
@@ -80,31 +79,29 @@ const JerseyCard = ({ product }: { product: (typeof products)[number] }) => {
 
   return (
     <div className="glass-card overflow-hidden hover-lift border border-border/60">
-      <div className="relative aspect-square overflow-hidden bg-surface group">
+      <div
+        className="relative aspect-square overflow-hidden bg-surface group cursor-pointer select-none"
+        onClick={() => setPaused((p) => !p)}
+        title={paused ? "Click to resume" : "Click to pause"}
+      >
+        {/* Wide image: front on left, back on right. Slides left on hover. */}
         <img
-          src={view === "front" ? product.front : product.back}
-          alt={`${product.name} ${view}`}
-          className="w-full h-full object-contain p-6 transition-transform duration-700 group-hover:scale-105"
+          src={product.image}
+          alt={product.name}
+          draggable={false}
+          className={`absolute top-0 left-0 h-full w-[200%] max-w-none object-contain p-6 transition-transform ease-in-out ${
+            paused ? "duration-0" : "duration-[3500ms] group-hover:-translate-x-1/2"
+          }`}
         />
-        <div className="absolute top-4 left-4 flex gap-1 bg-background/80 backdrop-blur-md rounded-full p-1 border border-border/40">
-          {(["front", "back"] as const).map((v) => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              className={`text-[10px] uppercase tracking-[0.15em] px-3 py-1 rounded-full transition-colors ${
-                view === v
-                  ? "bg-primary text-primary-foreground"
-                  : "text-foreground/60 hover:text-foreground"
-              }`}
-            >
-              {v}
-            </button>
-          ))}
-        </div>
-        <div className="absolute top-4 right-4 inline-flex items-center gap-1 bg-primary text-primary-foreground text-[10px] uppercase tracking-[0.15em] px-2.5 py-1 rounded-full font-semibold">
+        <div className="absolute top-4 right-4 inline-flex items-center gap-1 bg-primary text-primary-foreground text-[10px] uppercase tracking-[0.15em] px-2.5 py-1 rounded-full font-semibold shadow-md">
           <Sparkles className="h-3 w-3" />
           Pre-order
         </div>
+        {paused && (
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] uppercase tracking-[0.15em] bg-background/80 backdrop-blur-md text-foreground/80 px-3 py-1 rounded-full border border-border/40">
+            Paused — click to resume
+          </div>
+        )}
       </div>
 
       <div className="p-6 space-y-5">
