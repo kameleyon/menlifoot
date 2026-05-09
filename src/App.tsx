@@ -17,6 +17,8 @@ import ShareArticleRedirect from "./pages/ShareArticleRedirect";
 import Quizzes from "./pages/Quizzes";
 import QuizPlay from "./pages/QuizPlay";
 import NotFound from "./pages/NotFound";
+import CheckoutReturn from "./pages/CheckoutReturn";
+import { PaymentTestModeBanner } from "./components/PaymentTestModeBanner";
 
 const queryClient = new QueryClient();
 
@@ -29,8 +31,10 @@ const App = () => (
             <Toaster />
             <Sonner />
             <BrowserRouter>
+              <PaymentTestModeBanner />
               <Routes>
                 <Route path="/" element={<Index />} />
+                <Route path="/checkout/return" element={<CheckoutReturn />} />
                 <Route path="/news" element={<News />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/admin" element={<Admin />} />
