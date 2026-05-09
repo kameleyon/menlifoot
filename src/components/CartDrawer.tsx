@@ -1,8 +1,9 @@
+import { useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
 import { Minus, Plus, Trash2, ShoppingBag } from "lucide-react";
-import { toast } from "sonner";
+import { CheckoutDialog } from "./CheckoutDialog";
 
 const CartDrawer = () => {
   const {
@@ -14,9 +15,11 @@ const CartDrawer = () => {
     totalPrice,
     totalItems,
   } = useCart();
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
 
   const handleCheckout = () => {
-    toast.info("Checkout coming soon — Stripe integration in progress.");
+    closeCart();
+    setCheckoutOpen(true);
   };
 
   return (
