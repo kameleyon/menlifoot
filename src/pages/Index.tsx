@@ -30,8 +30,8 @@ const Index = () => {
             <main>
               <HeroSection />
               <ChatSection />
-              <ArticlesSection />
               <MerchSection />
+              <ArticlesSection />
             </main>
             <Footer />
             <AIAgent />
