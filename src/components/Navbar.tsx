@@ -46,7 +46,7 @@ const Navbar = () => {
     { name: t('nav.quiz'), href: "/quizzes" },
     { name: t('nav.askMenlifoot'), href: "#chat" },
     { name: t('nav.editorial'), href: "editorial", isDialog: true },
-    // { name: t('nav.store'), href: "#store" },
+    { name: t('nav.store'), href: "#store" },
   ];
 
   const languages: { code: Language; name: string }[] = [

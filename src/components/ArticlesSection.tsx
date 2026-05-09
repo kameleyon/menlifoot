@@ -317,7 +317,7 @@ const ArticlesSection = () => {
       }
     });
 
-    return result;
+    return result.slice(0, 30);
   }, [articles, translatedArticles, categoryFilter, authorFilter, sortBy]);
 
   const activeFiltersCount = (categoryFilter !== 'All' ? 1 : 0) + (authorFilter !== 'All' ? 1 : 0);
