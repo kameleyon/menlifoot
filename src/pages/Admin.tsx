@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import QuizAdmin from '@/components/QuizAdmin';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Plus, Trash2, Edit2, LogOut, ArrowLeft, Youtube, Music2, FileText, Calendar, Image, Users, Shield, ShieldOff, Ban, UserCheck, Languages, RefreshCw, X, Tag, Eye, Trophy } from 'lucide-react';
+import { Plus, Trash2, Edit2, LogOut, ArrowLeft, Youtube, Music2, FileText, Calendar, Image, Users, Shield, ShieldOff, Ban, UserCheck, Languages, RefreshCw, X, Tag, Eye, Trophy, Package } from 'lucide-react';
+import { OrdersAdmin } from '@/components/OrdersAdmin';
 import { ArticlePreviewDialog } from '@/components/ArticlePreviewDialog';
 import menlifootBall from '@/assets/menlifoot-ball.png';
 import { Button } from '@/components/ui/button';
@@ -763,6 +764,12 @@ const Admin = () => {
                 <span className="hidden sm:inline">Quizzes</span>
               </TabsTrigger>
               {isAdmin && (
+                <TabsTrigger value="orders" className="flex items-center gap-2">
+                  <Package className="h-4 w-4" />
+                  <span className="hidden sm:inline">Orders</span>
+                </TabsTrigger>
+              )}
+              {isAdmin && (
                 <TabsTrigger value="users" className="flex items-center gap-2">
                   <Users className="h-4 w-4" />
                   <span className="hidden sm:inline">Users</span>
@@ -1272,6 +1279,15 @@ const Admin = () => {
             <TabsContent value="quizzes" forceMount className="data-[state=inactive]:hidden">
               <QuizAdmin userId={user?.id} />
             </TabsContent>
+
+            {/* Orders Tab - Admin Only */}
+            {isAdmin && (
+              <TabsContent value="orders">
+                <div className="glass-card p-6">
+                  <OrdersAdmin />
+                </div>
+              </TabsContent>
+            )}
 
             {/* Users Tab - Admin Only */}
             {isAdmin && (
