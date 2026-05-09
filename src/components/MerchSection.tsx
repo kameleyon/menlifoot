@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import { ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
-import { useLanguage } from "@/contexts/LanguageContext";
 import { toast } from "sonner";
 import jerseyBlackFront from "@/assets/jersey-black-front.jpeg";
 import jerseyBlackBack from "@/assets/jersey-black-back.jpeg";
@@ -145,8 +144,6 @@ const JerseyCard = ({ product }: { product: (typeof products)[number] }) => {
 };
 
 const MerchSection = () => {
-  const { t } = useLanguage();
-
   return (
     <section id="store" className="py-20 md:py-32 relative overflow-hidden">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
