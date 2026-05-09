@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,11 +10,21 @@ export default function CheckoutReturn() {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get("session_id");
   const { clearCart } = useCart();
+  const sentRef = useRef(false);
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId || sentRef.current) return;
+    // Guard against React StrictMode double-invoke and any remounts
+    // by persisting a marker for this specific Stripe session.
+    const storageKey = `order-confirm-sent:${sessionId}`;
+    if (typeof window !== "undefined" && sessionStorage.getItem(storageKey)) {
+      sentRef.current = true;
+      clearCart();
+      return;
+    }
+    sentRef.current = true;
+    if (typeof window !== "undefined") sessionStorage.setItem(storageKey, "1");
     clearCart();
-    // Trigger order confirmation email (idempotent server-side)
     supabase.functions
       .invoke("send-order-confirmation", {
         body: { sessionId, environment: getStripeEnvironment() },
