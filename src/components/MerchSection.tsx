@@ -90,15 +90,25 @@ const JerseyCard = ({ product }: { product: (typeof products)[number] }) => {
         onClick={() => setPaused((p) => !p)}
         title={paused ? "Click to resume" : "Click to pause"}
       >
-        {/* Wide image: front on left, back on right. Slides left on hover. */}
-        <img
-          src={product.image}
-          alt={product.name}
-          draggable={false}
-          className={`absolute top-0 left-0 h-full w-[200%] max-w-none object-contain p-6 transition-transform ease-in-out ${
-            paused ? "duration-0" : "duration-[3500ms] group-hover:-translate-x-1/2"
-          }`}
-        />
+        {/* 3-image carousel: combo, front, back. Auto-slides; click to pause. */}
+        <div
+          className={`flex h-full w-[300%] ${paused ? "" : "animate-jersey-carousel"}`}
+          style={paused ? undefined : { animationPlayState: "running" }}
+        >
+          {product.images.map((src, i) => (
+            <div
+              key={i}
+              className="w-1/3 h-full flex items-center justify-center p-6"
+            >
+              <img
+                src={src}
+                alt={`${product.name} view ${i + 1}`}
+                draggable={false}
+                className="max-h-full max-w-full object-contain"
+              />
+            </div>
+          ))}
+        </div>
         <div className="absolute top-4 right-4 inline-flex items-center gap-1 bg-primary text-primary-foreground text-[10px] uppercase tracking-[0.15em] px-2.5 py-1 rounded-full font-semibold shadow-md">
           <Sparkles className="h-3 w-3" />
           Pre-order
