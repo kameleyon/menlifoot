@@ -763,6 +763,12 @@ const Admin = () => {
                 <span className="hidden sm:inline">Quizzes</span>
               </TabsTrigger>
               {isAdmin && (
+                <TabsTrigger value="orders" className="flex items-center gap-2">
+                  <Package className="h-4 w-4" />
+                  <span className="hidden sm:inline">Orders</span>
+                </TabsTrigger>
+              )}
+              {isAdmin && (
                 <TabsTrigger value="users" className="flex items-center gap-2">
                   <Users className="h-4 w-4" />
                   <span className="hidden sm:inline">Users</span>
