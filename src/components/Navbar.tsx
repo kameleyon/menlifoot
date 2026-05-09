@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Menu, X, Languages, ChevronDown } from "lucide-react";
+import { Menu, X, Languages, ChevronDown, ShoppingCart } from "lucide-react";
 import menlifootBall from "@/assets/menlifoot-ball.png";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
   const [isEditorialOpen, setIsEditorialOpen] = useState(false);
-  const { totalItems } = useCart();
+  const { totalItems, openCart } = useCart();
   const { language, setLanguage, t } = useLanguage();
   const { isAdmin, isEditor } = useAuth();
   
@@ -167,10 +167,11 @@ const Navbar = () => {
               </AnimatePresence>
             </div>
 
-            {/* Cart button - commented out since store is disabled */}
-            {/* <Button
+            <Button
               variant="ghost"
               size="icon"
+              onClick={openCart}
+              aria-label="Open cart"
               className="relative text-foreground/70 hover:text-primary hover:bg-primary/10"
             >
               <ShoppingCart className="h-5 w-5" />
@@ -179,7 +180,7 @@ const Navbar = () => {
                   {totalItems}
                 </span>
               )}
-            </Button> */}
+            </Button>
             {canAccessAdmin && (
               <Link to="/admin">
                 <Button

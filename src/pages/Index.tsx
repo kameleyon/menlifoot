@@ -4,6 +4,7 @@ import HeroSection from "@/components/HeroSection";
 import ArticlesSection from "@/components/ArticlesSection";
 import ChatSection from "@/components/ChatSection";
 import MerchSection from "@/components/MerchSection";
+import CartDrawer from "@/components/CartDrawer";
 import AIAgent from "@/components/AIAgent";
 import Footer from "@/components/Footer";
 import SplashIntro from "@/components/SplashIntro";
@@ -30,10 +31,11 @@ const Index = () => {
               <HeroSection />
               <ChatSection />
               <ArticlesSection />
-              {/* <MerchSection /> */}
+              <MerchSection />
             </main>
             <Footer />
             <AIAgent />
+            <CartDrawer />
           </>
         )}
       </div>
