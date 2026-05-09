@@ -65,51 +65,76 @@ Deno.serve(async (req) => {
       expand: ["data.line_items", "data.shipping_cost.shipping_rate"],
     });
 
-    const orders = sessions.data
-      .filter((s: any) => s.payment_status === "paid")
-      .map((s: any) => {
-        const addr =
-          s.shipping_details?.address || s.customer_details?.address || null;
-        const name =
-          s.shipping_details?.name || s.customer_details?.name || null;
-        const items = (s.line_items?.data || []).map((li: any) => ({
-          name: li.description,
-          quantity: li.quantity,
-        }));
-        const variants = Object.entries(s.metadata || {})
-          .filter(([k]) => k.startsWith("variant_"))
-          .map(([, v]) => v as string);
-        const currency = (s.currency || "cad").toUpperCase();
-        return {
-          id: s.id,
-          reference: `MF-${s.id.slice(-10).toUpperCase()}`,
-          createdAt: s.created ? s.created * 1000 : null,
-          email: s.customer_details?.email || s.customer_email || null,
-          name,
-          phone: s.customer_details?.phone || null,
-          address: addr
-            ? {
-                line1: addr.line1,
-                line2: addr.line2,
-                city: addr.city,
-                state: addr.state,
-                postal_code: addr.postal_code,
-                country: addr.country,
-              }
-            : null,
-          items,
-          variants,
-          subtotal: fmt(s.amount_subtotal, currency),
-          shipping: fmt(
-            (s as any).shipping_cost?.amount_total ?? null,
-            currency,
-          ),
-          tax: fmt(s.total_details?.amount_tax ?? null, currency),
-          total: fmt(s.amount_total, currency),
+    const paid = sessions.data.filter((s: any) => s.payment_status === "paid");
+
+    // Fetch saved statuses
+    const sessionIds = paid.map((s: any) => s.id);
+    const statusMap = new Map<string, any>();
+    if (sessionIds.length > 0) {
+      const { data: statuses } = await service
+        .from("order_status")
+        .select("*")
+        .in("stripe_session_id", sessionIds);
+      for (const row of statuses || []) {
+        statusMap.set(row.stripe_session_id, row);
+      }
+    }
+
+    const orders = paid.map((s: any) => {
+      const addr =
+        s.shipping_details?.address || s.customer_details?.address || null;
+      const name =
+        s.shipping_details?.name || s.customer_details?.name || null;
+      const items = (s.line_items?.data || []).map((li: any) => ({
+        name: li.description,
+        quantity: li.quantity,
+      }));
+      const variants = Object.entries(s.metadata || {})
+        .filter(([k]) => k.startsWith("variant_"))
+        .map(([, v]) => v as string);
+      const currency = (s.currency || "cad").toUpperCase();
+      const status = statusMap.get(s.id);
+      return {
+        id: s.id,
+        reference: `MF-${s.id.slice(-10).toUpperCase()}`,
+        createdAt: s.created ? s.created * 1000 : null,
+        livemode: !!s.livemode,
+        isTest: !s.livemode,
+        email: s.customer_details?.email || s.customer_email || null,
+        name,
+        phone: s.customer_details?.phone || null,
+        address: addr
+          ? {
+              line1: addr.line1,
+              line2: addr.line2,
+              city: addr.city,
+              state: addr.state,
+              postal_code: addr.postal_code,
+              country: addr.country,
+            }
+          : null,
+        items,
+        variants,
+        amountSubtotal: s.amount_subtotal ?? 0,
+        amountShipping: (s as any).shipping_cost?.amount_total ?? 0,
+        amountTax: s.total_details?.amount_tax ?? 0,
+        amountTotal: s.amount_total ?? 0,
+        subtotal: fmt(s.amount_subtotal, currency),
+        shipping: fmt(
+          (s as any).shipping_cost?.amount_total ?? null,
           currency,
-          status: s.payment_status,
-        };
-      });
+        ),
+        tax: fmt(s.total_details?.amount_tax ?? null, currency),
+        total: fmt(s.amount_total, currency),
+        currency,
+        paymentStatus: s.payment_status,
+        fulfillmentStatus: status?.status || "new",
+        trackingNumber: status?.tracking_number || null,
+        carrier: status?.carrier || null,
+        notes: status?.notes || null,
+        statusUpdatedAt: status?.updated_at || null,
+      };
+    });
 
     return new Response(JSON.stringify({ orders }), {
       status: 200,

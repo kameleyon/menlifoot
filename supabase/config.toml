@@ -31,3 +31,5 @@ project_id = "tjotexujwnfltszqqovk"
     verify_jwt = false
   [functions.translate-article]
     verify_jwt = false
+  [functions.update-order-status]
+    verify_jwt = false
