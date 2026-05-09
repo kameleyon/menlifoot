@@ -12,10 +12,8 @@ import {
 } from "@/components/ui/select";
 import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
-import jerseyBlackFront from "@/assets/jersey-black-front.jpeg";
-import jerseyBlackBack from "@/assets/jersey-black-back.jpeg";
-import jerseyWhiteFront from "@/assets/jersey-white-front.jpeg";
-import jerseyWhiteBack from "@/assets/jersey-white-back.jpeg";
+import jerseyBlackCombo from "@/assets/jersey-black-combo.jpeg";
+import jerseyWhiteCombo from "@/assets/jersey-white-combo.jpeg";
 
 type Gender = "male" | "female" | "kid";
 type Size = "S" | "M" | "L" | "XL";
@@ -35,14 +33,12 @@ const products = [
   {
     id: "jersey-black",
     name: "Menlifoot Jersey — Black",
-    front: jerseyBlackFront,
-    back: jerseyBlackBack,
+    image: jerseyBlackCombo,
   },
   {
     id: "jersey-white",
     name: "Menlifoot Jersey — White",
-    front: jerseyWhiteFront,
-    back: jerseyWhiteBack,
+    image: jerseyWhiteCombo,
   },
 ];
 
