@@ -225,10 +225,58 @@ const JerseyCard = ({ product }: { product: (typeof products)[number] }) => {
             </div>
           </div>
           {(customName || customNumber) && (
-            <p className="text-[11px] text-muted-foreground">
-              Preview: <span className="text-primary font-semibold tracking-wider">{customName || "—"}</span>{" "}
-              <span className="text-primary font-semibold">#{customNumber || "—"}</span>
-            </p>
+            <div className="space-y-2">
+              <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground text-center">
+                Back preview — confirm before adding
+              </p>
+              <div className="relative mx-auto w-full max-w-[260px] aspect-[3/4] rounded-md overflow-hidden bg-surface border border-border/40">
+                <img
+                  src={product.backBlank}
+                  alt={`${product.name} back preview`}
+                  className="absolute inset-0 w-full h-full object-contain"
+                  draggable={false}
+                />
+                {/* Name (upper back) */}
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 text-center pointer-events-none select-none"
+                  style={{
+                    top: "26%",
+                    fontFamily: "'Oswald', sans-serif",
+                    fontWeight: 600,
+                    letterSpacing: "0.18em",
+                    fontSize: "clamp(10px, 4.2vw, 22px)",
+                    color: product.isDark ? "hsl(45, 75%, 55%)" : "hsl(40, 60%, 35%)",
+                    textShadow: product.isDark
+                      ? "0 1px 0 rgba(0,0,0,0.4)"
+                      : "0 1px 0 rgba(0,0,0,0.15)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {customName || "\u00A0"}
+                </div>
+                {/* Number (center back) */}
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 text-center pointer-events-none select-none"
+                  style={{
+                    top: "42%",
+                    fontFamily: "'Oswald', sans-serif",
+                    fontWeight: 700,
+                    fontSize: "clamp(40px, 18vw, 96px)",
+                    lineHeight: 1,
+                    color: product.isDark ? "hsl(45, 75%, 55%)" : "hsl(40, 60%, 35%)",
+                    textShadow: product.isDark
+                      ? "0 2px 0 rgba(0,0,0,0.4)"
+                      : "0 2px 0 rgba(0,0,0,0.15)",
+                  }}
+                >
+                  {customNumber || "\u00A0"}
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground text-center">
+                <span className="text-primary font-semibold tracking-wider">{customName || "—"}</span>{" "}
+                <span className="text-primary font-semibold">#{customNumber || "—"}</span>
+              </p>
+            </div>
           )}
         </div>
 
