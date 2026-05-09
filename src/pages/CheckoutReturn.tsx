@@ -3,6 +3,8 @@ import { Link, useSearchParams } from "react-router-dom";
 import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
+import { supabase } from "@/integrations/supabase/client";
+import { getStripeEnvironment } from "@/lib/stripe";
 
 export default function CheckoutReturn() {
   const [searchParams] = useSearchParams();
@@ -10,7 +12,14 @@ export default function CheckoutReturn() {
   const { clearCart } = useCart();
 
   useEffect(() => {
-    if (sessionId) clearCart();
+    if (!sessionId) return;
+    clearCart();
+    // Trigger order confirmation email (idempotent server-side)
+    supabase.functions
+      .invoke("send-order-confirmation", {
+        body: { sessionId, environment: getStripeEnvironment() },
+      })
+      .catch((e) => console.error("Order confirmation email failed:", e));
   }, [sessionId, clearCart]);
 
   return (
