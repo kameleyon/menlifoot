@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Menu, X, Languages, ChevronDown, ShoppingCart } from "lucide-react";
-import menlifootBall from "@/assets/menlifoot-ball.png";
+import menlifootBall from "@/assets/soccer-ball-icon.png";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
