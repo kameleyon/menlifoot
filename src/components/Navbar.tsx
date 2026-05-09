@@ -74,10 +74,9 @@ const Navbar = () => {
             <motion.img 
               src={menlifootBall} 
               alt="Menlifoot" 
-              className="h-8 w-8 md:h-10 md:w-10"
-              animate={{ rotate: [0, 360] }}
-              transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-              whileHover={{ scale: 1.2, rotate: 720 }}
+              className="h-10 w-10 md:h-12 md:w-12 object-contain"
+              whileHover={{ scale: 1.1 }}
+              transition={{ duration: 0.3 }}
             />
             <span className="font-display text-2xl md:text-3xl font-light tracking-wide text-gradient-gold uppercase">
               MENLIFOOT
