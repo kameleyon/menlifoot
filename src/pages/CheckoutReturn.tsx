@@ -28,8 +28,11 @@ export default function CheckoutReturn() {
           shipping updates as your jersey moves through production.
         </p>
         {sessionId && (
-          <p className="text-xs text-muted-foreground/70 break-all">
-            Order reference: {sessionId}
+          <p className="text-sm text-muted-foreground">
+            Order reference:{" "}
+            <span className="font-mono text-primary tracking-wider">
+              MF-{sessionId.slice(-10).toUpperCase()}
+            </span>
           </p>
         )}
         <Link to="/">
