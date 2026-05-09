@@ -3,7 +3,8 @@
 import * as React from 'npm:react@18.3.1'
 
 import {
-  Body, Button, Container, Head, Heading, Hr, Html, Preview, Section, Text,
+  Body,
+  Img, Button, Container, Head, Heading, Hr, Html, Preview, Section, Text,
 } from 'npm:@react-email/components@0.0.22'
 
 interface InviteEmailProps {
@@ -19,6 +20,7 @@ export const InviteEmail = ({ siteName, confirmationUrl }: InviteEmailProps) => 
     <Body style={main}>
       <Container style={container}>
         <Section style={header}>
+          <Img src="https://tjotexujwnfltszqqovk.supabase.co/storage/v1/object/public/email-assets/menlifoot-ball.png" alt="Menlifoot" width="72" height="72" style={logo} />
           <Heading style={brand}>{siteName.toUpperCase()}</Heading>
           <Text style={tagline}>Invitation</Text>
         </Section>
@@ -45,6 +47,7 @@ const GOLD = '#D4AF37'
 const BLACK = '#0a0a0a'
 const main: React.CSSProperties = { backgroundColor: '#ffffff', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif', margin: 0, padding: 0 }
 const container: React.CSSProperties = { maxWidth: '560px', margin: '0 auto', padding: '24px 16px' }
+const logo: React.CSSProperties = { display: 'block', margin: '0 auto 12px', borderRadius: '50%' }
 const header: React.CSSProperties = { textAlign: 'center', padding: '24px 0' }
 const brand: React.CSSProperties = { color: GOLD, fontSize: '32px', fontWeight: 300, letterSpacing: '0.2em', margin: 0 }
 const tagline: React.CSSProperties = { color: '#999', fontSize: '12px', letterSpacing: '0.15em', textTransform: 'uppercase', margin: '8px 0 0' }

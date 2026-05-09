@@ -1,6 +1,7 @@
 import * as React from 'npm:react@18.3.1'
 import {
   Body,
+  Img,
   Container,
   Head,
   Heading,
@@ -53,6 +54,7 @@ const OrderConfirmationEmail = ({
     <Body style={main}>
       <Container style={container}>
         <Section style={header}>
+          <Img src="https://tjotexujwnfltszqqovk.supabase.co/storage/v1/object/public/email-assets/menlifoot-ball.png" alt="Menlifoot" width="72" height="72" style={logo} />
           <Heading style={brand}>{SITE_NAME.toUpperCase()}</Heading>
           <Text style={tagline}>Pre-order confirmed</Text>
         </Section>
@@ -186,6 +188,7 @@ const container: React.CSSProperties = {
   margin: '0 auto',
   padding: '24px 16px',
 }
+const logo: React.CSSProperties = { display: 'block', margin: '0 auto 12px', borderRadius: '50%' }
 const header: React.CSSProperties = {
   textAlign: 'center',
   padding: '24px 0',
