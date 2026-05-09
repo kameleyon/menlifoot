@@ -23,6 +23,7 @@ const CartDrawer = () => {
   };
 
   return (
+    <>
     <Sheet open={isOpen} onOpenChange={(o) => !o && closeCart()}>
       <SheetContent className="flex flex-col w-full sm:max-w-md">
         <SheetHeader>
