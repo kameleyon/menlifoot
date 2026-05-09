@@ -173,6 +173,50 @@ const JerseyCard = ({ product }: { product: (typeof products)[number] }) => {
           </div>
         </div>
 
+        <div className="space-y-3 rounded-lg border border-border/50 bg-background/30 p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-[0.15em] text-primary font-semibold">
+              Customize the back
+            </span>
+            <span className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+              Optional
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2">
+              <label className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-1.5 block">
+                Name
+              </label>
+              <Input
+                value={customName}
+                onChange={(e) => handleNameChange(e.target.value)}
+                placeholder="RICHARD"
+                maxLength={12}
+                className="bg-background/50 uppercase tracking-wider"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-1.5 block">
+                Number
+              </label>
+              <Input
+                value={customNumber}
+                onChange={(e) => handleNumberChange(e.target.value)}
+                placeholder="10"
+                inputMode="numeric"
+                maxLength={2}
+                className="bg-background/50 text-center"
+              />
+            </div>
+          </div>
+          {(customName || customNumber) && (
+            <p className="text-[11px] text-muted-foreground">
+              Preview: <span className="text-primary font-semibold tracking-wider">{customName || "—"}</span>{" "}
+              <span className="text-primary font-semibold">#{customNumber || "—"}</span>
+            </p>
+          )}
+        </div>
+
         <Button variant="gold" className="w-full" size="lg" onClick={handleAdd}>
           <ShoppingBag className="h-4 w-4 mr-2" />
           Pre-order — ${PREORDER_PRICE} CAD
