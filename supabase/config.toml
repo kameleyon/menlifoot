@@ -11,6 +11,8 @@ project_id = "tjotexujwnfltszqqovk"
     verify_jwt = false
   [functions.handle-email-suppression]
     verify_jwt = false
+  [functions.list-orders]
+    verify_jwt = false
   [functions.handle-email-unsubscribe]
     verify_jwt = false
   [functions.manage-users]
