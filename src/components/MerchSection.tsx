@@ -210,7 +210,11 @@ const JerseyCard = ({ product }: { product: (typeof products)[number] }) => {
           )}
         </div>
 
-        <Button variant="gold" className="w-full" size="lg" onClick={handleAdd}>
+        <Button
+          size="lg"
+          onClick={handleAdd}
+          className="w-full font-medium tracking-wide uppercase text-black bg-gradient-to-r from-[hsl(45,90%,55%)] via-[hsl(45,95%,65%)] to-[hsl(45,85%,50%)] hover:from-[hsl(45,90%,60%)] hover:via-[hsl(45,95%,70%)] hover:to-[hsl(45,85%,55%)] shadow-[0_4px_20px_-4px_hsl(45,90%,55%/0.55)] hover:shadow-[0_6px_28px_-4px_hsl(45,90%,55%/0.75)] transition-all duration-300 border border-[hsl(45,80%,45%)]/40"
+        >
           <ShoppingBag className="h-4 w-4 mr-2" />
           Pre-order — ${PREORDER_PRICE} CAD
         </Button>
