@@ -72,6 +72,7 @@ const CATEGORY_LABEL_KEYS: Record<CategoryValue, string> = {
   "Did You Know?": "articles.cat.didYouKnow",
   Flashback: "articles.cat.flashback",
   "Football Business": "articles.cat.footballBusiness",
+  Haiti: "articles.cat.haiti",
 };
 
 const getCategoryLabel = (t: (key: string) => string, category: string) => {
