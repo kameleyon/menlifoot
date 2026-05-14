@@ -51,6 +51,7 @@ const CATEGORY_VALUES = [
   "Did You Know?",
   "Flashback",
   "Football Business",
+  "Haiti",
 ] as const;
 
 type CategoryValue = (typeof CATEGORY_VALUES)[number];
