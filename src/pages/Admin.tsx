@@ -132,6 +132,7 @@ const ARTICLE_CATEGORIES = [
   'Did You Know?',
   'Flashback',
   'Football Business',
+  'Haiti',
 ];
 
 // Common keyword suggestions for football articles
