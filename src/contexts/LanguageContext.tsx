@@ -179,6 +179,7 @@ const translations: Record<Language, Record<string, string>> = {
     'articles.cat.didYouKnow': 'Did You Know?',
     'articles.cat.flashback': 'Flashback',
     'articles.cat.footballBusiness': 'Football Business',
+    'articles.cat.haiti': 'Haiti',
     'articles.subtitle': 'The latest football news, transfers, and analysis from around the world',
     'articles.searchPlaceholder': 'Search articles...',
     'articles.noResults': 'No articles found',

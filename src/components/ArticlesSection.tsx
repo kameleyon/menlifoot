@@ -37,10 +37,10 @@ interface TranslatedArticle extends Article {
 // Cache for translated articles
 const translationCache: Map<string, TranslatedArticle> = new Map();
 
-// Available categories including Haiti World Cup 26
+// Available categories
 const CATEGORIES = [
   'All',
-  'Haiti World Cup 26',
+  'Haiti',
   'Transfers',
   'Champions League',
   'Ligue 1',
