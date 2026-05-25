@@ -30,7 +30,7 @@ const Index = () => {
             <main>
               <HeroSection />
               <ChatSection />
-              <MerchSection />
+              {/* <MerchSection /> — temporarily hidden */}
               <ArticlesSection />
             </main>
             <Footer />
