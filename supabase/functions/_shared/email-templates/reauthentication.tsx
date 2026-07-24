@@ -19,7 +19,7 @@ export const ReauthenticationEmail = ({ token, siteName = 'Menlifoot' }: Reauthe
     <Body style={main}>
       <Container style={container}>
         <Section style={header}>
-          <Img src="https://tjotexujwnfltszqqovk.supabase.co/storage/v1/object/public/email-assets/menlifoot-ball.png" alt="Menlifoot" width="72" height="72" style={logo} />
+          <Img src="https://pgxeinqbqyyqvzoevogd.supabase.co/storage/v1/object/public/email-assets/menlifoot-ball.png" alt="Menlifoot" width="72" height="72" style={logo} />
           <Heading style={brand}>{siteName.toUpperCase()}</Heading>
           <Text style={tagline}>Verification code</Text>
         </Section>
