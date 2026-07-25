@@ -25,3 +25,4 @@ dist-ssr
 
 # local backup of original hi-res logo (not for repo)
 public/logo-original.png
+public/logoblack.png
