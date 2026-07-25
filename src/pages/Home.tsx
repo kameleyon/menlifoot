@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import wordmark from '@/assets/soccer-ball-icon.png';
+import wordmark from '@/assets/wordmark.png';
 import AppShell from '@/components/mobile/AppShell';
 
 interface Article {
@@ -139,7 +139,7 @@ const Home = () => {
           <div className="mb-3.5 font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-primary">MVP Podcast · new episode</div>
           <div className="flex items-center gap-3.5">
             <div className="flex h-16 w-16 flex-none items-center justify-center rounded-[10px] border border-white/[0.09] bg-[#070708]">
-              <img src={wordmark} alt="" className="h-[34px] w-auto" />
+              <img src="/logo.png" alt="" className="h-[34px] w-auto" />
             </div>
             <div className="flex flex-1 flex-col gap-[5px]">
               <div className="font-sans text-[14px] font-semibold leading-[1.25]">{podcast?.title ?? 'Road to 2026: the math'}</div>
