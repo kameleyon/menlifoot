@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import AppShell from '@/components/mobile/AppShell';
 import PlayerModal from '@/components/mobile/PlayerModal';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { HaitiPlayer, HaitiStat, HaitiConvocation, fullName, positionGroup, POSITION_ORDER, PositionGroup } from '@/types/grenadiers';
 
 type Match = { tournament: string | null; opponent: string | null; date: string | null; result: string | null };
-const POS_LABEL: Record<PositionGroup, string> = { Gardiens: 'Goalkeepers', Défenseurs: 'Defenders', Milieux: 'Midfielders', Attaquants: 'Forwards', Autres: 'Others' };
+const POS_KEY: Record<PositionGroup, string> = { Gardiens: 'gren.posGk', Défenseurs: 'gren.posDef', Milieux: 'gren.posMid', Attaquants: 'gren.posAtt', Autres: 'gren.posOther' };
+const TAB_KEY: Record<string, string> = { records: 'gren.rRecords', results: 'gren.rResults', squad: 'gren.rSquad' };
 const resultColor = (r: string | null) => {
   const c = (r ?? '').toUpperCase();
   if (c.includes('(V)') || c.includes('(W)')) return { bg: 'rgba(88,190,120,.16)', fg: '#7fd69a', res: 'W' };
@@ -18,6 +20,7 @@ const GrenadiersApp = () => {
   const [players, setPlayers] = useState<HaitiPlayer[]>([]);
   const [convs, setConvs] = useState<HaitiConvocation[]>([]);
   const [allStats, setAllStats] = useState<HaitiStat[]>([]);
+  const { t } = useLanguage();
   const [tab, setTab] = useState<'records' | 'results' | 'squad'>('records');
   const [following, setFollowing] = useState(false);
   const [selected, setSelected] = useState<HaitiPlayer | null>(null);
@@ -63,12 +66,12 @@ const GrenadiersApp = () => {
       <div className="pt-14">
         {/* Header */}
         <div className="flex flex-col gap-[11px] px-5 pb-[18px]">
-          <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.18em] text-primary">National team · {players.length} players</span>
+          <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.18em] text-primary">{t('gren.nationalTeam')} · {players.length} {t('gren.players')}</span>
           <span className="font-display text-[34px] uppercase leading-[0.95]">Les Grenadiers</span>
-          <span className="font-sans text-[12.5px] leading-[1.5] text-foreground/55">Results, call-ups and a profile for every player in the Haitian selection — clubs, caps, goals, market value.</span>
+          <span className="font-sans text-[12.5px] leading-[1.5] text-foreground/55">{t('gren.desc')}</span>
           <button onClick={() => setFollowing((f) => !f)} className="mt-[3px] self-start rounded-full px-[18px] py-[11px] font-sans text-[11px] font-bold uppercase tracking-[0.08em]"
             style={following ? { border: '1px solid rgba(255,255,255,.16)', color: 'rgba(244,242,238,.7)' } : { border: '1px solid transparent', background: 'linear-gradient(135deg,#e9c877,#c08a2a)', color: '#070708' }}>
-            {following ? 'Following' : 'Follow team'}
+            {following ? t('gren.following') : t('gren.followTeam')}
           </button>
         </div>
 
@@ -76,7 +79,7 @@ const GrenadiersApp = () => {
         {lastMatch && (
           <div className="mx-5 mb-[18px] flex flex-col gap-3 rounded-2xl border border-primary/[0.28] p-[18px]" style={{ background: 'linear-gradient(135deg,rgba(200,154,60,.12),rgba(200,154,60,.02))' }}>
             <div className="flex items-center justify-between">
-              <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-primary">Last match</span>
+              <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-primary">{t('gren.lastMatch')}</span>
               <span className="font-mono text-[10px] text-foreground/50">{lastMatch.date ? new Date(lastMatch.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }) : ''}</span>
             </div>
             <span className="font-display text-[26px] uppercase leading-[1.02]">Haiti {(lastMatch.result ?? '').replace(/\s*\(.\)/, '')} {lastMatch.opponent}</span>
@@ -88,23 +91,23 @@ const GrenadiersApp = () => {
 
         {/* Tabs */}
         <div className="flex gap-2 px-5 pb-3.5">
-          {(['records', 'results', 'squad'] as const).map((t) => (
-            <button key={t} onClick={() => setTab(t)} className="flex-none rounded-full px-3.5 py-2 font-sans text-[11px] font-semibold uppercase tracking-[0.08em] capitalize"
-              style={tab === t ? { background: '#f4f2ee', color: '#070708' } : { border: '1px solid rgba(255,255,255,.14)', color: 'rgba(244,242,238,.7)' }}>{t}</button>
+          {(['records', 'results', 'squad'] as const).map((tb) => (
+            <button key={tb} onClick={() => setTab(tb)} className="flex-none rounded-full px-3.5 py-2 font-sans text-[11px] font-semibold uppercase tracking-[0.08em]"
+              style={tab === tb ? { background: '#f4f2ee', color: '#070708' } : { border: '1px solid rgba(255,255,255,.14)', color: 'rgba(244,242,238,.7)' }}>{t(TAB_KEY[tb])}</button>
           ))}
         </div>
 
         {/* Records */}
         {tab === 'records' && (
           <div className="flex flex-col">
-            <div className="px-5 pb-2.5 pt-1.5 font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-foreground/40">All-time goals</div>
+            <div className="px-5 pb-2.5 pt-1.5 font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-foreground/40">{t('gren.allTimeGoals')}</div>
             {topScorers.map((l) => (
               <div key={l.player_id} className="flex items-center gap-3.5 border-t border-white/[0.05] px-5 py-3">
                 <span className="w-[30px] flex-none text-center font-display text-[20px] text-primary">{l.goals}</span>
                 <div className="flex flex-1 flex-col gap-1"><span className="font-sans text-[13px] font-medium">{nm(l.player_id)}</span><span className="font-sans text-[10.5px] text-foreground/40">Sélection · {l.matches_played ?? '—'} caps</span></div>
               </div>
             ))}
-            <div className="px-5 pb-2.5 pt-[22px] font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-foreground/40">Most caps</div>
+            <div className="px-5 pb-2.5 pt-[22px] font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-foreground/40">{t('gren.mostCaps')}</div>
             {topCaps.map((l) => (
               <div key={l.player_id} className="flex items-center gap-3.5 border-t border-white/[0.05] px-5 py-3">
                 <span className="w-[30px] flex-none text-center font-display text-[20px] text-foreground/70">{l.matches_played}</span>
@@ -135,7 +138,7 @@ const GrenadiersApp = () => {
           <div className="flex flex-col">
             {POSITION_ORDER.filter((g) => squad[g].length).map((g) => (
               <div key={g} className="flex flex-col">
-                <div className="px-5 pb-2 pt-3.5 font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-foreground/40">{POS_LABEL[g]}</div>
+                <div className="px-5 pb-2 pt-3.5 font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-foreground/40">{t(POS_KEY[g])}</div>
                 {squad[g].map((p) => (
                   <button key={p.id} onClick={() => setSelected(p)} className="flex w-full items-center gap-3.5 border-t border-white/[0.05] px-5 py-[11px] text-left transition-colors hover:bg-white/[0.03]">
                     <span className="w-[26px] flex-none text-center font-display text-[15px] text-primary">{p.jersey_number ?? '·'}</span>

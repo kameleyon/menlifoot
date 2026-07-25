@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useLanguage } from '@/contexts/LanguageContext';
 import wordmark from '@/assets/wordmark.png';
 import AppShell from '@/components/mobile/AppShell';
 import { podcastThumb } from '@/lib/podcast';
@@ -49,6 +50,7 @@ const SHOP = [
 
 const Home = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [articles, setArticles] = useState<Article[]>([]);
   const [podcast, setPodcast] = useState<Podcast | null>(null);
 
@@ -101,7 +103,7 @@ const Home = () => {
           <button onClick={() => navigate(`/articles/${lead.id}`)} className="mx-5 mb-[22px] block w-[calc(100%-40px)] text-left">
             <div className="relative flex h-[290px] flex-col justify-end overflow-hidden rounded-2xl" style={{ background: lead.thumbnail_url ? undefined : stripe }}>
               {lead.thumbnail_url && <img src={lead.thumbnail_url} alt="" className="absolute inset-0 h-full w-full object-cover" />}
-              <span className="absolute left-3.5 top-3.5 rounded-full bg-primary px-[9px] py-[5px] font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-[#070708]">Lead story</span>
+              <span className="absolute left-3.5 top-3.5 rounded-full bg-primary px-[9px] py-[5px] font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-[#070708]">{t('home.leadStory')}</span>
               <div className="relative px-[18px] pb-[18px] pt-[22px]" style={{ background: 'linear-gradient(to top,rgba(7,7,8,.94) 12%,rgba(7,7,8,0))' }}>
                 <div className="mb-[9px] font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-primary">{lead.category ?? 'Analysis'}</div>
                 <div className="font-display text-[25px] uppercase leading-[1.08] tracking-[0.005em]">{lead.title}</div>
@@ -114,16 +116,16 @@ const Home = () => {
         {/* Ask Menli */}
         <button onClick={() => navigate('/ask')} className="mx-5 mb-[26px] flex w-[calc(100%-40px)] items-center gap-3.5 rounded-2xl border border-primary/30 px-[18px] py-4 text-left" style={{ background: 'linear-gradient(135deg,rgba(200,154,60,.1),rgba(200,154,60,.02))' }}>
           <div className="flex flex-1 flex-col gap-[5px]">
-            <div className="font-sans text-[14px] font-semibold">Ask Menli</div>
-            <div className="font-sans text-[12px] leading-[1.45] text-foreground/60">Anything about the game — squads, history, tactics.</div>
+            <div className="font-sans text-[14px] font-semibold">{t('home.askTitle')}</div>
+            <div className="font-sans text-[12px] leading-[1.45] text-foreground/60">{t('home.askSub')}</div>
           </div>
           <span className="font-display text-[22px] text-primary">→</span>
         </button>
 
         {/* Latest */}
         <div className="flex items-baseline justify-between px-5 pb-3">
-          <span className="font-display text-[15px] uppercase tracking-[0.04em]">Latest</span>
-          <Link to="/articles" className="font-sans text-[11px] font-medium text-foreground/45">All analysis</Link>
+          <span className="font-display text-[15px] uppercase tracking-[0.04em]">{t('home.latest')}</span>
+          <Link to="/articles" className="font-sans text-[11px] font-medium text-foreground/45">{t('home.allAnalysis')}</Link>
         </div>
         <div className="flex flex-col">
           {latest.map((a) => (
@@ -140,7 +142,7 @@ const Home = () => {
 
         {/* Podcast */}
         <div className="mx-5 mt-7 rounded-2xl border border-white/[0.07] bg-[#101012] p-[18px]">
-          <div className="mb-3.5 font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-primary">MVP Podcast · new episode</div>
+          <div className="mb-3.5 font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-primary">{t('home.podcastNew')}</div>
           <div className="flex items-center gap-3.5">
             <div className="flex h-16 w-16 flex-none items-center justify-center overflow-hidden rounded-[10px] border border-white/[0.09] bg-[#070708]">
               {podcast && podcastThumb(podcast)
@@ -160,8 +162,8 @@ const Home = () => {
         {/* Shop */}
         <div className="mx-5 mt-[22px] flex flex-col gap-3">
           <div className="flex items-baseline justify-between">
-            <span className="font-display text-[15px] uppercase tracking-[0.04em]">Shop · launch drop</span>
-            <Link to="/shop" className="font-sans text-[11px] font-medium text-primary">See all</Link>
+            <span className="font-display text-[15px] uppercase tracking-[0.04em]">{t('home.shopDrop')}</span>
+            <Link to="/shop" className="font-sans text-[11px] font-medium text-primary">{t('home.seeAll')}</Link>
           </div>
           <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none]">
             {SHOP.map((p, i) => (

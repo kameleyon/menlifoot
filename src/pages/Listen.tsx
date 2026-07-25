@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import lockup from '@/assets/wordmark.png';
 import AppShell from '@/components/mobile/AppShell';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { podcastThumb } from '@/lib/podcast';
 
 interface Podcast {
@@ -27,6 +28,7 @@ const VIDEOS = [
 ];
 
 const Listen = () => {
+  const { t } = useLanguage();
   const [pods, setPods] = useState<Podcast[]>([]);
 
   useEffect(() => {
@@ -45,8 +47,8 @@ const Listen = () => {
     <AppShell>
       <div className="pt-14">
         <div className="flex flex-col gap-1.5 px-5 pb-[18px]">
-          <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.18em] text-primary">Menlifoot original</span>
-          <span className="font-display text-[30px] uppercase tracking-[0.01em]">MVP Podcast</span>
+          <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.18em] text-primary">{t('listen.original')}</span>
+          <span className="font-display text-[30px] uppercase tracking-[0.01em]">{t('listen.title')}</span>
         </div>
 
         {/* Now playing */}
@@ -78,7 +80,7 @@ const Listen = () => {
         </div>
 
         {/* Episodes */}
-        <div className="px-5 pb-2.5 font-display text-[15px] uppercase tracking-[0.04em]">Episodes</div>
+        <div className="px-5 pb-2.5 font-display text-[15px] uppercase tracking-[0.04em]">{t('listen.episodes')}</div>
         {rest.map((e) => (
           <button key={e.id} onClick={() => open(e.original_url)} className="flex w-full items-center gap-3.5 border-t border-white/[0.06] px-5 py-3.5 text-left transition-colors hover:bg-white/[0.03]">
             <div className="relative flex h-11 w-11 flex-none items-center justify-center overflow-hidden rounded-lg border border-white/[0.08] bg-[#111114] font-display text-[12px] text-primary">
@@ -96,7 +98,7 @@ const Listen = () => {
 
         {/* Watch */}
         <div className="mx-5 mt-[26px] flex flex-col gap-2.5 rounded-2xl border border-white/[0.08] px-[18px] py-4">
-          <span className="font-sans text-[13px] font-semibold">Watch · interviews</span>
+          <span className="font-sans text-[13px] font-semibold">{t('listen.watch')}</span>
           <div className="flex gap-3 overflow-x-auto [scrollbar-width:none]">
             {VIDEOS.map((v, i) => (
               <div key={i} className="w-[180px] flex-none">

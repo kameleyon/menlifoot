@@ -2,21 +2,17 @@ import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import { supabase } from '@/integrations/supabase/client';
+import { useLanguage } from '@/contexts/LanguageContext';
 import AppShell from '@/components/mobile/AppShell';
 
 interface Msg { role: 'user' | 'bot'; content: string; }
 
-const PROMPTS = [
-  'Who is the Haiti captain?',
-  'Best all-time Grenadiers scorer?',
-  'How did Haiti do at WC 2026?',
-];
+const PROMPT_KEYS = ['ask.p1', 'ask.p2', 'ask.p3'];
 
 const Ask = () => {
   const navigate = useNavigate();
-  const [thread, setThread] = useState<Msg[]>([
-    { role: 'bot', content: "I'm Menli — ask me anything about the game: squads, history, tactics, the Grenadiers." },
-  ]);
+  const { t } = useLanguage();
+  const [thread, setThread] = useState<Msg[]>(() => [{ role: 'bot', content: t('ask.intro') }]);
   const [input, setInput] = useState('');
   const [asking, setAsking] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -34,7 +30,7 @@ const Ask = () => {
       if (error) throw error;
       setThread((p) => [...p, { role: 'bot', content: (data as { reply?: string })?.reply ?? 'Try again.' }]);
     } catch {
-      setThread((p) => [...p, { role: 'bot', content: 'My bad, something went wrong. Try again! ⚽' }]);
+      setThread((p) => [...p, { role: 'bot', content: t('ask.error') }]);
     } finally {
       setAsking(false);
       requestAnimationFrame(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }));
@@ -48,8 +44,8 @@ const Ask = () => {
         <div className="flex items-center gap-3 border-b border-white/[0.07] px-4 pb-[18px]">
           <button onClick={() => navigate(-1)} className="flex h-[34px] w-[34px] items-center justify-center rounded-full border border-white/[0.12] font-display text-[15px]">←</button>
           <div className="flex flex-col gap-[3px]">
-            <span className="font-sans text-[14px] font-semibold">Ask Menli</span>
-            <span className="font-sans text-[10.5px] text-foreground/40">Trained on our archive · answers cite sources</span>
+            <span className="font-sans text-[14px] font-semibold">{t('ask.title')}</span>
+            <span className="font-sans text-[10.5px] text-foreground/40">{t('ask.sub')}</span>
           </div>
         </div>
 
@@ -81,8 +77,8 @@ const Ask = () => {
         {/* Prompt chips */}
         {thread.length <= 1 && (
           <div className="fixed bottom-[128px] left-1/2 z-30 flex w-full max-w-[520px] -translate-x-1/2 flex-wrap gap-2 px-5">
-            {PROMPTS.map((p) => (
-              <button key={p} onClick={() => send(p)} className="rounded-full border border-white/[0.13] px-[13px] py-[9px] font-sans text-[11.5px] font-medium text-foreground/70 transition-colors hover:border-primary/60 hover:text-primary">{p}</button>
+            {PROMPT_KEYS.map((p) => (
+              <button key={p} onClick={() => send(t(p))} className="rounded-full border border-white/[0.13] px-[13px] py-[9px] font-sans text-[11.5px] font-medium text-foreground/70 transition-colors hover:border-primary/60 hover:text-primary">{t(p)}</button>
             ))}
           </div>
         )}
@@ -94,7 +90,7 @@ const Ask = () => {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && send(input)}
-              placeholder="Ask about a match, a squad, a stat…"
+              placeholder={t('ask.placeholder')}
               className="flex-1 bg-transparent font-sans text-[13px] text-foreground placeholder:text-foreground/35 focus:outline-none"
             />
             <button onClick={() => send(input)} className="flex h-8 w-8 items-center justify-center rounded-full font-display text-[14px] text-[#070708]" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>↑</button>

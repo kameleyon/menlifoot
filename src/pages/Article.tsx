@@ -15,7 +15,7 @@ const stripe = 'repeating-linear-gradient(135deg,#1b1b1f 0 8px,#131316 8px 16px)
 const Article = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const [art, setArt] = useState<Art | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -68,7 +68,7 @@ const Article = () => {
               </div>
             )}
             <button onClick={() => navigate('/ask')} className="mt-3.5 flex items-center justify-between rounded-2xl border border-primary/30 bg-primary/[0.06] px-4 py-[15px] text-left">
-              <span className="font-sans text-[12.5px] leading-[1.4] text-foreground/80">Ask Menli about this piece</span>
+              <span className="font-sans text-[12.5px] leading-[1.4] text-foreground/80">{t('art.askPiece')}</span>
               <span className="font-display text-[18px] text-primary">→</span>
             </button>
           </div>
