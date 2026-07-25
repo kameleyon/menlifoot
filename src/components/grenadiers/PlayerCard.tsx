@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { HaitiPlayer, fullName, initials } from '@/types/grenadiers';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { HaitiPlayer, fullName, initials, localizePosition, localizeValue } from '@/types/grenadiers';
 
 interface PlayerCardProps {
   player: HaitiPlayer;
@@ -16,6 +17,7 @@ const statusDot = (status: string | null) => {
 };
 
 const PlayerCard = ({ player, onClick }: PlayerCardProps) => {
+  const { language } = useLanguage();
   return (
     <motion.button
       type="button"
@@ -36,13 +38,13 @@ const PlayerCard = ({ player, onClick }: PlayerCardProps) => {
       </Avatar>
 
       <h3 className="font-medium text-foreground">{fullName(player)}</h3>
-      <p className="mt-0.5 text-xs uppercase tracking-wide text-muted-foreground">{player.position ?? '—'}</p>
+      <p className="mt-0.5 text-xs uppercase tracking-wide text-muted-foreground">{localizePosition(player.position, language) ?? '—'}</p>
       <p className="mt-1 line-clamp-1 text-sm text-foreground/80">{player.current_club ?? '—'}</p>
 
       {player.status && (
         <span className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-border/50 px-2.5 py-0.5 text-[11px] text-muted-foreground">
           <span className={`h-1.5 w-1.5 rounded-full ${statusDot(player.status)}`} />
-          {player.status}
+          {localizeValue(player.status, language)}
         </span>
       )}
     </motion.button>

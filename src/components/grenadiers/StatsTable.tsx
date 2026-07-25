@@ -1,5 +1,5 @@
 import { useLanguage } from '@/contexts/LanguageContext';
-import { HaitiStat, HaitiPlayer, fullName } from '@/types/grenadiers';
+import { HaitiStat, HaitiPlayer, fullName, localizeValue } from '@/types/grenadiers';
 
 interface Props {
   stats: HaitiStat[];
@@ -7,7 +7,7 @@ interface Props {
 }
 
 const StatsTable = ({ stats, playersById }: Props) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   if (stats.length === 0) return <p className="py-10 text-center text-muted-foreground">{t('gren.noStats')}</p>;
 
@@ -33,8 +33,8 @@ const StatsTable = ({ stats, playersById }: Props) => {
             return (
               <tr key={s.id} className="border-t border-border/30 transition-colors hover:bg-gradient-card/40">
                 <td className="whitespace-nowrap px-3 py-2 font-medium text-foreground">{p ? fullName(p) : s.player_id ?? '—'}</td>
-                <td className="whitespace-nowrap px-3 py-2 text-foreground/80">{s.season ?? '—'}</td>
-                <td className="px-3 py-2 text-foreground/80">{s.competition ?? '—'}</td>
+                <td className="whitespace-nowrap px-3 py-2 text-foreground/80">{localizeValue(s.season, language) ?? '—'}</td>
+                <td className="px-3 py-2 text-foreground/80">{localizeValue(s.competition, language) ?? '—'}</td>
                 <td className="px-3 py-2">{s.matches_played ?? '—'}</td>
                 <td className="px-3 py-2">{s.starts ?? '—'}</td>
                 <td className="px-3 py-2">{s.minutes ?? '—'}</td>

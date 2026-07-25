@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useLanguage } from '@/contexts/LanguageContext';
 import {
   HaitiPlayer, HaitiStat, HaitiConvocation,
-  fullName, initials, formatEuro, formatDateFr, ageFrom,
+  fullName, initials, formatEuro, formatDate, ageFrom, localizePosition, localizeValue,
 } from '@/types/grenadiers';
 
 interface Props {
@@ -23,7 +23,7 @@ const Info = ({ label, value }: { label: string; value: React.ReactNode }) =>
   );
 
 const PlayerDetailDialog = ({ player, stats, convocations, onOpenChange }: Props) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   if (!player) return null;
   const age = ageFrom(player.birth_date);
   const socials: { icon: typeof Instagram; url: string | null; label: string }[] = [
@@ -49,7 +49,7 @@ const PlayerDetailDialog = ({ player, stats, convocations, onOpenChange }: Props
                 {fullName(player)}
               </DialogTitle>
               <p className="text-sm text-muted-foreground">
-                {[player.position, player.jersey_number != null ? `#${player.jersey_number}` : null].filter(Boolean).join(' · ')}
+                {[localizePosition(player.position, language), player.jersey_number != null ? `#${player.jersey_number}` : null].filter(Boolean).join(' · ')}
               </p>
             </div>
           </div>
@@ -57,15 +57,15 @@ const PlayerDetailDialog = ({ player, stats, convocations, onOpenChange }: Props
 
         {/* Profile */}
         <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          <Info label={t('gren.currentClub')} value={player.current_club} />
-          <Info label={t('gren.clubCountry')} value={player.club_country} />
-          <Info label={t('gren.birth')} value={[formatDateFr(player.birth_date), age ? `(${age} ${t('gren.years')})` : null].filter(Boolean).join(' ')} />
+          <Info label={t('gren.currentClub')} value={localizeValue(player.current_club, language)} />
+          <Info label={t('gren.clubCountry')} value={localizeValue(player.club_country, language)} />
+          <Info label={t('gren.birth')} value={[formatDate(player.birth_date, language), age ? `(${age} ${t('gren.years')})` : null].filter(Boolean).join(' ')} />
           <Info label={t('gren.birthPlace')} value={player.birth_place} />
           <Info label={t('gren.marketValue')} value={formatEuro(player.market_value_eur)} />
-          <Info label={t('gren.status')} value={player.status} />
-          <Info label={t('gren.contract')} value={player.contract_end ? `${formatDateFr(player.contract_start) ?? '?'} → ${formatDateFr(player.contract_end)}` : null} />
+          <Info label={t('gren.status')} value={localizeValue(player.status, language)} />
+          <Info label={t('gren.contract')} value={player.contract_end ? `${formatDate(player.contract_start, language) ?? '?'} → ${formatDate(player.contract_end, language)}` : null} />
           <Info label={t('gren.agent')} value={player.agent} />
-          <Info label={t('gren.injuries')} value={player.recent_injuries} />
+          <Info label={t('gren.injuries')} value={localizeValue(player.recent_injuries, language)} />
         </dl>
 
         {player.clubs_history && (
@@ -110,9 +110,9 @@ const PlayerDetailDialog = ({ player, stats, convocations, onOpenChange }: Props
                 <tbody>
                   {stats.map((s) => (
                     <tr key={s.id} className="border-t border-border/30">
-                      <td className="px-2 py-1.5">{s.season ?? '—'}</td>
-                      <td className="px-2 py-1.5">{s.competition ?? '—'}</td>
-                      <td className="px-2 py-1.5">{s.club_or_selection ?? '—'}</td>
+                      <td className="px-2 py-1.5">{localizeValue(s.season, language) ?? '—'}</td>
+                      <td className="px-2 py-1.5">{localizeValue(s.competition, language) ?? '—'}</td>
+                      <td className="px-2 py-1.5">{localizeValue(s.club_or_selection, language) ?? '—'}</td>
                       <td className="px-2 py-1.5">{s.matches_played ?? '—'}</td>
                       <td className="px-2 py-1.5">{s.goals ?? '—'}</td>
                       <td className="px-2 py-1.5">{s.assists ?? '—'}</td>
@@ -137,13 +137,13 @@ const PlayerDetailDialog = ({ player, stats, convocations, onOpenChange }: Props
                   <div className="min-w-0">
                     <p className="truncate text-foreground">{c.tournament ?? '—'}</p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {[formatDateFr(c.match_date), c.opponent ? `vs ${c.opponent}` : null].filter(Boolean).join(' · ')}
+                      {[formatDate(c.match_date, language), c.opponent ? `vs ${c.opponent}` : null].filter(Boolean).join(' · ')}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2 text-xs">
                     {c.result && <span className="text-foreground/80">{c.result}</span>}
                     <span className={`rounded px-1.5 py-0.5 ${(c.present_absent ?? '').toLowerCase().includes('présent') ? 'text-emerald-400' : 'text-muted-foreground'}`}>
-                      {c.present_absent ?? c.callup_status ?? ''}
+                      {localizeValue(c.present_absent ?? c.callup_status, language) ?? ''}
                     </span>
                   </div>
                 </div>

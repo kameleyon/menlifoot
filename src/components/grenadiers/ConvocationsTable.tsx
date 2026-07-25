@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { HaitiConvocation, fullName, formatDateFr } from '@/types/grenadiers';
+import { HaitiConvocation, fullName, formatDate, localizeValue } from '@/types/grenadiers';
 
 interface Props {
   convocations: HaitiConvocation[];
 }
 
 const ConvocationsTable = ({ convocations }: Props) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const tournaments = useMemo(
     () => Array.from(new Set(convocations.map((c) => c.tournament).filter(Boolean))) as string[],
     [convocations],
@@ -64,11 +64,11 @@ const ConvocationsTable = ({ convocations }: Props) => {
                 <tr key={c.id} className="border-t border-border/30 transition-colors hover:bg-gradient-card/40">
                   <td className="whitespace-nowrap px-3 py-2 font-medium text-foreground">{fullName(c)}</td>
                   <td className="px-3 py-2 text-foreground/80">{c.tournament ?? '—'}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-foreground/80">{formatDateFr(c.match_date) ?? '—'}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-foreground/80">{formatDate(c.match_date, language) ?? '—'}</td>
                   <td className="px-3 py-2">{c.opponent ?? '—'}</td>
                   <td className="px-3 py-2 text-foreground/80">{c.location ?? '—'}</td>
                   <td className="whitespace-nowrap px-3 py-2">{c.result ?? '—'}</td>
-                  <td className={`px-3 py-2 ${present ? 'text-emerald-400' : 'text-muted-foreground'}`}>{c.present_absent ?? c.callup_status ?? '—'}</td>
+                  <td className={`px-3 py-2 ${present ? 'text-emerald-400' : 'text-muted-foreground'}`}>{localizeValue(c.present_absent ?? c.callup_status, language) ?? '—'}</td>
                   <td className="px-3 py-2 font-medium text-primary">{c.goals ?? '—'}</td>
                   <td className="px-3 py-2">{c.minutes ?? '—'}</td>
                 </tr>
