@@ -2,12 +2,15 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import lockup from '@/assets/wordmark.png';
 import AppShell from '@/components/mobile/AppShell';
+import { podcastThumb } from '@/lib/podcast';
 
 interface Podcast {
   id: string;
   title: string;
   platform: string | null;
   original_url: string | null;
+  embed_url: string | null;
+  thumbnail_url: string | null;
   episode_number: number | null;
   duration: string | null;
   published_at: string | null;
@@ -28,7 +31,7 @@ const Listen = () => {
 
   useEffect(() => {
     (async () => {
-      const p = await db.from('podcasts').select('id,title,platform,original_url,episode_number,duration,published_at')
+      const p = await db.from('podcasts').select('id,title,platform,original_url,embed_url,thumbnail_url,episode_number,duration,published_at')
         .order('published_at', { ascending: false, nullsFirst: false }).limit(30);
       if (p.data) setPods(p.data as Podcast[]);
     })();
@@ -48,8 +51,10 @@ const Listen = () => {
 
         {/* Now playing */}
         <div className="mx-5 mb-6 overflow-hidden rounded-2xl border border-white/[0.07] bg-[#101012]">
-          <div className="flex h-[190px] items-center justify-center" style={{ background: 'radial-gradient(120% 100% at 50% 0%,#1d1a14,#0a0a0b)' }}>
-            <img src={lockup} alt="Menlifoot" className="h-[60px] w-auto opacity-95" />
+          <div className="relative flex h-[190px] items-center justify-center overflow-hidden" style={{ background: 'radial-gradient(120% 100% at 50% 0%,#1d1a14,#0a0a0b)' }}>
+            {now && podcastThumb(now)
+              ? <img src={podcastThumb(now)!} alt={now.title} className="h-full w-full object-cover" />
+              : <img src={lockup} alt="Menlifoot" className="h-[60px] w-auto opacity-95" />}
           </div>
           <div className="flex flex-col gap-3.5 px-[18px] pb-[18px] pt-4">
             <div className="flex flex-col gap-1.5">
@@ -76,7 +81,11 @@ const Listen = () => {
         <div className="px-5 pb-2.5 font-display text-[15px] uppercase tracking-[0.04em]">Episodes</div>
         {rest.map((e) => (
           <button key={e.id} onClick={() => open(e.original_url)} className="flex w-full items-center gap-3.5 border-t border-white/[0.06] px-5 py-3.5 text-left transition-colors hover:bg-white/[0.03]">
-            <div className="flex h-11 w-11 flex-none items-center justify-center rounded-lg border border-white/[0.08] bg-[#111114] font-display text-[12px] text-primary">{e.episode_number ?? '·'}</div>
+            <div className="relative flex h-11 w-11 flex-none items-center justify-center overflow-hidden rounded-lg border border-white/[0.08] bg-[#111114] font-display text-[12px] text-primary">
+              {podcastThumb(e)
+                ? <img src={podcastThumb(e)!} alt="" className="h-full w-full object-cover" />
+                : (e.episode_number ?? '·')}
+            </div>
             <div className="flex flex-1 flex-col gap-1.5">
               <span className="font-sans text-[13.5px] font-semibold leading-[1.3]">{e.title}</span>
               <span className="font-sans text-[11px] text-foreground/40">{[e.platform, e.duration].filter(Boolean).join(' · ')}</span>

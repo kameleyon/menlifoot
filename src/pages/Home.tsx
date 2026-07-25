@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import wordmark from '@/assets/wordmark.png';
 import AppShell from '@/components/mobile/AppShell';
+import { podcastThumb } from '@/lib/podcast';
 
 interface Article {
   id: string;
@@ -20,6 +21,9 @@ interface Podcast {
   title: string;
   episode_number: number | null;
   duration: string | null;
+  embed_url: string | null;
+  original_url: string | null;
+  thumbnail_url: string | null;
 }
 
 const db = supabase as unknown as {
@@ -53,7 +57,7 @@ const Home = () => {
       const a = await db.from('articles').select('id,title,summary,subtitle,category,thumbnail_url,author,published_at')
         .eq('is_published', true).order('published_at', { ascending: false, nullsFirst: false }).limit(6);
       if (a.data) setArticles(a.data as Article[]);
-      const p = await db.from('podcasts').select('id,title,episode_number,duration')
+      const p = await db.from('podcasts').select('id,title,episode_number,duration,embed_url,original_url,thumbnail_url')
         .order('published_at', { ascending: false, nullsFirst: false }).limit(1);
       if (p.data && (p.data as Podcast[])[0]) setPodcast((p.data as Podcast[])[0]);
     })();
@@ -138,8 +142,10 @@ const Home = () => {
         <div className="mx-5 mt-7 rounded-2xl border border-white/[0.07] bg-[#101012] p-[18px]">
           <div className="mb-3.5 font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-primary">MVP Podcast · new episode</div>
           <div className="flex items-center gap-3.5">
-            <div className="flex h-16 w-16 flex-none items-center justify-center rounded-[10px] border border-white/[0.09] bg-[#070708]">
-              <img src="/logo.png" alt="" className="h-[34px] w-auto" />
+            <div className="flex h-16 w-16 flex-none items-center justify-center overflow-hidden rounded-[10px] border border-white/[0.09] bg-[#070708]">
+              {podcast && podcastThumb(podcast)
+                ? <img src={podcastThumb(podcast)!} alt="" className="h-full w-full object-cover" />
+                : <img src="/logo.png" alt="" className="h-[34px] w-auto" />}
             </div>
             <div className="flex flex-1 flex-col gap-[5px]">
               <div className="font-sans text-[14px] font-semibold leading-[1.25]">{podcast?.title ?? 'Road to 2026: the math'}</div>

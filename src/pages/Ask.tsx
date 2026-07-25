@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
 import { supabase } from '@/integrations/supabase/client';
 import AppShell from '@/components/mobile/AppShell';
 
@@ -61,7 +62,11 @@ const Ask = () => {
                   ? 'self-end border-primary/40 bg-primary/10 text-foreground'
                   : 'self-start border-white/[0.08] bg-[#101012] text-foreground/85'
               }`}>
-              {m.content}
+              {m.role === 'user' ? m.content : (
+                <div className="[&_a]:text-primary [&_a]:underline [&_code]:rounded [&_code]:bg-white/10 [&_code]:px-1 [&_h1]:mb-1 [&_h1]:font-display [&_h1]:text-[15px] [&_h2]:mb-1 [&_h2]:mt-2 [&_h2]:font-display [&_h2]:text-[14px] [&_h3]:mt-2 [&_h3]:font-semibold [&_li]:ml-4 [&_li]:list-disc [&_ol_li]:list-decimal [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_strong]:text-foreground [&_ul]:mb-2">
+                  <ReactMarkdown>{m.content}</ReactMarkdown>
+                </div>
+              )}
             </div>
           ))}
           {asking && (

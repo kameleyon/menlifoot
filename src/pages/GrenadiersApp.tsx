@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import AppShell from '@/components/mobile/AppShell';
-import { HaitiPlayer, HaitiConvocation, fullName, positionGroup, POSITION_ORDER, PositionGroup } from '@/types/grenadiers';
-
-interface SelStat { player_id: string; matches_played: number | null; goals: number | null; }
+import PlayerModal from '@/components/mobile/PlayerModal';
+import { HaitiPlayer, HaitiStat, HaitiConvocation, fullName, positionGroup, POSITION_ORDER, PositionGroup } from '@/types/grenadiers';
 
 type Match = { tournament: string | null; opponent: string | null; date: string | null; result: string | null };
 const POS_LABEL: Record<PositionGroup, string> = { Gardiens: 'Goalkeepers', Défenseurs: 'Defenders', Milieux: 'Midfielders', Attaquants: 'Forwards', Autres: 'Others' };
@@ -18,9 +17,10 @@ const resultColor = (r: string | null) => {
 const GrenadiersApp = () => {
   const [players, setPlayers] = useState<HaitiPlayer[]>([]);
   const [convs, setConvs] = useState<HaitiConvocation[]>([]);
-  const [sel, setSel] = useState<SelStat[]>([]);
+  const [allStats, setAllStats] = useState<HaitiStat[]>([]);
   const [tab, setTab] = useState<'records' | 'results' | 'squad'>('records');
   const [following, setFollowing] = useState(false);
+  const [selected, setSelected] = useState<HaitiPlayer | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -28,11 +28,12 @@ const GrenadiersApp = () => {
       if (p.data) setPlayers(p.data as HaitiPlayer[]);
       const c = await (supabase as any).from('haiti_convocations').select('*').order('match_date', { ascending: false });
       if (c.data) setConvs(c.data as HaitiConvocation[]);
-      const s = await (supabase as any).from('haiti_stats').select('player_id,matches_played,goals,category').eq('category', 'Sélection');
-      if (s.data) setSel(s.data as SelStat[]);
+      const s = await (supabase as any).from('haiti_stats').select('*');
+      if (s.data) setAllStats(s.data as HaitiStat[]);
     })();
   }, []);
 
+  const sel = useMemo(() => allStats.filter((s) => s.category === 'Sélection'), [allStats]);
   const playersById = useMemo(() => Object.fromEntries(players.map((p) => [p.id, p])), [players]);
 
   const matches: Match[] = useMemo(() => {
@@ -136,18 +137,27 @@ const GrenadiersApp = () => {
               <div key={g} className="flex flex-col">
                 <div className="px-5 pb-2 pt-3.5 font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-foreground/40">{POS_LABEL[g]}</div>
                 {squad[g].map((p) => (
-                  <div key={p.id} className="flex items-center gap-3.5 border-t border-white/[0.05] px-5 py-[11px]">
+                  <button key={p.id} onClick={() => setSelected(p)} className="flex w-full items-center gap-3.5 border-t border-white/[0.05] px-5 py-[11px] text-left transition-colors hover:bg-white/[0.03]">
                     <span className="w-[26px] flex-none text-center font-display text-[15px] text-primary">{p.jersey_number ?? '·'}</span>
                     <div className="h-[34px] w-[34px] flex-none rounded-full" style={{ background: 'repeating-linear-gradient(135deg,#1c1c20 0 6px,#141417 6px 12px)' }} />
                     <div className="flex flex-1 flex-col gap-1"><span className="font-sans text-[13px] font-medium">{fullName(p)}</span><span className="font-sans text-[10.5px] text-foreground/40">{p.current_club ?? '—'}</span></div>
                     <span className="font-mono text-[10px] text-foreground/35">{capsOf(p.id) != null ? `${capsOf(p.id)} caps` : ''}</span>
-                  </div>
+                  </button>
                 ))}
               </div>
             ))}
           </div>
         )}
       </div>
+
+      <PlayerModal
+        player={selected}
+        stats={selected ? allStats.filter((s) => s.player_id === selected.id) : []}
+        convocations={selected ? convs.filter((c) => c.player_id === selected.id) : []}
+        caps={selected ? sel.find((s) => s.player_id === selected.id)?.matches_played ?? null : null}
+        goals={selected ? sel.find((s) => s.player_id === selected.id)?.goals ?? null : null}
+        onClose={() => setSelected(null)}
+      />
     </AppShell>
   );
 };
