@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,8 +25,13 @@ const db = supabase as unknown as {
   };
 };
 
+const POS_KEY: Record<PositionGroup, string> = {
+  Gardiens: 'gren.posGk', Défenseurs: 'gren.posDef', Milieux: 'gren.posMid', Attaquants: 'gren.posAtt', Autres: 'gren.posOther',
+};
+
 const Grenadiers = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [players, setPlayers] = useState<HaitiPlayer[]>([]);
   const [stats, setStats] = useState<HaitiStat[]>([]);
   const [convocations, setConvocations] = useState<HaitiConvocation[]>([]);
@@ -69,7 +75,7 @@ const Grenadiers = () => {
 
       <main className="container mx-auto px-4 pb-20 pt-24 md:px-6 md:pt-28">
         <Button variant="ghost" onClick={() => navigate('/')} className="mb-6 text-muted-foreground hover:text-primary">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Accueil
+          <ArrowLeft className="mr-2 h-4 w-4" /> {t('gren.back')}
         </Button>
 
         {/* Header */}
@@ -83,11 +89,11 @@ const Grenadiers = () => {
             Les Grenadiers
           </h1>
           <p className="mt-2 text-sm uppercase tracking-[0.25em] text-muted-foreground">
-            Sélection nationale d'Haïti&nbsp;🇭🇹
+            {t('gren.subtitle')}&nbsp;🇭🇹
           </p>
           {!loading && (
             <p className="mt-3 text-sm text-foreground/70">
-              {players.length} joueurs · {stats.length} lignes de stats · {convocations.length} convocations
+              {players.length} {t('gren.players')} · {stats.length} {t('gren.statLines')} · {convocations.length} {t('gren.callupsWord')}
             </p>
           )}
         </motion.div>
@@ -101,16 +107,16 @@ const Grenadiers = () => {
         ) : (
           <Tabs defaultValue="effectif" className="w-full">
             <TabsList className="mx-auto mb-8 flex w-full max-w-md">
-              <TabsTrigger value="effectif" className="flex-1">Effectif</TabsTrigger>
-              <TabsTrigger value="stats" className="flex-1">Statistiques</TabsTrigger>
-              <TabsTrigger value="convocations" className="flex-1">Convocations</TabsTrigger>
+              <TabsTrigger value="effectif" className="flex-1">{t('gren.tabSquad')}</TabsTrigger>
+              <TabsTrigger value="stats" className="flex-1">{t('gren.tabStats')}</TabsTrigger>
+              <TabsTrigger value="convocations" className="flex-1">{t('gren.tabCallups')}</TabsTrigger>
             </TabsList>
 
             {/* Effectif */}
             <TabsContent value="effectif" className="space-y-10">
               {POSITION_ORDER.filter((grp) => grouped[grp].length > 0).map((grp) => (
                 <section key={grp}>
-                  <h2 className="mb-4 font-display text-lg uppercase tracking-wide text-primary/80">{grp}</h2>
+                  <h2 className="mb-4 font-display text-lg uppercase tracking-wide text-primary/80">{t(POS_KEY[grp])}</h2>
                   <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                     {grouped[grp].map((p) => (
                       <PlayerCard key={p.id} player={p} onClick={() => setSelected(p)} />

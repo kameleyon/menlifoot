@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { HaitiConvocation, fullName, formatDateFr } from '@/types/grenadiers';
 
@@ -7,6 +8,7 @@ interface Props {
 }
 
 const ConvocationsTable = ({ convocations }: Props) => {
+  const { t } = useLanguage();
   const tournaments = useMemo(
     () => Array.from(new Set(convocations.map((c) => c.tournament).filter(Boolean))) as string[],
     [convocations],
@@ -21,32 +23,37 @@ const ConvocationsTable = ({ convocations }: Props) => {
     [convocations, tournament],
   );
 
-  if (convocations.length === 0) return <p className="py-10 text-center text-muted-foreground">Aucune convocation disponible.</p>;
+  if (convocations.length === 0) return <p className="py-10 text-center text-muted-foreground">{t('gren.noCallups')}</p>;
+
+  const headers = [
+    'gren.thPlayer', 'gren.thTournament', 'gren.thDate', 'gren.thOpponent',
+    'gren.thLocation', 'gren.thResult', 'gren.thPresence', 'gren.thGoals', 'gren.thMin',
+  ];
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <span className="text-sm text-muted-foreground">Tournoi</span>
+        <span className="text-sm text-muted-foreground">{t('gren.tournament')}</span>
         <Select value={tournament} onValueChange={setTournament}>
           <SelectTrigger className="w-[280px] max-w-full">
-            <SelectValue placeholder="Tous les tournois" />
+            <SelectValue placeholder={t('gren.allTournaments')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tous les tournois</SelectItem>
-            {tournaments.map((t) => (
-              <SelectItem key={t} value={t}>{t}</SelectItem>
+            <SelectItem value="all">{t('gren.allTournaments')}</SelectItem>
+            {tournaments.map((tn) => (
+              <SelectItem key={tn} value={tn}>{tn}</SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <span className="text-sm text-muted-foreground">{rows.length} match(s)</span>
+        <span className="text-sm text-muted-foreground">{rows.length} {t('gren.matches')}</span>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-border/50">
         <table className="w-full min-w-[760px] text-sm">
           <thead className="bg-gradient-card text-[11px] uppercase text-muted-foreground">
             <tr>
-              {['Joueur', 'Tournoi', 'Date', 'Adversaire', 'Lieu', 'Résultat', 'Présence', 'Buts', 'Min'].map((h) => (
-                <th key={h} className="whitespace-nowrap px-3 py-2 text-left font-medium">{h}</th>
+              {headers.map((h) => (
+                <th key={h} className="whitespace-nowrap px-3 py-2 text-left font-medium">{t(h)}</th>
               ))}
             </tr>
           </thead>

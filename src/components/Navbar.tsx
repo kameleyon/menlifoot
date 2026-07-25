@@ -40,7 +40,7 @@ const Navbar = () => {
 
   const navLinks = [
     { name: t('nav.home'), href: "/" },
-    { name: "Les Grenadiers", href: "/grenadiers" },
+    { name: t('nav.grenadiers'), href: "/grenadiers" },
     { name: t('nav.podcast'), href: "/podcasts" },
     { name: t('nav.articles'), href: "/articles" },
     { name: t('nav.quiz'), href: "/quizzes" },
@@ -71,15 +71,15 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
-            <motion.img 
-              src="/logo.png" 
-              alt="Menlifoot" 
-              className="h-10 w-10 md:h-12 md:w-12 object-contain"
-              whileHover={{ scale: 1.2 }}
-            />
             <span className="font-display text-2xl md:text-3xl font-light tracking-wide text-gradient-gold uppercase">
               MENLIFOOT
             </span>
+            <motion.img
+              src="/logo.png"
+              alt="Menlifoot"
+              className="h-10 w-10 md:h-12 md:w-12 object-contain"
+              whileHover={{ scale: 1.2 }}
+            />
           </Link>
 
           {/* Desktop Navigation */}

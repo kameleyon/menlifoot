@@ -1,6 +1,7 @@
 import { Instagram, Youtube, Globe, Music2, Twitter, ShoppingBag } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { useLanguage } from '@/contexts/LanguageContext';
 import {
   HaitiPlayer, HaitiStat, HaitiConvocation,
   fullName, initials, formatEuro, formatDateFr, ageFrom,
@@ -21,26 +22,19 @@ const Info = ({ label, value }: { label: string; value: React.ReactNode }) =>
     </div>
   );
 
-const socialLink = (href: string | null, handle?: boolean) => {
-  if (!href) return null;
-  if (href.startsWith('http')) return href;
-  if (handle) {
-    const h = href.replace(/^@/, '');
-    return `https://instagram.com/${h}`; // fallback; overridden per-network below
-  }
-  return href;
-};
-
 const PlayerDetailDialog = ({ player, stats, convocations, onOpenChange }: Props) => {
+  const { t } = useLanguage();
   if (!player) return null;
   const age = ageFrom(player.birth_date);
   const socials: { icon: typeof Instagram; url: string | null; label: string }[] = [
     { icon: Instagram, url: player.instagram && (player.instagram.startsWith('http') ? player.instagram : `https://instagram.com/${player.instagram.replace(/^@/, '')}`), label: 'Instagram' },
     { icon: Twitter, url: player.twitter && (player.twitter.startsWith('http') ? player.twitter : `https://x.com/${player.twitter.replace(/^@/, '')}`), label: 'X' },
     { icon: Music2, url: player.tiktok && (player.tiktok.startsWith('http') ? player.tiktok : `https://tiktok.com/@${player.tiktok.replace(/^@/, '')}`), label: 'TikTok' },
-    { icon: Youtube, url: socialLink(player.youtube), label: 'YouTube' },
-    { icon: Globe, url: socialLink(player.website), label: 'Site' },
+    { icon: Youtube, url: player.youtube && (player.youtube.startsWith('http') ? player.youtube : null), label: 'YouTube' },
+    { icon: Globe, url: player.website && (player.website.startsWith('http') ? player.website : null), label: 'Site' },
   ];
+
+  const statHeaders = ['gren.thSeason', 'gren.thCompetition', 'gren.thClub', 'gren.thMp', 'gren.thGoals', 'gren.thAssists', 'gren.thRating'];
 
   return (
     <Dialog open={!!player} onOpenChange={onOpenChange}>
@@ -63,20 +57,20 @@ const PlayerDetailDialog = ({ player, stats, convocations, onOpenChange }: Props
 
         {/* Profile */}
         <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          <Info label="Club actuel" value={player.current_club} />
-          <Info label="Pays du club" value={player.club_country} />
-          <Info label="Naissance" value={[formatDateFr(player.birth_date), age ? `(${age} ans)` : null].filter(Boolean).join(' ')} />
-          <Info label="Lieu de naissance" value={player.birth_place} />
-          <Info label="Valeur marchande" value={formatEuro(player.market_value_eur)} />
-          <Info label="Statut" value={player.status} />
-          <Info label="Contrat" value={player.contract_end ? `${formatDateFr(player.contract_start) ?? '?'} → ${formatDateFr(player.contract_end)}` : null} />
-          <Info label="Agent" value={player.agent} />
-          <Info label="Blessures récentes" value={player.recent_injuries} />
+          <Info label={t('gren.currentClub')} value={player.current_club} />
+          <Info label={t('gren.clubCountry')} value={player.club_country} />
+          <Info label={t('gren.birth')} value={[formatDateFr(player.birth_date), age ? `(${age} ${t('gren.years')})` : null].filter(Boolean).join(' ')} />
+          <Info label={t('gren.birthPlace')} value={player.birth_place} />
+          <Info label={t('gren.marketValue')} value={formatEuro(player.market_value_eur)} />
+          <Info label={t('gren.status')} value={player.status} />
+          <Info label={t('gren.contract')} value={player.contract_end ? `${formatDateFr(player.contract_start) ?? '?'} → ${formatDateFr(player.contract_end)}` : null} />
+          <Info label={t('gren.agent')} value={player.agent} />
+          <Info label={t('gren.injuries')} value={player.recent_injuries} />
         </dl>
 
         {player.clubs_history && (
           <div>
-            <p className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">Parcours</p>
+            <p className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">{t('gren.career')}</p>
             <p className="text-sm text-foreground/80">{player.clubs_history}</p>
           </div>
         )}
@@ -90,7 +84,7 @@ const PlayerDetailDialog = ({ player, stats, convocations, onOpenChange }: Props
                 <s.icon className="h-3.5 w-3.5" /> {s.label}
               </a>
             ))}
-            {[{ url: player.merch_personal_url, label: 'Merch perso' }, { url: player.merch_club_url, label: 'Merch club' }]
+            {[{ url: player.merch_personal_url, label: t('gren.merchPerso') }, { url: player.merch_club_url, label: t('gren.merchClub') }]
               .filter((m) => m.url).map((m) => (
                 <a key={m.label} href={m.url!} target="_blank" rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 rounded-full border border-border/50 px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/60 hover:text-primary">
@@ -103,13 +97,13 @@ const PlayerDetailDialog = ({ player, stats, convocations, onOpenChange }: Props
         {/* Stats */}
         {stats.length > 0 && (
           <section>
-            <h4 className="mb-2 font-display text-sm uppercase tracking-wide text-primary">Statistiques</h4>
+            <h4 className="mb-2 font-display text-sm uppercase tracking-wide text-primary">{t('gren.statsTitle')}</h4>
             <div className="overflow-x-auto rounded-lg border border-border/50">
               <table className="w-full text-sm">
                 <thead className="bg-gradient-card text-[11px] uppercase text-muted-foreground">
                   <tr>
-                    {['Saison', 'Compétition', 'Club/Sél.', 'MJ', 'Buts', 'PD', 'Note'].map((h) => (
-                      <th key={h} className="px-2 py-1.5 text-left font-medium">{h}</th>
+                    {statHeaders.map((h) => (
+                      <th key={h} className="px-2 py-1.5 text-left font-medium">{t(h)}</th>
                     ))}
                   </tr>
                 </thead>
@@ -135,7 +129,7 @@ const PlayerDetailDialog = ({ player, stats, convocations, onOpenChange }: Props
         {convocations.length > 0 && (
           <section>
             <h4 className="mb-2 font-display text-sm uppercase tracking-wide text-primary">
-              Convocations <span className="text-muted-foreground">({convocations.length})</span>
+              {t('gren.callupsTitle')} <span className="text-muted-foreground">({convocations.length})</span>
             </h4>
             <div className="max-h-56 space-y-1.5 overflow-y-auto pr-1">
               {convocations.map((c) => (

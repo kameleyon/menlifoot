@@ -1,3 +1,4 @@
+import { useLanguage } from '@/contexts/LanguageContext';
 import { HaitiStat, HaitiPlayer, fullName } from '@/types/grenadiers';
 
 interface Props {
@@ -5,22 +6,24 @@ interface Props {
   playersById: Record<string, HaitiPlayer>;
 }
 
-const COLS = [
-  ['Joueur', 'player'], ['Saison', 'season'], ['Compétition', 'competition'],
-  ['MJ', 'matches_played'], ['Titu', 'starts'], ['Min', 'minutes'],
-  ['Buts', 'goals'], ['PD', 'assists'], ['CJ', 'yellow_cards'], ['CR', 'red_cards'], ['Note', 'avg_rating'],
-] as const;
-
 const StatsTable = ({ stats, playersById }: Props) => {
-  if (stats.length === 0) return <p className="py-10 text-center text-muted-foreground">Aucune statistique disponible.</p>;
+  const { t } = useLanguage();
+
+  if (stats.length === 0) return <p className="py-10 text-center text-muted-foreground">{t('gren.noStats')}</p>;
+
+  const headers = [
+    'gren.thPlayer', 'gren.thSeason', 'gren.thCompetition',
+    'gren.thMp', 'gren.thStarts', 'gren.thMin',
+    'gren.thGoals', 'gren.thAssists', 'gren.thYellow', 'gren.thRed', 'gren.thRating',
+  ];
 
   return (
     <div className="overflow-x-auto rounded-xl border border-border/50">
       <table className="w-full min-w-[720px] text-sm">
         <thead className="bg-gradient-card text-[11px] uppercase text-muted-foreground">
           <tr>
-            {COLS.map(([label]) => (
-              <th key={label} className="whitespace-nowrap px-3 py-2 text-left font-medium">{label}</th>
+            {headers.map((h) => (
+              <th key={h} className="whitespace-nowrap px-3 py-2 text-left font-medium">{t(h)}</th>
             ))}
           </tr>
         </thead>
