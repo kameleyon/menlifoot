@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Menu, X, Languages, ChevronDown, ShoppingCart } from "lucide-react";
-import menlifootBall from "@/assets/soccer-ball-icon.png";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
@@ -72,7 +71,7 @@ const Navbar = () => {
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
             <motion.img 
-              src={menlifootBall} 
+              src="/logo.png" 
               alt="Menlifoot" 
               className="h-10 w-10 md:h-12 md:w-12 object-contain"
               animate={{ rotate: [0, 360] }}

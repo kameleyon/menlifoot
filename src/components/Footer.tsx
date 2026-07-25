@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import { Twitter, Instagram, Youtube, Send, Facebook } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
-import menlifootBall from "@/assets/menlifoot-ball.png";
 import AboutUsDialog from "@/components/legal/AboutUsDialog";
 import PrivacyPolicyDialog from "@/components/legal/PrivacyPolicyDialog";
 import TermsOfServiceDialog from "@/components/legal/TermsOfServiceDialog";
@@ -62,7 +61,7 @@ const Footer = () => {
                 className="inline-flex items-center gap-2"
               >
                 <motion.img 
-                  src={menlifootBall} 
+                  src="/logo.png" 
                   alt="Menlifoot" 
                   className="h-10 w-10"
                   animate={{ rotate: [0, 360] }}

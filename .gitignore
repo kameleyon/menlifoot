@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# local backup of original hi-res logo (not for repo)
+public/logo-original.png

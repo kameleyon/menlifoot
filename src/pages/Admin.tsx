@@ -5,7 +5,6 @@ import { motion } from 'framer-motion';
 import { Plus, Trash2, Edit2, LogOut, ArrowLeft, Youtube, Music2, FileText, Calendar, Image, Users, Shield, ShieldOff, Ban, UserCheck, Languages, RefreshCw, X, Tag, Eye, Trophy, Package } from 'lucide-react';
 import { OrdersAdmin } from '@/components/OrdersAdmin';
 import { ArticlePreviewDialog } from '@/components/ArticlePreviewDialog';
-import menlifootBall from '@/assets/menlifoot-ball.png';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -723,7 +722,7 @@ const Admin = () => {
               </Button>
               
               <motion.img 
-                src={menlifootBall} 
+                src="/logo.png" 
                 alt="Menlifoot" 
                 className="h-8 w-8 sm:h-10 sm:w-10 animate-bounce-subtle"
                 initial={{ scale: 0, rotate: -180 }}

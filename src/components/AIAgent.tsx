@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
 import { useLanguage } from "@/contexts/LanguageContext";
-import menlifootBall from "@/assets/menlifoot-ball.png";
 
 interface Message {
   id: number;
@@ -122,7 +121,7 @@ const AIAgent = () => {
                 <div className="flex items-center gap-3">
                   <div className="relative">
                     <img 
-                      src={menlifootBall} 
+                      src="/logo.png" 
                       alt="Menlifoot Expert" 
                       className="w-10 h-10 rounded-full object-cover border-2 border-primary/50"
                     />
