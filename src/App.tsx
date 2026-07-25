@@ -20,7 +20,7 @@ import ArticleDetail from "./pages/ArticleDetail";
 import ShareArticleRedirect from "./pages/ShareArticleRedirect";
 import Quizzes from "./pages/Quizzes";
 import QuizPlay from "./pages/QuizPlay";
-import Grenadiers from "./pages/Grenadiers";
+import GrenadiersApp from "./pages/GrenadiersApp";
 import NotFound from "./pages/NotFound";
 import CheckoutReturn from "./pages/CheckoutReturn";
 import Unsubscribe from "./pages/Unsubscribe";
@@ -56,7 +56,7 @@ const App = () => (
                 <Route path="/share/articles/:id" element={<ShareArticleRedirect />} />
                 <Route path="/quizzes" element={<Quizzes />} />
                 <Route path="/quizzes/:id" element={<QuizPlay />} />
-                <Route path="/grenadiers" element={<Grenadiers />} />
+                <Route path="/grenadiers" element={<GrenadiersApp />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
