@@ -7,6 +7,8 @@ import { CartProvider } from "./contexts/CartContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import Index from "./pages/Index";
+import Home from "./pages/Home";
+import { Listen, Shop, Me, Ask } from "./pages/mobileStubs";
 import News from "./pages/News";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
@@ -35,7 +37,12 @@ const App = () => (
             <BrowserRouter>
               <PaymentTestModeBanner />
               <Routes>
-                <Route path="/" element={<Index />} />
+                <Route path="/" element={<Home />} />
+                <Route path="/old-home" element={<Index />} />
+                <Route path="/listen" element={<Listen />} />
+                <Route path="/shop" element={<Shop />} />
+                <Route path="/me" element={<Me />} />
+                <Route path="/ask" element={<Ask />} />
                 <Route path="/checkout/return" element={<CheckoutReturn />} />
                 <Route path="/unsubscribe" element={<Unsubscribe />} />
                 <Route path="/news" element={<News />} />

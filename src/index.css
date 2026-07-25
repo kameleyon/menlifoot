@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Anton&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,48 +6,48 @@
 
 @layer base {
   :root {
-    --background: 0 0% 4%;
-    --foreground: 45 10% 95%;
+    --background: 240 7% 3%;
+    --foreground: 40 21% 95%;
 
-    --card: 0 0% 7%;
-    --card-foreground: 45 10% 95%;
+    --card: 240 6% 7%;
+    --card-foreground: 40 21% 95%;
 
-    --popover: 0 0% 7%;
-    --popover-foreground: 45 10% 95%;
+    --popover: 240 6% 7%;
+    --popover-foreground: 40 21% 95%;
 
-    --primary: 43 74% 49%;
-    --primary-foreground: 0 0% 4%;
+    --primary: 40 54% 51%;
+    --primary-foreground: 240 7% 3%;
 
-    --secondary: 0 0% 12%;
-    --secondary-foreground: 45 10% 95%;
+    --secondary: 240 5% 11%;
+    --secondary-foreground: 40 21% 95%;
 
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 0% 60%;
+    --muted: 240 5% 14%;
+    --muted-foreground: 40 8% 62%;
 
-    --accent: 43 74% 49%;
-    --accent-foreground: 0 0% 4%;
+    --accent: 40 54% 51%;
+    --accent-foreground: 240 7% 3%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 0 0% 15%;
-    --input: 0 0% 15%;
-    --ring: 43 74% 49%;
+    --border: 240 6% 14%;
+    --input: 240 6% 14%;
+    --ring: 40 54% 51%;
 
-    --radius: 0.75rem;
+    --radius: 0.875rem;
 
-    /* Custom design tokens */
-    --gold: 43 74% 49%;
-    --gold-light: 43 80% 60%;
-    --gold-dark: 43 70% 35%;
-    --surface: 0 0% 8%;
-    --surface-elevated: 0 0% 10%;
-    
+    /* Custom design tokens — Menlifoot rebrand */
+    --gold: 40 54% 51%;
+    --gold-light: 43 71% 69%;
+    --gold-dark: 36 64% 46%;
+    --surface: 240 6% 7%;
+    --surface-elevated: 240 6% 9%;
+
     /* Gradients */
-    --gradient-gold: linear-gradient(135deg, hsl(43, 74%, 49%) 0%, hsl(43, 80%, 60%) 50%, hsl(43, 74%, 49%) 100%);
-    --gradient-gold-text: linear-gradient(90deg, hsl(43, 74%, 49%) 0%, hsl(43, 80%, 65%) 100%);
-    --gradient-dark: linear-gradient(180deg, hsl(0, 0%, 6%) 0%, hsl(0, 0%, 4%) 100%);
-    --gradient-card: linear-gradient(145deg, hsl(0, 0%, 10%) 0%, hsl(0, 0%, 7%) 100%);
+    --gradient-gold: linear-gradient(135deg, hsl(43, 71%, 69%) 0%, hsl(36, 64%, 46%) 100%);
+    --gradient-gold-text: linear-gradient(90deg, hsl(43, 71%, 69%) 0%, hsl(40, 54%, 51%) 100%);
+    --gradient-dark: linear-gradient(180deg, hsl(240, 6%, 6%) 0%, hsl(240, 7%, 3%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(240, 6%, 9%) 0%, hsl(240, 6%, 6%) 100%);
     
     /* Shadows */
     --shadow-gold: 0 4px 30px -10px hsl(43 74% 49% / 0.3);
@@ -75,11 +75,11 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Archivo', system-ui, sans-serif;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Anton', system-ui, sans-serif;
   }
 }
 

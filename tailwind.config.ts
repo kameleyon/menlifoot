@@ -14,8 +14,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['Inter', 'sans-serif'],
-        display: ['Oswald', 'sans-serif'],
+        sans: ['Archivo', 'system-ui', 'sans-serif'],
+        display: ['Anton', 'system-ui', 'sans-serif'],
+        body: ['Archivo', 'system-ui', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",
