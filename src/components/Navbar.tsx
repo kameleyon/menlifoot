@@ -40,6 +40,7 @@ const Navbar = () => {
 
   const navLinks = [
     { name: t('nav.home'), href: "/" },
+    { name: "Les Grenadiers", href: "/grenadiers" },
     { name: t('nav.podcast'), href: "/podcasts" },
     { name: t('nav.articles'), href: "/articles" },
     { name: t('nav.quiz'), href: "/quizzes" },
@@ -82,7 +83,7 @@ const Navbar = () => {
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-8">
+          <div className="hidden lg:flex items-center gap-6">
             {navLinks.map((link) => (
               link.isDialog ? (
                 <button
@@ -183,7 +184,7 @@ const Navbar = () => {
                 <Button
                   variant="nav"
                   size="sm"
-                  className="hidden md:flex"
+                  className="hidden lg:flex"
                 >
                   Admin
                 </Button>
@@ -194,7 +195,7 @@ const Navbar = () => {
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden text-foreground"
+              className="lg:hidden text-foreground"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
               {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
@@ -211,7 +212,7 @@ const Navbar = () => {
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.3 }}
-            className="md:hidden bg-background/95 backdrop-blur-xl border-b border-border"
+            className="lg:hidden bg-background/95 backdrop-blur-xl border-b border-border"
           >
             <div className="container mx-auto px-4 py-4 space-y-2">
               {navLinks.map((link) => (

@@ -27,3 +27,6 @@ data*
 # local backup of original hi-res logo (not for repo)
 public/logo-original.png
 public/logoblack.png
+
+# playwright test artifacts
+.playwright-mcp/
