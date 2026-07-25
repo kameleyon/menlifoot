@@ -8,9 +8,11 @@ import { LanguageProvider } from "./contexts/LanguageContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import Index from "./pages/Index";
 import Home from "./pages/Home";
-import { Shop, Me } from "./pages/mobileStubs";
+import Article from "./pages/Article";
 import Ask from "./pages/Ask";
 import Listen from "./pages/Listen";
+import Shop from "./pages/Shop";
+import Me from "./pages/Me";
 import News from "./pages/News";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
@@ -52,7 +54,8 @@ const App = () => (
                 <Route path="/admin" element={<Admin />} />
                 <Route path="/podcasts" element={<Podcasts />} />
                 <Route path="/articles" element={<Articles />} />
-                <Route path="/articles/:id" element={<ArticleDetail />} />
+                <Route path="/articles/:id" element={<Article />} />
+                <Route path="/articles/:id/full" element={<ArticleDetail />} />
                 <Route path="/share/articles/:id" element={<ShareArticleRedirect />} />
                 <Route path="/quizzes" element={<Quizzes />} />
                 <Route path="/quizzes/:id" element={<QuizPlay />} />
