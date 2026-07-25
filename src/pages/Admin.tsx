@@ -725,10 +725,10 @@ const Admin = () => {
                 src="/logo.png" 
                 alt="Menlifoot" 
                 className="h-8 w-8 sm:h-10 sm:w-10 animate-bounce-subtle"
-                initial={{ scale: 0, rotate: -180 }}
-                animate={{ scale: 1, rotate: 0 }}
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
                 transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.2 }}
-                whileHover={{ scale: 1.2, rotate: 15 }}
+                whileHover={{ scale: 1.2 }}
               />
               
               <h1 className="font-display text-xl sm:text-3xl tracking-wide text-gradient-gold">

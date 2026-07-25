@@ -74,8 +74,6 @@ const Navbar = () => {
               src="/logo.png" 
               alt="Menlifoot" 
               className="h-10 w-10 md:h-12 md:w-12 object-contain"
-              animate={{ rotate: [0, 360] }}
-              transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
               whileHover={{ scale: 1.2 }}
             />
             <span className="font-display text-2xl md:text-3xl font-light tracking-wide text-gradient-gold uppercase">
