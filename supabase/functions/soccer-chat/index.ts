@@ -40,7 +40,7 @@ serve(async (req) => {
         "X-Title": "Menlifoot Soccer AI",
       },
       body: JSON.stringify({
-        model: "openai/gpt-4o-search-preview",
+        model: "perplexity/sonar",
         messages: [
           {
             role: "system",
