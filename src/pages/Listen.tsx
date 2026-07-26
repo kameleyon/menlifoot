@@ -47,8 +47,9 @@ const Listen = () => {
   const rest = pods.slice(1);
 
   return (
-    <AppShell>
-      <div className="pt-14">
+    <AppShell wide>
+      {/* ===== Mobile ===== */}
+      <div className="pt-14 lg:hidden">
         <div className="flex flex-col gap-1.5 px-5 pb-[18px]">
           <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.18em] text-primary">{t('listen.original')}</span>
           <span className="font-display text-[30px] uppercase tracking-[0.01em]">{t('listen.title')}</span>
@@ -107,6 +108,41 @@ const Listen = () => {
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* ===== Desktop (wide web) ===== */}
+      <div className="hidden lg:block">
+        <div className="border-b border-white/[0.07]" style={{ background: 'radial-gradient(90% 140% at 12% 0%,#1a1811,#070708)' }}>
+          <div className="mx-auto flex max-w-[1180px] gap-10 px-10 py-11">
+            <div className="aspect-video w-[420px] flex-none overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0b0b0d]">
+              {playing && playing.embed_url ? (
+                <iframe src={embedSrc(playing.embed_url)} title={playing.title} className="h-full w-full" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
+              ) : (
+                <button onClick={() => current && setPlaying(current)} className="relative flex h-full w-full items-center justify-center">
+                  {current && podcastThumb(current) ? <img src={podcastThumb(current)!} alt={current.title} className="h-full w-full object-cover" /> : <img src={lockup} alt="Menlifoot" className="h-[80px] w-auto" />}
+                  <span className="absolute flex h-16 w-16 items-center justify-center rounded-full font-display text-[20px] text-[#070708]" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>▶</span>
+                </button>
+              )}
+            </div>
+            <div className="flex flex-1 flex-col justify-center gap-4">
+              <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[0.18em] text-primary">{t('listen.original')}</span>
+              <span className="font-display text-[56px] uppercase leading-[0.95]">{t('listen.title')}</span>
+              <span className="font-sans text-[15px] font-semibold">{current?.title ?? ''}</span>
+              <p className="m-0 max-w-[52ch] font-sans text-[14px] leading-[1.7] text-foreground/55">The Menlifoot desk on the week in football — squads, tactics, transfers, and the road through 2026.</p>
+            </div>
+          </div>
+        </div>
+        <div className="mx-auto max-w-[1180px] px-10 pt-8">
+          {rest.map((e) => (
+            <button key={e.id} onClick={() => setPlaying(e)} className="flex w-full items-center gap-5 border-b border-white/[0.06] py-5 text-left transition-colors hover:bg-white/[0.02]">
+              <div className="relative h-14 w-14 flex-none overflow-hidden rounded-lg border border-white/[0.08] bg-[#111114]">
+                {podcastThumb(e) ? <img src={podcastThumb(e)!} alt="" className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center font-display text-primary">{e.episode_number ?? '·'}</span>}
+              </div>
+              <div className="flex flex-1 flex-col gap-1.5"><span className="font-sans text-[15px] font-semibold">{e.title}</span><span className="font-sans text-[12px] text-foreground/40">{[e.platform, e.duration].filter(Boolean).join(' · ')}</span></div>
+              <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.16] font-display text-[11px] text-foreground/70">▶</span>
+            </button>
+          ))}
         </div>
       </div>
     </AppShell>

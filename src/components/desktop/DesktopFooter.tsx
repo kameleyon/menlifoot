@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
-import wordmark from '@/assets/wordmark.png';
 
 const DesktopFooter = () => {
   const { t } = useLanguage();
@@ -9,7 +8,7 @@ const DesktopFooter = () => {
       <div className="mx-auto flex max-w-[1180px] flex-col gap-8 px-10 py-12">
         <div className="flex flex-wrap items-start justify-between gap-8">
           <div className="flex flex-col gap-3">
-            <img src={wordmark} alt="Menlifoot" className="h-4 w-auto" />
+            <span className="text-gradient-gold font-display text-[26px] uppercase leading-none tracking-wide">Menlifoot</span>
             <span className="max-w-[280px] font-sans text-[12px] leading-[1.6] text-foreground/45">Soccer media — analysis, interviews, the MVP Podcast, and Les Grenadiers coverage.</span>
           </div>
           <div className="flex gap-16">

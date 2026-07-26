@@ -37,31 +37,32 @@ const db = supabase as unknown as {
 };
 
 const stripe = 'repeating-linear-gradient(135deg,#1b1b1f 0 8px,#131316 8px 16px)';
-const SHOP = [
-  { name: 'Grenadier Home Tee', price: '$42' },
-  { name: 'Gold Mark Cap', price: '$34' },
-  { name: 'Podcast Crewneck', price: '$68' },
-];
+const money = (c: number | null) => (c == null ? '' : `$${(c / 100).toFixed(2)}`);
+interface ShopProduct { id: string; title: string; image: string | null; price_cents: number | null; }
 
 const Home = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const [articles, setArticles] = useState<Article[]>([]);
   const [podcast, setPodcast] = useState<Podcast | null>(null);
+  const [shop, setShop] = useState<ShopProduct[]>([]);
 
   useEffect(() => {
     (async () => {
       const a = await db.from('articles').select('id,title,summary,subtitle,category,thumbnail_url,author,published_at')
-        .eq('is_published', true).order('published_at', { ascending: false, nullsFirst: false }).limit(6);
+        .eq('is_published', true).order('published_at', { ascending: false, nullsFirst: false }).limit(12);
       if (a.data) setArticles(a.data as Article[]);
       const p = await db.from('podcasts').select('id,title,episode_number,duration,embed_url,original_url,thumbnail_url')
         .order('published_at', { ascending: false, nullsFirst: false }).limit(1);
       if (p.data && (p.data as Podcast[])[0]) setPodcast((p.data as Podcast[])[0]);
+      const pr = await supabase.functions.invoke('printify', { body: { action: 'products' } });
+      setShop(((pr.data as { products?: ShopProduct[] })?.products ?? []).slice(0, 4));
     })();
   }, []);
 
   const lead = articles[0];
   const latest = articles.slice(1, 5);
+  const deskLatest = articles.slice(1, 11);
 
   return (
     <AppShell wide>
@@ -96,7 +97,7 @@ const Home = () => {
         {/* Ask Menli */}
         <button onClick={() => navigate('/ask')} className="mx-5 mb-[26px] flex w-[calc(100%-40px)] items-center gap-3.5 rounded-2xl border border-primary/30 px-[18px] py-4 text-left" style={{ background: 'linear-gradient(135deg,rgba(200,154,60,.1),rgba(200,154,60,.02))' }}>
           <div className="flex flex-1 flex-col gap-[5px]">
-            <div className="font-sans text-[15px] font-bold text-primary">{t('home.askTitle')}</div>
+            <div className="text-gradient-gold font-sans text-[15px] font-bold">{t('home.askTitle')}</div>
             <div className="font-sans text-[12px] leading-[1.45] text-foreground/60">{t('home.askSub')}</div>
           </div>
           <span className="font-display text-[22px] text-primary">→</span>
@@ -146,13 +147,13 @@ const Home = () => {
             <Link to="/shop" className="font-sans text-[11px] font-medium text-primary">{t('home.seeAll')}</Link>
           </div>
           <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none]">
-            {SHOP.map((p, i) => (
-              <Link key={i} to="/shop" className="w-[132px] flex-none">
-                <div className="flex h-[150px] items-end justify-center rounded-xl pb-2.5" style={{ background: stripe }}>
-                  <span className="font-mono text-[8px] uppercase tracking-[0.14em] text-foreground/30">product</span>
+            {shop.map((p) => (
+              <Link key={p.id} to="/shop" className="w-[132px] flex-none">
+                <div className="flex h-[150px] items-end justify-center overflow-hidden rounded-xl" style={{ background: p.image ? undefined : stripe }}>
+                  {p.image && <img src={p.image} alt={p.title} className="h-full w-full object-cover" />}
                 </div>
-                <div className="mt-[9px] font-sans text-[12px] font-medium leading-[1.3]">{p.name}</div>
-                <div className="mt-1 font-sans text-[12px] text-primary">{p.price}</div>
+                <div className="mt-[9px] line-clamp-1 font-sans text-[12px] font-medium leading-[1.3]">{p.title}</div>
+                <div className="mt-1 font-sans text-[12px] text-primary">{money(p.price_cents)}</div>
               </Link>
             ))}
           </div>
@@ -178,7 +179,7 @@ const Home = () => {
           </div>
           <div className="flex flex-1 flex-col gap-4 p-8">
             <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[0.18em] text-foreground/40">{t('home.latest')}</span>
-            {latest.map((a) => (
+            {deskLatest.map((a) => (
               <button key={a.id} onClick={() => navigate(`/articles/${a.id}`)} className="flex gap-3.5 border-b border-white/[0.06] pb-4 text-left">
                 <div className="flex flex-1 flex-col gap-1.5">
                   <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.14em] text-primary/85">{a.category ?? 'Analysis'}</span>
@@ -209,11 +210,11 @@ const Home = () => {
             <Link to="/shop" className="font-sans text-[10.5px] font-semibold uppercase tracking-[0.14em] text-primary">{t('home.seeAll')}</Link>
           </div>
           <div className="grid grid-cols-4 gap-5">
-            {SHOP.concat(SHOP).slice(0, 4).map((p, i) => (
-              <Link key={i} to="/shop">
-                <div className="h-[220px] rounded-xl" style={{ background: stripe }} />
-                <div className="mt-2.5 font-sans text-[13px] font-medium">{p.name}</div>
-                <div className="mt-1 font-sans text-[12.5px] text-primary">{p.price}</div>
+            {shop.map((p) => (
+              <Link key={p.id} to="/shop">
+                <div className="h-[220px] overflow-hidden rounded-xl" style={{ background: p.image ? undefined : stripe }}>{p.image && <img src={p.image} alt={p.title} className="h-full w-full object-cover" />}</div>
+                <div className="mt-2.5 font-sans text-[13px] font-medium">{p.title}</div>
+                <div className="mt-1 font-sans text-[12.5px] text-primary">{money(p.price_cents)}</div>
               </Link>
             ))}
           </div>

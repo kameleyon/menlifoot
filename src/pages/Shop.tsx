@@ -41,7 +41,7 @@ const Shop = () => {
   const subtotal = cart.reduce((s, l) => s + l.variant.price, 0);
 
   return (
-    <AppShell>
+    <AppShell wide>
       {/* SHOP */}
       {view === 'shop' && (
         <div className="pt-14">
@@ -57,7 +57,7 @@ const Shop = () => {
           </div>
 
           {loading ? (
-            <div className="grid grid-cols-2 gap-4 px-5">
+            <div className="grid grid-cols-2 gap-4 px-5 lg:mx-auto lg:max-w-[1180px] lg:grid-cols-4 lg:gap-6">
               {[0, 1, 2, 3].map((i) => <div key={i} className="h-[176px] animate-pulse rounded-xl bg-white/[0.05]" />)}
             </div>
           ) : products.length === 0 ? (
@@ -67,7 +67,7 @@ const Shop = () => {
               <span className="font-sans text-[12.5px] leading-[1.6] text-foreground/50">{t('shop.soonDesc')}</span>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 px-5">
+            <div className="grid grid-cols-2 gap-4 px-5 lg:mx-auto lg:max-w-[1180px] lg:grid-cols-4 lg:gap-6">
               {products.map((p) => (
                 <button key={p.id} onClick={() => openProduct(p)} className="flex flex-col gap-2 text-left">
                   <div className="relative flex h-[176px] items-end justify-center overflow-hidden rounded-xl" style={{ background: p.image ? undefined : stripe }}>

@@ -62,8 +62,9 @@ const GrenadiersApp = () => {
   const nm = (id: string) => (playersById[id] ? fullName(playersById[id]) : id);
 
   return (
-    <AppShell>
-      <div className="pt-14">
+    <AppShell wide>
+      {/* ===== Mobile ===== */}
+      <div className="pt-14 lg:hidden">
         {/* Header */}
         <div className="flex flex-col gap-[11px] px-5 pb-[18px]">
           <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.18em] text-primary">{t('gren.nationalTeam')} · {players.length} {t('gren.players')}</span>
@@ -151,6 +152,71 @@ const GrenadiersApp = () => {
             ))}
           </div>
         )}
+      </div>
+
+      {/* ===== Desktop (wide web) ===== */}
+      <div className="mx-auto hidden max-w-[1180px] gap-11 px-10 py-10 lg:flex">
+        {/* Left: identity + last match + results */}
+        <div className="flex flex-[1.15] flex-col gap-7">
+          <div className="flex flex-col gap-3">
+            <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[0.18em] text-primary">{t('gren.nationalTeam')} · {players.length} {t('gren.players')}</span>
+            <span className="font-display text-[52px] uppercase leading-[0.95]">Les Grenadiers</span>
+            <p className="m-0 max-w-[48ch] font-sans text-[15px] leading-[1.7] text-foreground/60">{t('gren.desc')}</p>
+          </div>
+          {lastMatch && (
+            <div className="flex flex-col gap-3.5 rounded-2xl border border-primary/[0.28] p-6" style={{ background: 'linear-gradient(135deg,rgba(200,154,60,.12),rgba(200,154,60,.02))' }}>
+              <div className="flex items-center justify-between">
+                <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[0.18em] text-primary">{t('gren.lastMatch')}</span>
+                <span className="font-mono text-[11px] text-foreground/50">{lastMatch.date ? new Date(lastMatch.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }) : ''}</span>
+              </div>
+              <span className="font-display text-[38px] uppercase leading-[1.02]">Haiti {(lastMatch.result ?? '').replace(/\s*\(.\)/, '')} {lastMatch.opponent}</span>
+              <span className="font-sans text-[13px] font-medium text-foreground/70">{lastMatch.tournament}</span>
+              <button onClick={() => setFollowing((f) => !f)} className="mt-1 self-start rounded-full px-5 py-3 font-sans text-[11px] font-bold uppercase tracking-[0.08em]"
+                style={following ? { border: '1px solid rgba(255,255,255,.16)', color: 'rgba(244,242,238,.7)' } : { border: '1px solid transparent', background: 'linear-gradient(135deg,#e9c877,#c08a2a)', color: '#070708' }}>{following ? t('gren.following') : t('gren.followTeam')}</button>
+            </div>
+          )}
+          <div className="flex flex-col gap-3.5">
+            <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[0.18em] text-foreground/40">{t('gren.rResults')}</span>
+            {matches.slice(0, 8).map((r, i) => {
+              const rc = resultColor(r.result);
+              return (
+                <div key={i} className="flex items-center gap-4 border-b border-white/[0.06] pb-3.5">
+                  <span className="flex h-7 w-7 flex-none items-center justify-center rounded-full font-sans text-[12px] font-bold" style={{ background: rc.bg, color: rc.fg }}>{rc.res}</span>
+                  <div className="flex flex-1 flex-col gap-1"><span className="font-sans text-[14px] font-medium">Haiti {(r.result ?? '').replace(/\s*\(.\)/, '')} {r.opponent}</span><span className="font-sans text-[11px] text-foreground/40">{r.tournament}</span></div>
+                  <span className="font-mono text-[10.5px] text-foreground/40">{r.date ? new Date(r.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: 'UTC' }) : ''}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Right: records + squad */}
+        <div className="flex flex-1 flex-col gap-8">
+          <div className="flex flex-col gap-3.5">
+            <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[0.18em] text-foreground/40">{t('gren.allTimeGoals')}</span>
+            {topScorers.map((l) => (
+              <button key={l.player_id} onClick={() => playersById[l.player_id] && setSelected(playersById[l.player_id])} className="flex items-center gap-4 border-b border-white/[0.06] pb-3 text-left transition-colors hover:opacity-80">
+                <span className="w-[34px] flex-none font-display text-[22px] text-primary">{l.goals}</span>
+                <div className="flex flex-1 flex-col gap-1"><span className="font-sans text-[14px] font-medium">{nm(l.player_id)}</span><span className="font-sans text-[11px] text-foreground/40">Sélection · {l.matches_played ?? '—'} {t('gren.caps')}</span></div>
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-col gap-3">
+            <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[0.18em] text-foreground/40">{t('gren.rSquad')}</span>
+            {POSITION_ORDER.filter((g) => squad[g].length).map((g) => (
+              <div key={g} className="flex flex-col">
+                <div className="pb-1.5 pt-2.5 font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-foreground/35">{t(POS_KEY[g])}</div>
+                {squad[g].map((p) => (
+                  <button key={p.id} onClick={() => setSelected(p)} className="flex items-center gap-3.5 border-t border-white/[0.05] py-2.5 text-left transition-colors hover:opacity-80">
+                    <span className="w-6 flex-none text-center font-display text-[15px] text-primary">{p.jersey_number ?? '·'}</span>
+                    <span className="flex-1 font-sans text-[13.5px] font-medium">{fullName(p)}</span>
+                    <span className="font-sans text-[11px] text-foreground/40">{p.current_club ?? '—'}</span>
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       <PlayerModal
