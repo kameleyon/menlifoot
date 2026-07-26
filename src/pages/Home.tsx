@@ -89,10 +89,10 @@ const Home = () => {
         {/* Lead story */}
         {lead && (
           <button onClick={() => navigate(`/articles/${lead.id}`)} className="mx-5 mb-[22px] block w-[calc(100%-40px)] text-left">
-            <div className="relative flex h-[290px] flex-col justify-end overflow-hidden rounded-2xl" style={{ background: lead.thumbnail_url ? undefined : stripe }}>
+            <div className="relative flex h-[380px] flex-col justify-end overflow-hidden rounded-2xl" style={{ background: lead.thumbnail_url ? undefined : stripe }}>
               {lead.thumbnail_url && <img src={lead.thumbnail_url} alt="" className="absolute inset-0 h-full w-full object-cover" />}
               <span className="absolute left-3.5 top-3.5 rounded-full bg-primary px-[9px] py-[5px] font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-[#070708]">{t('home.leadStory')}</span>
-              <div className="relative px-[18px] pb-[18px] pt-[22px]" style={{ background: 'linear-gradient(to top,rgba(7,7,8,.94) 12%,rgba(7,7,8,0))' }}>
+              <div className="relative px-[18px] pb-[18px] pt-[12px]" style={{ background: 'linear-gradient(to top,rgba(7,7,8,.96) 0%,rgba(7,7,8,.72) 22%,rgba(7,7,8,0) 46%)' }}>
                 <div className="mb-[9px] font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-primary">{lead.category ?? 'Analysis'}</div>
                 <div className="font-display text-[25px] uppercase leading-[1.08] tracking-[0.005em]">{lead.title}</div>
                 {lead.summary && <div className="mt-2 font-sans text-[13px] leading-[1.5] text-foreground/60 line-clamp-2">{lead.summary}</div>}
@@ -102,12 +102,12 @@ const Home = () => {
         )}
 
         {/* Ask Menli */}
-        <button onClick={() => navigate('/ask')} className="mx-5 mb-[26px] flex w-[calc(100%-40px)] items-center gap-3.5 rounded-2xl border border-primary/30 px-[18px] py-4 text-left" style={{ background: 'linear-gradient(135deg,rgba(200,154,60,.1),rgba(200,154,60,.02))' }}>
+        <button onClick={() => navigate('/ask')} className="mx-5 mb-[26px] flex w-[calc(100%-40px)] items-center gap-3.5 rounded-2xl px-[18px] py-[18px] text-left" style={{ background: '#d8a93f' }}>
           <div className="flex flex-1 flex-col gap-[5px]">
-            <div className="font-sans text-[15px] font-bold text-[#e9c877]">{t('home.askTitle')}</div>
-            <div className="font-sans text-[12px] leading-[1.45] text-foreground/60">{t('home.askSub')}</div>
+            <div className="font-sans text-[16px] font-bold text-[#070708]">{t('home.askTitle')}</div>
+            <div className="font-sans text-[12.5px] font-medium leading-[1.45] text-[#070708]/75">{t('home.askSub')}</div>
           </div>
-          <span className="font-display text-[22px] text-primary">→</span>
+          <span className="font-display text-[22px] text-[#070708]">→</span>
         </button>
 
         {/* Latest */}
