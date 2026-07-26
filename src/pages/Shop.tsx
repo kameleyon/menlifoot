@@ -292,7 +292,7 @@ const Shop = () => {
               {gallery[imgIdx] && <img src={gallery[imgIdx].src} alt={selected.title} className="h-full w-full object-cover" />}
             </div>
             {gallery.length > 1 && (
-              <div className="mt-3 flex gap-2 overflow-x-auto px-5 lg:px-0 [scrollbar-width:none]">
+              <div className="mt-3 flex gap-2 overflow-x-auto px-5 lg:flex-wrap lg:overflow-visible lg:px-0 [scrollbar-width:none]">
                 {gallery.map((im, i) => (
                   <button key={i} onClick={() => setImgIdx(i)} className={`h-16 w-16 flex-none overflow-hidden rounded-lg border bg-white ${i === imgIdx ? 'border-primary' : 'border-white/[0.1]'}`}>
                     <img src={im.src} alt="" className="h-full w-full object-cover" />
