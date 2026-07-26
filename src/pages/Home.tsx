@@ -64,8 +64,9 @@ const Home = () => {
   const latest = articles.slice(1, 5);
 
   return (
-    <AppShell>
-      <div className="pb-2 pt-14">
+    <AppShell wide>
+      {/* ===== Mobile ===== */}
+      <div className="pb-2 pt-14 lg:hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 pb-4">
           <img src={wordmark} alt="Menlifoot" className="h-6 w-auto" />
@@ -152,6 +153,67 @@ const Home = () => {
                 </div>
                 <div className="mt-[9px] font-sans text-[12px] font-medium leading-[1.3]">{p.name}</div>
                 <div className="mt-1 font-sans text-[12px] text-primary">{p.price}</div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ===== Desktop (wide web) ===== */}
+      <div className="mx-auto hidden max-w-[1180px] lg:block">
+        {/* Hero + latest */}
+        <div className="flex border-b border-white/[0.07]">
+          <div className="flex flex-[1.55] flex-col gap-5 border-r border-white/[0.07] p-10">
+            {lead && (
+              <>
+                <button onClick={() => navigate(`/articles/${lead.id}`)} className="block h-[340px] w-full overflow-hidden rounded-2xl text-left" style={{ background: lead.thumbnail_url ? undefined : stripe }}>
+                  {lead.thumbnail_url && <img src={lead.thumbnail_url} alt="" className="h-full w-full object-cover" />}
+                </button>
+                <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[0.18em] text-primary">{lead.category ?? 'Analysis'}</span>
+                <h2 className="m-0 max-w-[16ch] font-display text-[46px] uppercase leading-none">{lead.title}</h2>
+                {lead.summary && <p className="m-0 max-w-[56ch] font-sans text-[15.5px] leading-[1.7] text-foreground/60">{lead.summary}</p>}
+                <button onClick={() => navigate(`/articles/${lead.id}`)} className="self-start rounded-full px-[22px] py-[13px] font-sans text-[12px] font-bold uppercase tracking-[0.06em] text-[#070708]" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>{t('home.allAnalysis')}</button>
+              </>
+            )}
+          </div>
+          <div className="flex flex-1 flex-col gap-4 p-8">
+            <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[0.18em] text-foreground/40">{t('home.latest')}</span>
+            {latest.map((a) => (
+              <button key={a.id} onClick={() => navigate(`/articles/${a.id}`)} className="flex gap-3.5 border-b border-white/[0.06] pb-4 text-left">
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.14em] text-primary/85">{a.category ?? 'Analysis'}</span>
+                  <span className="font-sans text-[14px] font-semibold leading-[1.35]">{a.title}</span>
+                </div>
+                <div className="h-[62px] w-[62px] flex-none rounded-lg bg-cover bg-center" style={{ background: a.thumbnail_url ? `center/cover url(${a.thumbnail_url})` : stripe }} />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Podcast band */}
+        <div className="flex items-center gap-10 border-b border-white/[0.07] px-10 py-[34px]" style={{ background: 'linear-gradient(90deg,rgba(200,154,60,.09),rgba(200,154,60,0) 65%)' }}>
+          <div className="flex h-[110px] w-[110px] flex-none items-center justify-center overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0d0d0f]">
+            {podcast && podcastThumb(podcast) ? <img src={podcastThumb(podcast)!} alt="" className="h-full w-full object-cover" /> : <img src="/logo.png" alt="" className="h-[60px] w-auto" />}
+          </div>
+          <div className="flex flex-1 flex-col gap-2.5">
+            <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[0.18em] text-primary">{t('home.podcastNew')}</span>
+            <span className="font-display text-[30px] uppercase">{podcast?.title ?? 'Road to 2026: the math'}</span>
+          </div>
+          <button onClick={() => navigate('/listen')} className="flex h-[58px] w-[58px] flex-none items-center justify-center rounded-full font-display text-[16px] text-[#070708]" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>▶</button>
+        </div>
+
+        {/* Store */}
+        <div className="flex flex-col gap-5 px-10 py-9">
+          <div className="flex items-baseline justify-between">
+            <span className="font-display text-[22px] uppercase tracking-[0.03em]">{t('home.shopDrop')}</span>
+            <Link to="/shop" className="font-sans text-[10.5px] font-semibold uppercase tracking-[0.14em] text-primary">{t('home.seeAll')}</Link>
+          </div>
+          <div className="grid grid-cols-4 gap-5">
+            {SHOP.concat(SHOP).slice(0, 4).map((p, i) => (
+              <Link key={i} to="/shop">
+                <div className="h-[220px] rounded-xl" style={{ background: stripe }} />
+                <div className="mt-2.5 font-sans text-[13px] font-medium">{p.name}</div>
+                <div className="mt-1 font-sans text-[12.5px] text-primary">{p.price}</div>
               </Link>
             ))}
           </div>

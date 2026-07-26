@@ -49,18 +49,16 @@ serve(async (req) => {
       return json({ products });
     }
     if (action === "product") {
-      const r = await fetch(`${API}/shops/${SHOP_ID}/products/${body.id}.json`, { headers });
-      if (!r.ok) return json({ error: `product ${body.id}: ${r.status}` }, r.status);
+      // Validate the id strictly — never interpolate untrusted input into the URL path (SSRF / path traversal).
+      const id = String(body.id ?? "");
+      if (!/^[a-zA-Z0-9]{1,40}$/.test(id)) return json({ error: "invalid product id" }, 400);
+      const r = await fetch(`${API}/shops/${SHOP_ID}/products/${id}.json`, { headers });
+      if (!r.ok) return json({ error: `product ${id}: ${r.status}` }, r.status);
       return json({ product: mapProduct(await r.json(), true) });
     }
-    if (action === "shipping") {
-      const r = await fetch(`${API}/shops/${SHOP_ID}/orders/shipping.json`, { method: "POST", headers, body: JSON.stringify(body.payload) });
-      return json(await r.json(), r.status);
-    }
-    if (action === "order") {
-      const r = await fetch(`${API}/shops/${SHOP_ID}/orders.json`, { method: "POST", headers, body: JSON.stringify(body.payload) });
-      return json(await r.json(), r.status);
-    }
+    // NOTE: write actions (order/shipping submission) are intentionally NOT exposed here.
+    // They are privileged (orders.write) and must only run behind an authenticated,
+    // server-validated checkout (verified user + server-side price/cart validation).
     return json({ error: "unknown action" }, 400);
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : "proxy error" }, 500);
