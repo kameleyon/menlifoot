@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, ReactNode, FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -43,6 +44,7 @@ const AuthModal = ({ isOpen, setOpen, mode, setMode }: Props) => {
   const { t } = useLanguage();
   const { signIn, signUp } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -61,11 +63,14 @@ const AuthModal = ({ isOpen, setOpen, mode, setMode }: Props) => {
       toast({ title: error.message, variant: 'destructive' });
       return;
     }
-    if (mode === 'signup') {
-      toast({ title: t('auth.checkEmail') });
-    }
     setOpen(false);
     setEmail(''); setPassword('');
+    if (mode === 'signup') {
+      toast({ title: t('auth.checkEmail') });
+    } else {
+      // Signed in — send them to the admin panel (it self-guards non-admins).
+      navigate('/admin');
+    }
   };
 
   const tabCls = (active: boolean) =>

@@ -721,18 +721,10 @@ const Admin = () => {
                 <span className="hidden sm:inline">Back</span>
               </Button>
               
-              <motion.img 
-                src="/logo.png" 
-                alt="Menlifoot" 
-                className="h-8 w-8 sm:h-10 sm:w-10 animate-bounce-subtle"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.2 }}
-                whileHover={{ scale: 1.2 }}
-              />
-              
-              <h1 className="font-display text-xl sm:text-3xl tracking-wide text-gradient-gold">
-                ADMIN PANEL
+              <img src="/logo.png" alt="" className="h-8 w-auto sm:h-9" />
+
+              <h1 className="font-display text-xl uppercase tracking-wide text-gradient-gold sm:text-[28px]">
+                Admin Panel
               </h1>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
