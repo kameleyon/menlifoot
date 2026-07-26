@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -28,6 +29,7 @@ const Field = ({ label, value, onChange, className = '' }: { label: string; valu
 
 const Shop = () => {
   const { t } = useLanguage();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [view, setView] = useState<'shop' | 'product' | 'cart' | 'address' | 'done'>('shop');
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,13 +41,16 @@ const Shop = () => {
   const [address, setAddress] = useState({ ...EMPTY_ADDR });
   const [placing, setPlacing] = useState(false);
 
+  // React to ?checkout=success / ?cart=1 even when already on the shop page (e.g. top-bar bag click).
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('checkout') === 'success') {
-      setView('done'); setCart([]); window.history.replaceState({}, '', '/shop');
-    } else if (params.get('cart') === '1') {
-      setView('cart'); window.history.replaceState({}, '', '/shop');
+    if (searchParams.get('checkout') === 'success') {
+      setView('done'); setCart([]); setSearchParams({}, { replace: true });
+    } else if (searchParams.get('cart') === '1') {
+      setView('cart'); setSearchParams({}, { replace: true });
     }
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
     (async () => {
       const { data } = await supabase.functions.invoke('printify', { body: { action: 'products' } });
       setProducts(((data as { products?: Product[] })?.products) ?? []);
@@ -127,7 +132,7 @@ const Shop = () => {
               <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.18em] text-primary">{t('shop.nowOpen')}</span>
               <span className="font-display text-[30px] uppercase lg:text-[42px]">{t('shop.store')}</span>
             </div>
-            <button onClick={() => setView('cart')} className="relative flex h-[38px] w-[38px] items-center justify-center rounded-full border border-white/[0.14]">
+            <button onClick={() => setView('cart')} className="relative flex h-[38px] w-[38px] items-center justify-center rounded-full border border-white/[0.14] lg:hidden">
               <span className="font-sans text-[11px] font-medium text-foreground/80">{t('shop.bag')}</span>
               {cart.length > 0 && <span className="absolute -right-1 -top-1 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-primary px-1 font-sans text-[10px] font-bold text-[#070708]">{cart.length}</span>}
             </button>
