@@ -50,7 +50,7 @@ const Ask = () => {
         </div>
 
         {/* Thread */}
-        <div ref={scrollRef} className="flex flex-1 flex-col gap-3.5 overflow-y-auto px-5 pb-[150px] pt-5">
+        <div ref={scrollRef} className="flex flex-1 flex-col gap-3.5 overflow-y-auto px-5 pb-[200px] pt-5">
           {thread.map((m, i) => (
             <div key={i}
               className={`max-w-[82%] rounded-2xl border px-[15px] py-[13px] font-sans text-[13px] leading-[1.6] ${
@@ -76,7 +76,7 @@ const Ask = () => {
 
         {/* Prompt chips */}
         {thread.length <= 1 && (
-          <div className="fixed bottom-[128px] left-1/2 z-30 flex w-full max-w-[520px] -translate-x-1/2 flex-wrap gap-2 px-5">
+          <div className="fixed bottom-[158px] left-1/2 z-30 flex w-full max-w-[520px] -translate-x-1/2 flex-wrap gap-2 px-5">
             {PROMPT_KEYS.map((p) => (
               <button key={p} onClick={() => send(t(p))} className="rounded-full border border-white/[0.13] px-[13px] py-[9px] font-sans text-[11.5px] font-medium text-foreground/70 transition-colors hover:border-primary/60 hover:text-primary">{t(p)}</button>
             ))}
