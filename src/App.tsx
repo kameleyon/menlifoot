@@ -7,7 +7,6 @@ import { CartProvider } from "./contexts/CartContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { AuthModalProvider } from "./components/AuthModal";
-import IntroSplash from "./components/IntroSplash";
 import Index from "./pages/Index";
 import Home from "./pages/Home";
 import Article from "./pages/Article";
@@ -44,7 +43,6 @@ const App = () => (
             <Sonner />
             <BrowserRouter>
               <AuthModalProvider>
-              <IntroSplash />
               <PaymentTestModeBanner />
               <Routes>
                 <Route path="/" element={<Home />} />
