@@ -188,7 +188,7 @@ const translations: Record<Language, Record<string, string>> = {
     'chat.tryAsking': 'Try asking:',
     
     // Footer
-    'footer.tagline': 'Your ultimate soccer companion. Stay connected with the beautiful game through podcasts, news, and community.',
+    'footer.tagline': 'Football, differently — stay connected to the beautiful game.',
     'footer.company': 'Company',
     'footer.content': 'Content',
     'footer.support': 'Support',
@@ -209,7 +209,7 @@ const translations: Record<Language, Record<string, string>> = {
     'footer.rights': 'All rights reserved.',
     
     // Splash
-    'splash.companion': 'Your Soccer Companion',
+    'splash.companion': 'Football, differently',
     
     // Articles
     'articles.badge': 'Latest Articles',
@@ -501,7 +501,7 @@ const translations: Record<Language, Record<string, string>> = {
     'footer.rights': 'Tous droits réservés.',
     
     // Splash
-    'splash.companion': 'Votre Compagnon Football',
+    'splash.companion': 'Le football autrement',
     
     // Articles
     'articles.badge': 'Derniers Articles',
@@ -793,7 +793,7 @@ const translations: Record<Language, Record<string, string>> = {
     'footer.rights': 'Todos los derechos reservados.',
     
     // Splash
-    'splash.companion': 'Tu Compañero de Fútbol',
+    'splash.companion': 'El fútbol de otra manera',
     
     // Articles
     'articles.badge': 'Últimos Artículos',
@@ -1085,7 +1085,7 @@ const translations: Record<Language, Record<string, string>> = {
     'footer.rights': 'Tout dwa rezève.',
     
     // Splash
-    'splash.companion': 'Patnè Foutbòl Ou',
+    'splash.companion': 'Foutbòl yon lòt jan',
     
     // Articles
     'articles.badge': 'Dènye Atik yo',

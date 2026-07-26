@@ -1,7 +1,7 @@
 {
   "name": "Menlifoot",
   "short_name": "Menlifoot",
-  "description": "Your Ultimate Soccer Companion - Expert analysis, player interviews, match insights, and more.",
+  "description": "Le football autrement — analyses, interviews, MVP Podcast.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",

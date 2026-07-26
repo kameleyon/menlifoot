@@ -9,6 +9,8 @@ import { AuthProvider } from "./contexts/AuthContext";
 import Index from "./pages/Index";
 import Home from "./pages/Home";
 import Article from "./pages/Article";
+import Editorial from "./pages/Editorial";
+import QuizList from "./pages/QuizList";
 import Ask from "./pages/Ask";
 import Listen from "./pages/Listen";
 import Shop from "./pages/Shop";
@@ -53,11 +55,11 @@ const App = () => (
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/admin" element={<Admin />} />
                 <Route path="/podcasts" element={<Podcasts />} />
-                <Route path="/articles" element={<Articles />} />
+                <Route path="/articles" element={<Editorial />} />
                 <Route path="/articles/:id" element={<Article />} />
                 <Route path="/articles/:id/full" element={<ArticleDetail />} />
                 <Route path="/share/articles/:id" element={<ShareArticleRedirect />} />
-                <Route path="/quizzes" element={<Quizzes />} />
+                <Route path="/quizzes" element={<QuizList />} />
                 <Route path="/quizzes/:id" element={<QuizPlay />} />
                 <Route path="/grenadiers" element={<GrenadiersApp />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
