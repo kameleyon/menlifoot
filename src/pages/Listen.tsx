@@ -27,9 +27,12 @@ const VIDEOS = [
   { title: 'Inside the 2026 camp', meta: '8 min · Featurette' },
 ];
 
+const embedSrc = (url: string | null) => (url ? `${url}${url.includes('?') ? '&' : '?'}autoplay=1` : '');
+
 const Listen = () => {
   const { t } = useLanguage();
   const [pods, setPods] = useState<Podcast[]>([]);
+  const [playing, setPlaying] = useState<Podcast | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -40,8 +43,8 @@ const Listen = () => {
   }, []);
 
   const now = pods[0];
+  const current = playing ?? now;
   const rest = pods.slice(1);
-  const open = (url: string | null) => url && window.open(url, '_blank', 'noopener');
 
   return (
     <AppShell>
@@ -53,36 +56,30 @@ const Listen = () => {
 
         {/* Now playing */}
         <div className="mx-5 mb-6 overflow-hidden rounded-2xl border border-white/[0.07] bg-[#101012]">
-          <div className="relative flex h-[190px] items-center justify-center overflow-hidden" style={{ background: 'radial-gradient(120% 100% at 50% 0%,#1d1a14,#0a0a0b)' }}>
-            {now && podcastThumb(now)
-              ? <img src={podcastThumb(now)!} alt={now.title} className="h-full w-full object-cover" />
-              : <img src={lockup} alt="Menlifoot" className="h-[60px] w-auto opacity-95" />}
-          </div>
-          <div className="flex flex-col gap-3.5 px-[18px] pb-[18px] pt-4">
-            <div className="flex flex-col gap-1.5">
-              <span className="font-sans text-[15px] font-semibold leading-[1.25]">{now?.title ?? 'Road to 2026: the math'}</span>
-              <span className="font-sans text-[11px] text-foreground/45">{now ? `Ep. ${now.episode_number ?? '—'} · ${now.duration ?? ''}` : 'Ep. 48 · 54 min'}</span>
-            </div>
-            <div className="flex flex-col gap-[7px]">
-              <div className="relative h-[3px] rounded-full bg-white/10">
-                <div className="absolute inset-y-0 left-0 w-[8%] rounded-full" style={{ background: 'linear-gradient(90deg,#c08a2a,#e9c877)' }} />
-              </div>
-              <div className="flex justify-between font-mono text-[10px] text-foreground/40"><span>0:00</span><span>{now?.duration ?? '54:00'}</span></div>
-            </div>
-            <div className="flex items-center justify-center gap-[26px]">
-              <span className="font-sans text-[12px] font-medium text-foreground/55">15s</span>
-              <button onClick={() => open(now?.original_url ?? null)} className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>
-                <span className="font-display text-[16px] text-[#070708]">▶</span>
+          <div className="relative aspect-video w-full overflow-hidden" style={{ background: 'radial-gradient(120% 100% at 50% 0%,#1d1a14,#0a0a0b)' }}>
+            {playing && playing.embed_url ? (
+              <iframe src={embedSrc(playing.embed_url)} title={playing.title} className="h-full w-full" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
+            ) : (
+              <button onClick={() => current && setPlaying(current)} className="flex h-full w-full items-center justify-center">
+                {current && podcastThumb(current)
+                  ? <img src={podcastThumb(current)!} alt={current.title} className="h-full w-full object-cover" />
+                  : <img src={lockup} alt="Menlifoot" className="h-[60px] w-auto opacity-95" />}
+                <span className="absolute flex h-14 w-14 items-center justify-center rounded-full" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>
+                  <span className="ml-0.5 font-display text-[18px] text-[#070708]">▶</span>
+                </span>
               </button>
-              <span className="font-sans text-[12px] font-medium text-foreground/55">30s</span>
-            </div>
+            )}
+          </div>
+          <div className="flex flex-col gap-2 px-[18px] pb-[18px] pt-4">
+            <span className="font-sans text-[15px] font-semibold leading-[1.25]">{current?.title ?? 'Road to 2026: the math'}</span>
+            <span className="font-sans text-[11px] text-foreground/45">{current ? `Ep. ${current.episode_number ?? '—'} · ${current.duration ?? ''}` : 'Ep. 48 · 54 min'}</span>
           </div>
         </div>
 
         {/* Episodes */}
         <div className="px-5 pb-2.5 font-display text-[15px] uppercase tracking-[0.04em]">{t('listen.episodes')}</div>
         {rest.map((e) => (
-          <button key={e.id} onClick={() => open(e.original_url)} className="flex w-full items-center gap-3.5 border-t border-white/[0.06] px-5 py-3.5 text-left transition-colors hover:bg-white/[0.03]">
+          <button key={e.id} onClick={() => setPlaying(e)} className="flex w-full items-center gap-3.5 border-t border-white/[0.06] px-5 py-3.5 text-left transition-colors hover:bg-white/[0.03]">
             <div className="relative flex h-11 w-11 flex-none items-center justify-center overflow-hidden rounded-lg border border-white/[0.08] bg-[#111114] font-display text-[12px] text-primary">
               {podcastThumb(e)
                 ? <img src={podcastThumb(e)!} alt="" className="h-full w-full object-cover" />

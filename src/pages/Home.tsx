@@ -37,11 +37,6 @@ const db = supabase as unknown as {
 };
 
 const stripe = 'repeating-linear-gradient(135deg,#1b1b1f 0 8px,#131316 8px 16px)';
-const SCORES = [
-  { min: "72'", h: 'Haiti', hs: '1', a: 'Canada', as: '0' },
-  { min: 'HT', h: 'Jamaica', hs: '0', a: 'Mexico', as: '2' },
-  { min: "36'", h: 'USA', hs: '1', a: 'Panama', as: '1' },
-];
 const SHOP = [
   { name: 'Grenadier Home Tee', price: '$42' },
   { name: 'Gold Mark Cap', price: '$34' },
@@ -82,22 +77,6 @@ const Home = () => {
           </div>
         </div>
 
-        {/* Live scores */}
-        <div className="flex gap-2.5 overflow-x-auto px-5 pb-[18px] [scrollbar-width:none]">
-          {SCORES.map((m, i) => (
-            <div key={i} className="flex w-[132px] flex-none flex-col gap-[9px] rounded-xl border border-white/[0.07] bg-[#101012] px-3 py-[11px]">
-              <div className="flex items-center gap-[5px]">
-                <span className="h-[5px] w-[5px] animate-pulse rounded-full bg-[#e2483f]" />
-                <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.14em] text-foreground/50">{m.min}</span>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <div className="flex justify-between font-sans text-[13px] font-medium"><span>{m.h}</span><span className="font-display text-[15px]">{m.hs}</span></div>
-                <div className="flex justify-between font-sans text-[13px] font-medium text-foreground/60"><span>{m.a}</span><span className="font-display text-[15px]">{m.as}</span></div>
-              </div>
-            </div>
-          ))}
-        </div>
-
         {/* Lead story */}
         {lead && (
           <button onClick={() => navigate(`/articles/${lead.id}`)} className="mx-5 mb-[22px] block w-[calc(100%-40px)] text-left">
@@ -116,7 +95,7 @@ const Home = () => {
         {/* Ask Menli */}
         <button onClick={() => navigate('/ask')} className="mx-5 mb-[26px] flex w-[calc(100%-40px)] items-center gap-3.5 rounded-2xl border border-primary/30 px-[18px] py-4 text-left" style={{ background: 'linear-gradient(135deg,rgba(200,154,60,.1),rgba(200,154,60,.02))' }}>
           <div className="flex flex-1 flex-col gap-[5px]">
-            <div className="font-sans text-[14px] font-semibold">{t('home.askTitle')}</div>
+            <div className="font-sans text-[15px] font-bold text-primary">{t('home.askTitle')}</div>
             <div className="font-sans text-[12px] leading-[1.45] text-foreground/60">{t('home.askSub')}</div>
           </div>
           <span className="font-display text-[22px] text-primary">→</span>

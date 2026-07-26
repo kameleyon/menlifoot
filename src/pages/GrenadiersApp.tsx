@@ -102,14 +102,14 @@ const GrenadiersApp = () => {
           <div className="flex flex-col">
             <div className="px-5 pb-2.5 pt-1.5 font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-foreground/40">{t('gren.allTimeGoals')}</div>
             {topScorers.map((l) => (
-              <div key={l.player_id} className="flex items-center gap-3.5 border-t border-white/[0.05] px-5 py-3">
+              <div key={l.player_id} onClick={() => playersById[l.player_id] && setSelected(playersById[l.player_id])} className="flex cursor-pointer items-center gap-3.5 border-t border-white/[0.05] px-5 py-3 transition-colors hover:bg-white/[0.03]">
                 <span className="w-[30px] flex-none text-center font-display text-[20px] text-primary">{l.goals}</span>
                 <div className="flex flex-1 flex-col gap-1"><span className="font-sans text-[13px] font-medium">{nm(l.player_id)}</span><span className="font-sans text-[10.5px] text-foreground/40">Sélection · {l.matches_played ?? '—'} caps</span></div>
               </div>
             ))}
             <div className="px-5 pb-2.5 pt-[22px] font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-foreground/40">{t('gren.mostCaps')}</div>
             {topCaps.map((l) => (
-              <div key={l.player_id} className="flex items-center gap-3.5 border-t border-white/[0.05] px-5 py-3">
+              <div key={l.player_id} onClick={() => playersById[l.player_id] && setSelected(playersById[l.player_id])} className="flex cursor-pointer items-center gap-3.5 border-t border-white/[0.05] px-5 py-3 transition-colors hover:bg-white/[0.03]">
                 <span className="w-[30px] flex-none text-center font-display text-[20px] text-foreground/70">{l.matches_played}</span>
                 <div className="flex flex-1 flex-col gap-1"><span className="font-sans text-[13px] font-medium">{nm(l.player_id)}</span><span className="font-sans text-[10.5px] text-foreground/40">Sélection · {l.goals ?? 0} goals</span></div>
               </div>

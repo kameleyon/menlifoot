@@ -13,7 +13,7 @@ const translations: Record<Language, Record<string, string>> = {
   en: {
     // Navbar
     'nav.home': 'Home',
-    'nav.grenadiers': 'Les Grenadiers',
+    'nav.grenadiers': 'Haiti',
     // Grenadiers
     'gren.subtitle': 'Haiti National Team',
     'gren.back': 'Home',
@@ -305,7 +305,7 @@ const translations: Record<Language, Record<string, string>> = {
   fr: {
     // Navbar
     'nav.home': 'Accueil',
-    'nav.grenadiers': 'Les Grenadiers',
+    'nav.grenadiers': 'Haiti',
     // Grenadiers
     'gren.subtitle': 'Sélection nationale d\'Haïti',
     'gren.back': 'Accueil',
@@ -597,7 +597,7 @@ const translations: Record<Language, Record<string, string>> = {
   es: {
     // Navbar
     'nav.home': 'Inicio',
-    'nav.grenadiers': 'Les Grenadiers',
+    'nav.grenadiers': 'Haiti',
     // Grenadiers
     'gren.subtitle': 'Selección nacional de Haití',
     'gren.back': 'Inicio',
@@ -889,7 +889,7 @@ const translations: Record<Language, Record<string, string>> = {
   ht: {
     // Navbar
     'nav.home': 'Lakay',
-    'nav.grenadiers': 'Les Grenadiers',
+    'nav.grenadiers': 'Haiti',
     // Grenadiers
     'gren.subtitle': 'Seleksyon nasyonal Ayiti',
     'gren.back': 'Lakay',
