@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { X, Search, Check } from 'lucide-react';
+import { X, Search, Check, Heart, Bookmark, Share2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useAuthModal } from '@/components/AuthModal';
+import { useToast } from '@/hooks/use-toast';
 import { RichTextContent } from '@/components/RichTextContent';
 import AppShell from '@/components/mobile/AppShell';
 
@@ -41,7 +44,13 @@ const Field = ({ label, value, onChange, className = '' }: { label: string; valu
 
 const Shop = () => {
   const { t } = useLanguage();
+  const { user } = useAuth();
+  const { open: openAuth } = useAuthModal();
+  const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [favorited, setFavorited] = useState(false);
   const [view, setView] = useState<'shop' | 'product' | 'cart' | 'address' | 'done'>('shop');
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,8 +106,43 @@ const Shop = () => {
     return imgs.length ? imgs : (selected?.images ?? []);
   }, [selected, colorId]);
 
+  // deno-lint-ignore no-explicit-any
+  const pdb = supabase as any;
+  const loadEngagement = async (productId: string) => {
+    setLiked(false); setFavorited(false); setLikeCount(0);
+    const { count } = await pdb.from('product_likes').select('*', { count: 'exact', head: true }).eq('product_id', productId);
+    setLikeCount(count ?? 0);
+    if (user) {
+      const l = await pdb.from('product_likes').select('user_id').eq('product_id', productId).eq('user_id', user.id).maybeSingle();
+      setLiked(!!l.data);
+      const f = await pdb.from('product_favorites').select('user_id').eq('product_id', productId).eq('user_id', user.id).maybeSingle();
+      setFavorited(!!f.data);
+    }
+  };
+  const toggleLike = async () => {
+    if (!selected) return;
+    if (!user) return openAuth('signin');
+    const pid = selected.id;
+    if (liked) { setLiked(false); setLikeCount((n) => Math.max(0, n - 1)); await pdb.from('product_likes').delete().eq('product_id', pid).eq('user_id', user.id); }
+    else { setLiked(true); setLikeCount((n) => n + 1); await pdb.from('product_likes').insert({ product_id: pid, user_id: user.id }); }
+  };
+  const toggleFavorite = async () => {
+    if (!selected) return;
+    if (!user) return openAuth('signin');
+    const pid = selected.id;
+    if (favorited) { setFavorited(false); await pdb.from('product_favorites').delete().eq('product_id', pid).eq('user_id', user.id); }
+    else { setFavorited(true); await pdb.from('product_favorites').insert({ product_id: pid, user_id: user.id }); toast({ title: t('shop.favorited') }); }
+  };
+  const shareProduct = async () => {
+    if (!selected) return;
+    const url = `${window.location.origin}/shop?product=${selected.id}`;
+    try { if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(url); toast({ title: t('shop.linkCopied') }); }
+    catch { toast({ title: url }); }
+  };
+
   const openProduct = async (p: Product) => {
     setSelected(p); setColorId(null); setSizeId(null); setImgIdx(0); setPersonalization(''); setPqty(1); setView('product');
+    loadEngagement(p.id);
     const { data } = await supabase.functions.invoke('printify', { body: { action: 'product', id: p.id } });
     const full = (data as { product?: Product })?.product;
     if (!full) return;
@@ -111,6 +155,16 @@ const Shop = () => {
     const firstSize = (full.sizes ?? []).find((s) => (full.variants ?? []).some((v) => vc(v) === firstColor && vsz(v) === s.id))?.id ?? null;
     setColorId(firstColor); setSizeId(firstSize); setImgIdx(0);
   };
+
+  // Open a product directly from a shared link (/shop?product=ID).
+  useEffect(() => {
+    const pid = searchParams.get('product');
+    if (pid && /^[a-zA-Z0-9]{1,40}$/.test(pid)) {
+      openProduct({ id: pid, title: '', image: null, price_cents: null });
+      setSearchParams({}, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const pickColor = (id: number) => {
     setColorId(id); setImgIdx(0);
@@ -253,6 +307,19 @@ const Shop = () => {
             <div className="flex flex-col gap-2">
               <span className="font-display text-[26px] uppercase leading-[1.05] lg:text-[34px]">{selected.title}</span>
               <span className="font-sans text-[18px] font-medium">{money(variant?.price ?? selected.price_cents)}</span>
+            </div>
+
+            {/* Like · Favorite · Share */}
+            <div className="flex items-center gap-1">
+              <button onClick={toggleLike} aria-label="like" className={`flex items-center gap-1.5 rounded-full py-1.5 pr-2.5 font-sans text-[12.5px] transition-colors ${liked ? 'text-primary' : 'text-primary/70 hover:text-primary'}`}>
+                <Heart className={`h-[17px] w-[17px] ${liked ? 'fill-current' : ''}`} /> {likeCount}
+              </button>
+              <button onClick={toggleFavorite} aria-label="favorite" className={`rounded-full px-2 py-1.5 transition-colors ${favorited ? 'text-primary' : 'text-primary/70 hover:text-primary'}`}>
+                <Bookmark className={`h-[17px] w-[17px] ${favorited ? 'fill-current' : ''}`} />
+              </button>
+              <button onClick={shareProduct} aria-label="share" className="rounded-full px-2 py-1.5 text-primary/70 hover:text-primary">
+                <Share2 className="h-[17px] w-[17px]" />
+              </button>
             </div>
 
             {/* Colors */}
