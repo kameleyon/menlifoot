@@ -12,7 +12,9 @@ export interface Eng {
   views: number; likes: number; liked: boolean; bookmarked: boolean;
   comments: Comment[]; draft: string; busy: boolean; currentUserId: string | null;
   setDraft: (s: string) => void;
-  toggleLike: () => void; toggleBookmark: () => void; share: () => void;
+  toggleLike: () => void; toggleBookmark: () => void;
+  getShare: () => { url: string; title: string; text: string };
+  copyLink: () => void; canNativeShare: boolean; nativeShare: () => void;
   postComment: () => void; deleteComment: (id: string) => void;
 }
 
@@ -71,14 +73,32 @@ export function useArticleEngagement(articleId: string, meta: { title: string; s
     else { setBookmarked(true); await db.from('article_bookmarks').insert({ article_id: articleId, user_id: user.id }); toast({ title: t('art.saved') }); }
   };
 
-  const share = async () => {
+  const getShare = () => {
     const m = metaRef.current;
     const first15 = (m.summary ?? '').split(/\s+/).filter(Boolean).slice(0, 15).join(' ');
-    const url = `${window.location.origin}/articles/${articleId}`;
-    const data = { title: m.title, text: first15 ? `${first15}…` : m.title, url };
+    return {
+      url: `${window.location.origin}/articles/${articleId}`,
+      title: m.title || 'Menlifoot',
+      text: first15 ? `${first15}…` : (m.title || 'Menlifoot'),
+    };
+  };
+  const copyLink = async () => {
+    const { url } = getShare();
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(url);
+      else {
+        const ta = document.createElement('textarea');
+        ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+      }
+      toast({ title: t('art.linkCopied') });
+    } catch { toast({ title: url }); }
+  };
+  // deno-lint-ignore no-explicit-any
+  const canNativeShare = typeof navigator !== 'undefined' && !!(navigator as any).share;
+  const nativeShare = async () => {
     // deno-lint-ignore no-explicit-any
-    if ((navigator as any).share) { try { await (navigator as any).share(data); } catch { /* cancelled */ } }
-    else { try { await navigator.clipboard.writeText(url); toast({ title: t('art.linkCopied') }); } catch { /* noop */ } }
+    try { await (navigator as any).share(getShare()); } catch { /* cancelled */ }
   };
 
   const postComment = async () => {
@@ -102,11 +122,19 @@ export function useArticleEngagement(articleId: string, meta: { title: string; s
     await db.from('article_comments').delete().eq('id', cid).eq('user_id', user.id);
   };
 
-  return { views, likes, liked, bookmarked, comments, draft, busy, currentUserId: user?.id ?? null, setDraft, toggleLike, toggleBookmark, share, postComment, deleteComment };
+  return { views, likes, liked, bookmarked, comments, draft, busy, currentUserId: user?.id ?? null, setDraft, toggleLike, toggleBookmark, getShare, copyLink, canNativeShare, nativeShare, postComment, deleteComment };
 }
 
 export function EngagementBar({ eng }: { eng: Eng }) {
+  const { t } = useLanguage();
+  const [shareOpen, setShareOpen] = useState(false);
   const scrollToComments = () => document.getElementById('article-comments')?.scrollIntoView({ behavior: 'smooth' });
+  const sh = eng.getShare();
+  const socials = [
+    { label: 'WhatsApp', href: `https://wa.me/?text=${encodeURIComponent(`${sh.text} ${sh.url}`)}` },
+    { label: 'X', href: `https://twitter.com/intent/tweet?text=${encodeURIComponent(sh.text)}&url=${encodeURIComponent(sh.url)}` },
+    { label: 'Facebook', href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(sh.url)}` },
+  ];
   return (
     <div className="flex items-center gap-1 border-y border-white/[0.08] py-2">
       <span className="mr-auto flex items-center gap-1.5 font-sans text-[12px] text-foreground/45"><Eye className="h-[15px] w-[15px]" /> {eng.views}</span>
@@ -119,9 +147,22 @@ export function EngagementBar({ eng }: { eng: Eng }) {
       <button onClick={eng.toggleBookmark} aria-label="bookmark" className={`rounded-full px-2 py-1.5 transition-colors ${eng.bookmarked ? 'text-primary' : 'text-foreground/60 hover:text-primary'}`}>
         <Bookmark className={`h-[15px] w-[15px] ${eng.bookmarked ? 'fill-current' : ''}`} />
       </button>
-      <button onClick={eng.share} aria-label="share" className="rounded-full px-2 py-1.5 text-foreground/60 hover:text-primary">
-        <Share2 className="h-[15px] w-[15px]" />
-      </button>
+      <div className="relative">
+        <button onClick={() => (eng.canNativeShare ? eng.nativeShare() : setShareOpen((v) => !v))} aria-label="share" className="rounded-full px-2 py-1.5 text-foreground/60 hover:text-primary">
+          <Share2 className="h-[15px] w-[15px]" />
+        </button>
+        {shareOpen && !eng.canNativeShare && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setShareOpen(false)} />
+            <div className="absolute right-0 top-full z-50 mt-2 w-40 overflow-hidden rounded-xl border border-white/[0.1] bg-[#0d0d0f] py-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.6)]">
+              <button onClick={() => { eng.copyLink(); setShareOpen(false); }} className="block w-full px-4 py-2 text-left font-sans text-[12.5px] text-foreground/75 transition-colors hover:bg-white/[0.04] hover:text-primary">{t('art.copyLink')}</button>
+              {socials.map((s) => (
+                <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer" onClick={() => setShareOpen(false)} className="block px-4 py-2 text-left font-sans text-[12.5px] text-foreground/75 transition-colors hover:bg-white/[0.04] hover:text-primary">{s.label}</a>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
