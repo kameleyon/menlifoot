@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { User } from 'lucide-react';
 import { RichTextContent } from '@/components/RichTextContent';
 import AppShell from '@/components/mobile/AppShell';
 import { useArticleEngagement, EngagementBar, CommentsSection } from '@/components/ArticleEngagement';
@@ -16,7 +17,7 @@ const stripe = 'repeating-linear-gradient(135deg,#1b1b1f 0 8px,#131316 8px 16px)
 const Article = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { language, t } = useLanguage();
+  const { language } = useLanguage();
   const [art, setArt] = useState<Art | null>(null);
   const [loading, setLoading] = useState(true);
   const eng = useArticleEngagement(id ?? '', { title: art?.title ?? '', summary: art?.summary ?? null });
@@ -44,9 +45,9 @@ const Article = () => {
       ) : !art ? (
         <div className="px-6 pt-32 text-center font-sans text-foreground/50">Article not found.</div>
       ) : (
-        <div className="pb-24">
+        <div className="pb-24 lg:pt-8">
           {/* Hero */}
-          <div className="relative flex h-[280px] items-center justify-center" style={{ background: art.thumbnail_url ? undefined : stripe }}>
+          <div className="relative flex h-[280px] items-center justify-center overflow-hidden lg:rounded-2xl" style={{ background: art.thumbnail_url ? undefined : stripe }}>
             {art.thumbnail_url && <img src={art.thumbnail_url} alt="" className="absolute inset-0 h-full w-full object-cover" />}
             <button onClick={() => navigate(-1)} className="absolute left-4 top-[52px] flex h-[34px] w-[34px] items-center justify-center rounded-full bg-[#070708]/65 font-display text-[15px] backdrop-blur-md">←</button>
           </div>
@@ -54,7 +55,7 @@ const Article = () => {
             <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-primary">{art.category ?? 'Analysis'}</span>
             <h2 className="m-0 font-display text-[28px] uppercase leading-[1.08]">{art.title}</h2>
             <div className="flex items-center gap-2.5 border-b border-white/[0.08] pb-1.5">
-              <div className="h-7 w-7 rounded-full" style={{ background: 'repeating-linear-gradient(135deg,#1c1c20 0 6px,#141417 6px 12px)' }} />
+              <div className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.12] text-foreground/55"><User className="h-[15px] w-[15px]" /></div>
               <span className="font-sans text-[11.5px] text-foreground/50">{[art.author ?? 'Menlifoot desk', art.published_at ? new Date(art.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : null].filter(Boolean).join(' · ')}</span>
             </div>
             {/* Engagement (top) */}
@@ -71,10 +72,6 @@ const Article = () => {
                 ))}
               </div>
             )}
-            <button onClick={() => navigate('/ask')} className="mt-3.5 flex items-center justify-between rounded-2xl border border-primary/30 bg-primary/[0.06] px-4 py-[15px] text-left">
-              <span className="font-sans text-[12.5px] leading-[1.4] text-foreground/80">{t('art.askPiece')}</span>
-              <span className="font-display text-[18px] text-primary">→</span>
-            </button>
             {/* Engagement (bottom) + comments */}
             <div className="mt-4"><EngagementBar eng={eng} /></div>
             <CommentsSection eng={eng} />

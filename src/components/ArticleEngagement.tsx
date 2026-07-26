@@ -148,13 +148,14 @@ export function EngagementBar({ eng }: { eng: Eng }) {
         <Bookmark className={`h-[15px] w-[15px] ${eng.bookmarked ? 'fill-current' : ''}`} />
       </button>
       <div className="relative">
-        <button onClick={() => (eng.canNativeShare ? eng.nativeShare() : setShareOpen((v) => !v))} aria-label="share" className="rounded-full px-2 py-1.5 text-foreground/60 hover:text-primary">
+        <button onClick={() => setShareOpen((v) => !v)} aria-label="share" className="rounded-full px-2 py-1.5 text-foreground/60 hover:text-primary">
           <Share2 className="h-[15px] w-[15px]" />
         </button>
-        {shareOpen && !eng.canNativeShare && (
+        {shareOpen && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setShareOpen(false)} />
             <div className="absolute right-0 top-full z-50 mt-2 w-40 overflow-hidden rounded-xl border border-white/[0.1] bg-[#0d0d0f] py-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.6)]">
+              {eng.canNativeShare && <button onClick={() => { eng.nativeShare(); setShareOpen(false); }} className="block w-full px-4 py-2 text-left font-sans text-[12.5px] text-foreground/75 transition-colors hover:bg-white/[0.04] hover:text-primary">{t('art.shareVia')}</button>}
               <button onClick={() => { eng.copyLink(); setShareOpen(false); }} className="block w-full px-4 py-2 text-left font-sans text-[12.5px] text-foreground/75 transition-colors hover:bg-white/[0.04] hover:text-primary">{t('art.copyLink')}</button>
               {socials.map((s) => (
                 <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer" onClick={() => setShareOpen(false)} className="block px-4 py-2 text-left font-sans text-[12.5px] text-foreground/75 transition-colors hover:bg-white/[0.04] hover:text-primary">{s.label}</a>
