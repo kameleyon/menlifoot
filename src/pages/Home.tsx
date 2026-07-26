@@ -89,14 +89,16 @@ const Home = () => {
         {/* Lead story */}
         {lead && (
           <button onClick={() => navigate(`/articles/${lead.id}`)} className="mx-5 mb-[22px] block w-[calc(100%-40px)] text-left">
-            <div className="relative flex h-[380px] flex-col justify-end overflow-hidden rounded-2xl" style={{ background: lead.thumbnail_url ? undefined : stripe }}>
-              {lead.thumbnail_url && <img src={lead.thumbnail_url} alt="" className="absolute inset-0 h-full w-full object-cover" />}
-              <span className="absolute left-3.5 top-3.5 rounded-full bg-primary px-[9px] py-[5px] font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-[#070708]">{t('home.leadStory')}</span>
-              <div className="relative px-[18px] pb-[18px] pt-[12px]" style={{ background: 'linear-gradient(to top,rgba(7,7,8,.96) 0%,rgba(7,7,8,.72) 22%,rgba(7,7,8,0) 46%)' }}>
-                <div className="mb-[9px] font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-primary">{lead.category ?? 'Analysis'}</div>
-                <div className="font-display text-[25px] uppercase leading-[1.08] tracking-[0.005em]">{lead.title}</div>
-                {lead.summary && <div className="mt-2 font-sans text-[13px] leading-[1.5] text-foreground/60 line-clamp-2">{lead.summary}</div>}
+            <div className="relative overflow-hidden rounded-2xl">
+              <div className="aspect-[4/3] w-full" style={{ background: lead.thumbnail_url ? undefined : stripe }}>
+                {lead.thumbnail_url && <img src={lead.thumbnail_url} alt="" className="h-full w-full object-cover" />}
               </div>
+              <span className="absolute left-3.5 top-3.5 rounded-full bg-primary px-[9px] py-[5px] font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-[#070708]">{t('home.leadStory')}</span>
+            </div>
+            <div className="pt-3.5">
+              <div className="mb-[9px] font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-primary">{lead.category ?? 'Analysis'}</div>
+              <div className="font-display text-[25px] uppercase leading-[1.08] tracking-[0.005em]">{lead.title}</div>
+              {lead.summary && <div className="mt-2 font-sans text-[13px] leading-[1.5] text-foreground/60 line-clamp-2">{lead.summary}</div>}
             </div>
           </button>
         )}
