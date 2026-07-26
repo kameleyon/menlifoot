@@ -23,14 +23,17 @@ export default async function handler(req, res) {
   if (/^[a-zA-Z0-9-]{6,60}$/.test(id)) {
     try {
       const r = await fetch(
-        `${SUPABASE_URL}/rest/v1/articles?id=eq.${id}&select=title,summary,thumbnail_url&is_published=eq.true&limit=1`,
+        `${SUPABASE_URL}/rest/v1/articles?id=eq.${id}&select=title,summary,content,thumbnail_url&is_published=eq.true&limit=1`,
         { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } },
       );
       const rows = await r.json();
       const a = Array.isArray(rows) ? rows[0] : null;
       if (a) {
         if (a.title) title = a.title;
-        if (a.summary) desc = String(a.summary).split(/\s+/).slice(0, 25).join(' ');
+        // Use the summary, else the first words of the article body (HTML stripped).
+        let intro = a.summary && String(a.summary).trim();
+        if (!intro && a.content) intro = String(a.content).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        if (intro) desc = intro.split(/\s+/).slice(0, 25).join(' ') + '…';
         if (a.thumbnail_url) {
           image = /^https?:\/\//.test(a.thumbnail_url) ? a.thumbnail_url : `https://${host}${a.thumbnail_url}`;
         }
