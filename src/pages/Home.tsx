@@ -46,7 +46,7 @@ interface ShopProduct { id: string; title: string; image: string | null; price_c
 const Home = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
-  const { user } = useAuth();
+  const { user, isAdmin, isEditor } = useAuth();
   const { open: openAuth } = useAuthModal();
   const [articles, setArticles] = useState<Article[]>([]);
   const [podcast, setPodcast] = useState<Podcast | null>(null);
@@ -80,7 +80,7 @@ const Home = () => {
             <button onClick={() => navigate('/ask')} aria-label={t('home.askTitle')} className="flex h-[38px] w-[38px] items-center justify-center rounded-full border border-white/[0.12] text-primary transition-colors hover:border-primary/60">
               <MessageCircle className="h-[19px] w-[19px]" strokeWidth={2} />
             </button>
-            <button onClick={() => (user ? navigate('/me') : openAuth('signin'))} aria-label={t('auth.signin')} className="flex h-[38px] w-[38px] items-center justify-center rounded-full border border-white/[0.12] text-foreground/70 transition-colors hover:border-primary/60 hover:text-primary">
+            <button onClick={() => (user ? navigate(isAdmin || isEditor ? '/admin' : '/me') : openAuth('signin'))} aria-label={t('auth.signin')} className="flex h-[38px] w-[38px] items-center justify-center rounded-full border border-white/[0.12] text-foreground/70 transition-colors hover:border-primary/60 hover:text-primary">
               <User className="h-[19px] w-[19px]" strokeWidth={2} />
             </button>
           </div>

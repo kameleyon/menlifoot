@@ -24,7 +24,7 @@ const LANGS: { code: Language; label: string; full: string }[] = [
 const DesktopNav = () => {
   const { pathname } = useLocation();
   const { t, language, setLanguage } = useLanguage();
-  const { user } = useAuth();
+  const { user, isAdmin, isEditor } = useAuth();
   const { open: openAuth } = useAuthModal();
   const navigate = useNavigate();
   const [langOpen, setLangOpen] = useState(false);
@@ -72,7 +72,7 @@ const DesktopNav = () => {
           </div>
 
           <Link to="/shop?cart=1" aria-label={t('nav.shop')} className="text-foreground/60 hover:text-primary"><ShoppingBag className="h-[18px] w-[18px]" /></Link>
-          <button onClick={() => (user ? navigate('/me') : openAuth('signin'))} aria-label={t('auth.signin')} className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 text-foreground/70 hover:border-primary/60 hover:text-primary"><User className="h-[17px] w-[17px]" /></button>
+          <button onClick={() => (user ? navigate(isAdmin || isEditor ? '/admin' : '/me') : openAuth('signin'))} aria-label={t('auth.signin')} className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 text-foreground/70 hover:border-primary/60 hover:text-primary"><User className="h-[17px] w-[17px]" /></button>
         </div>
       </div>
     </header>
