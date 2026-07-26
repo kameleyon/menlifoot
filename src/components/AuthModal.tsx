@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, ReactNode, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
@@ -81,6 +81,8 @@ const AuthModal = ({ isOpen, setOpen, mode, setMode }: Props) => {
   return (
     <Dialog open={isOpen} onOpenChange={setOpen}>
       <DialogContent className="max-w-[400px] border-white/[0.08] bg-[#0d0d0f] p-0">
+        <DialogTitle className="sr-only">{mode === 'signin' ? t('auth.signin') : t('auth.signup')}</DialogTitle>
+        <DialogDescription className="sr-only">{mode === 'signin' ? t('auth.welcome') : t('auth.createTitle')}</DialogDescription>
         <div className="p-7">
           <div className="mb-1 flex items-center gap-2.5">
             <img src="/logo.png" alt="" className="h-7 w-auto" />

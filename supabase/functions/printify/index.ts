@@ -18,12 +18,16 @@ function mapProduct(p: any, full = false) {
   const enabled = (p.variants ?? []).filter((v: any) => v.is_enabled);
   const prices = enabled.map((v: any) => v.price).filter((n: number) => typeof n === "number");
   const img = p.images?.find((i: any) => i.is_default)?.src ?? p.images?.[0]?.src ?? null;
+  const tags = p.tags ?? [];
   const base = {
     id: p.id,
     title: p.title,
     image: img,
     price_cents: prices.length ? Math.min(...prices) : null,
-    tags: p.tags ?? [],
+    tags,
+    // The v1 API doesn't expose Printify's "Personalizable" flag, so the merchant
+    // opts a product in by adding a tag containing "personaliz" (e.g. "Personalizable").
+    personalize: tags.some((t: string) => /personaliz/i.test(String(t))),
   };
   if (!full) return base;
   const colorOpt = (p.options ?? []).find((o: any) => o.type === "color");

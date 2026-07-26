@@ -15,10 +15,10 @@ interface Size { id: number; title: string }
 interface Variant { id: number; title: string; price: number; options: number[] }
 interface Img { src: string; variant_ids: number[] }
 interface Product {
-  id: string; title: string; image: string | null; price_cents: number | null; tags?: string[];
+  id: string; title: string; image: string | null; price_cents: number | null; tags?: string[]; personalize?: boolean;
   description?: string; images?: Img[]; colors?: Color[]; sizes?: Size[]; variants?: Variant[];
 }
-interface CartLine { product: Product; variant: Variant; qty: number }
+interface CartLine { product: Product; variant: Variant; qty: number; personalization?: string }
 
 const Field = ({ label, value, onChange, className = '' }: { label: string; value: string; onChange: (v: string) => void; className?: string }) => (
   <div className={`flex flex-col gap-1 ${className}`}>
@@ -38,6 +38,7 @@ const Shop = () => {
   const [colorId, setColorId] = useState<number | null>(null);
   const [sizeId, setSizeId] = useState<number | null>(null);
   const [imgIdx, setImgIdx] = useState(0);
+  const [personalization, setPersonalization] = useState('');
   const [address, setAddress] = useState({ ...EMPTY_ADDR });
   const [placing, setPlacing] = useState(false);
 
@@ -81,7 +82,7 @@ const Shop = () => {
   }, [selected, colorId]);
 
   const openProduct = async (p: Product) => {
-    setSelected(p); setColorId(null); setSizeId(null); setImgIdx(0); setView('product');
+    setSelected(p); setColorId(null); setSizeId(null); setImgIdx(0); setPersonalization(''); setView('product');
     const { data } = await supabase.functions.invoke('printify', { body: { action: 'product', id: p.id } });
     const full = (data as { product?: Product })?.product;
     if (!full) return;
@@ -106,12 +107,15 @@ const Shop = () => {
   const removeLine = (i: number) => setCart((c) => c.filter((_, idx) => idx !== i));
   const setQty = (i: number, delta: number) =>
     setCart((c) => c.map((l, idx) => (idx === i ? { ...l, qty: Math.max(1, Math.min(20, l.qty + delta)) } : l)));
-  const addToCart = (product: Product, variant: Variant) => {
+  const addToCart = (product: Product, variant: Variant, note?: string) => {
     setCart((c) => {
-      const i = c.findIndex((l) => l.product.id === product.id && l.variant.id === variant.id);
+      // Personalized items are always their own line (each has unique text).
+      if (note) return [...c, { product, variant, qty: 1, personalization: note }];
+      const i = c.findIndex((l) => l.product.id === product.id && l.variant.id === variant.id && !l.personalization);
       if (i >= 0) { const n = [...c]; n[i] = { ...n[i], qty: Math.min(20, n[i].qty + 1) }; return n; }
       return [...c, { product, variant, qty: 1 }];
     });
+    setPersonalization('');
     setView('shop');
   };
   const cartProductIds = useMemo(() => new Set(cart.map((l) => l.product.id)), [cart]);
@@ -119,13 +123,12 @@ const Shop = () => {
 
   const placeOrder = async () => {
     setPlacing(true);
-    const agg: Record<string, { product_id: string; variant_id: number; quantity: number }> = {};
-    cart.forEach((l) => {
-      const k = `${l.product.id}_${l.variant.id}`;
-      if (!agg[k]) agg[k] = { product_id: l.product.id, variant_id: l.variant.id, quantity: 0 };
-      agg[k].quantity += l.qty;
-    });
-    const { data, error } = await supabase.functions.invoke('checkout', { body: { items: Object.values(agg), address } });
+    // Each cart line is already unique (variants merge by qty; personalized lines stay separate).
+    const items = cart.map((l) => ({
+      product_id: l.product.id, variant_id: l.variant.id, quantity: l.qty,
+      ...(l.personalization ? { personalization: l.personalization } : {}),
+    }));
+    const { data, error } = await supabase.functions.invoke('checkout', { body: { items, address } });
     setPlacing(false);
     const url = (data as { url?: string })?.url;
     if (url) window.location.href = url;
@@ -230,16 +233,29 @@ const Shop = () => {
               </div>
             )}
 
+            {/* Personalization (products the merchant tagged "Personalizable") */}
+            {selected.personalize && (
+              <div className="flex flex-col gap-2">
+                <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.14em] text-primary">{t('shop.personalize')}</span>
+                <input
+                  value={personalization} onChange={(e) => setPersonalization(e.target.value)} maxLength={40}
+                  placeholder={t('shop.personalizePlaceholder')}
+                  className="rounded-xl border border-primary/40 bg-[#101012] px-3.5 py-2.5 font-sans text-[14px] text-foreground focus:border-primary focus:outline-none"
+                />
+                <span className="font-sans text-[10.5px] text-foreground/40">{t('shop.personalizeHint')}</span>
+              </div>
+            )}
+
             {selected.description && <RichTextContent html={selected.description} className="font-sans text-[13.5px] leading-[1.65] text-foreground/60 [&_p]:mb-2" />}
 
-            <button onClick={() => { if (variant) addToCart(selected, variant); }} disabled={!variant}
+            <button onClick={() => { if (variant) addToCart(selected, variant, selected.personalize ? personalization.trim() || undefined : undefined); }} disabled={!variant}
               className="mt-1 hidden h-[52px] items-center justify-center rounded-full font-sans text-[13.5px] font-bold tracking-[0.04em] text-[#070708] disabled:opacity-40 lg:flex" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>{t('shop.add')} · {money(variant?.price ?? selected.price_cents)}</button>
           </div>
         </div>
 
           {/* Mobile sticky add bar */}
           <div className="fixed inset-x-0 bottom-[76px] left-1/2 z-30 flex w-full max-w-[520px] -translate-x-1/2 items-center gap-3 px-5 pb-4 pt-3 lg:hidden" style={{ background: 'linear-gradient(to top,#070708 55%,rgba(7,7,8,0))' }}>
-            <button onClick={() => { if (variant) addToCart(selected, variant); }} disabled={!variant} className="flex h-[52px] flex-1 items-center justify-center rounded-full font-sans text-[13.5px] font-bold tracking-[0.04em] text-[#070708] disabled:opacity-40" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>{t('shop.add')} · {money(variant?.price ?? selected.price_cents)}</button>
+            <button onClick={() => { if (variant) addToCart(selected, variant, selected.personalize ? personalization.trim() || undefined : undefined); }} disabled={!variant} className="flex h-[52px] flex-1 items-center justify-center rounded-full font-sans text-[13.5px] font-bold tracking-[0.04em] text-[#070708] disabled:opacity-40" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>{t('shop.add')} · {money(variant?.price ?? selected.price_cents)}</button>
             <button onClick={() => setView('cart')} className="flex h-[52px] w-[52px] items-center justify-center rounded-full border border-white/[0.16] font-sans text-[11px] text-foreground/75">{cartCount}</button>
           </div>
         </div>
@@ -260,6 +276,7 @@ const Shop = () => {
                   <div className="flex flex-1 flex-col gap-1.5">
                     <span className="font-sans text-[13px] font-medium leading-[1.3]">{l.product.title}</span>
                     <span className="font-sans text-[11px] text-foreground/40">{l.variant.title}</span>
+                    {l.personalization && <span className="font-sans text-[11px] text-primary/85">✎ {l.personalization}</span>}
                     <div className="mt-1 flex items-center gap-3">
                       <div className="flex items-center rounded-full border border-white/[0.14]">
                         <button onClick={() => setQty(i, -1)} disabled={l.qty <= 1} aria-label="−" className="flex h-7 w-7 items-center justify-center font-sans text-[16px] leading-none text-foreground/70 transition-colors hover:text-primary disabled:opacity-30">−</button>

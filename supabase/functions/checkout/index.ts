@@ -12,7 +12,7 @@ const cors = {
 };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 
-interface InItem { product_id: string; variant_id: number; quantity: number }
+interface InItem { product_id: string; variant_id: number; quantity: number; personalization?: string }
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -29,17 +29,18 @@ serve(async (req) => {
     const pfHeaders = { Authorization: `Bearer ${PRINTIFY_KEY}`, "Content-Type": "application/json", "User-Agent": "Menlifoot" };
 
     // Validate every item against Printify (server-side price is the source of truth).
-    const validated: { product_id: string; variant_id: number; quantity: number; title: string; price: number }[] = [];
+    const validated: { product_id: string; variant_id: number; quantity: number; title: string; price: number; personalization?: string }[] = [];
     for (const it of items) {
       if (!/^[a-zA-Z0-9]{1,40}$/.test(String(it.product_id))) return json({ error: "invalid product" }, 400);
       const qty = Math.max(1, Math.min(20, Math.floor(Number(it.quantity) || 1)));
+      const personalization = it.personalization ? String(it.personalization).slice(0, 60) : undefined;
       const r = await fetch(`${PRINTIFY_API}/shops/${SHOP_ID}/products/${it.product_id}.json`, { headers: pfHeaders });
       if (!r.ok) return json({ error: `product ${it.product_id} unavailable` }, 400);
       // deno-lint-ignore no-explicit-any
       const p: any = await r.json();
       const v = (p.variants ?? []).find((x: any) => x.id === Number(it.variant_id) && x.is_enabled);
       if (!v) return json({ error: "variant unavailable" }, 400);
-      validated.push({ product_id: it.product_id, variant_id: v.id, quantity: qty, title: `${p.title} — ${v.title}`, price: v.price });
+      validated.push({ product_id: it.product_id, variant_id: v.id, quantity: qty, title: `${p.title} — ${v.title}`, price: v.price, ...(personalization ? { personalization } : {}) });
     }
 
     // Shipping is free to the customer. Show an estimated delivery window (US vs international).
@@ -58,7 +59,13 @@ serve(async (req) => {
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: validated.map((v) => ({
-        price_data: { currency: "usd", product_data: { name: v.title.slice(0, 250) }, unit_amount: v.price },
+        price_data: {
+          currency: "usd",
+          // Personalization is appended to the name so it surfaces on the checkout page,
+          // the Stripe dashboard, and the admin Orders list (which reads the line-item name).
+          product_data: { name: (v.personalization ? `${v.title} (✎ ${v.personalization})` : v.title).slice(0, 250) },
+          unit_amount: v.price,
+        },
         quantity: v.quantity,
       })),
       shipping_options: [{
