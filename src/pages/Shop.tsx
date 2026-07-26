@@ -18,7 +18,7 @@ interface Product {
   id: string; title: string; image: string | null; price_cents: number | null; tags?: string[];
   description?: string; images?: Img[]; colors?: Color[]; sizes?: Size[]; variants?: Variant[];
 }
-interface CartLine { product: Product; variant: Variant }
+interface CartLine { product: Product; variant: Variant; qty: number }
 
 const Field = ({ label, value, onChange, className = '' }: { label: string; value: string; onChange: (v: string) => void; className?: string }) => (
   <div className={`flex flex-col gap-1 ${className}`}>
@@ -101,8 +101,19 @@ const Shop = () => {
     setSizeId(firstSize);
   };
 
-  const subtotal = cart.reduce((s, l) => s + l.variant.price, 0);
+  const subtotal = cart.reduce((s, l) => s + l.variant.price * l.qty, 0);
+  const cartCount = cart.reduce((s, l) => s + l.qty, 0);
   const removeLine = (i: number) => setCart((c) => c.filter((_, idx) => idx !== i));
+  const setQty = (i: number, delta: number) =>
+    setCart((c) => c.map((l, idx) => (idx === i ? { ...l, qty: Math.max(1, Math.min(20, l.qty + delta)) } : l)));
+  const addToCart = (product: Product, variant: Variant) => {
+    setCart((c) => {
+      const i = c.findIndex((l) => l.product.id === product.id && l.variant.id === variant.id);
+      if (i >= 0) { const n = [...c]; n[i] = { ...n[i], qty: Math.min(20, n[i].qty + 1) }; return n; }
+      return [...c, { product, variant, qty: 1 }];
+    });
+    setView('shop');
+  };
   const cartProductIds = useMemo(() => new Set(cart.map((l) => l.product.id)), [cart]);
   const similar = useMemo(() => products.filter((p) => !cartProductIds.has(p.id)).slice(0, 6), [products, cartProductIds]);
 
@@ -112,7 +123,7 @@ const Shop = () => {
     cart.forEach((l) => {
       const k = `${l.product.id}_${l.variant.id}`;
       if (!agg[k]) agg[k] = { product_id: l.product.id, variant_id: l.variant.id, quantity: 0 };
-      agg[k].quantity += 1;
+      agg[k].quantity += l.qty;
     });
     const { data, error } = await supabase.functions.invoke('checkout', { body: { items: Object.values(agg), address } });
     setPlacing(false);
@@ -134,7 +145,7 @@ const Shop = () => {
             </div>
             <button onClick={() => setView('cart')} className="relative flex h-[38px] w-[38px] items-center justify-center rounded-full border border-white/[0.14] lg:hidden">
               <span className="font-sans text-[11px] font-medium text-foreground/80">{t('shop.bag')}</span>
-              {cart.length > 0 && <span className="absolute -right-1 -top-1 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-primary px-1 font-sans text-[10px] font-bold text-[#070708]">{cart.length}</span>}
+              {cart.length > 0 && <span className="absolute -right-1 -top-1 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-primary px-1 font-sans text-[10px] font-bold text-[#070708]">{cartCount}</span>}
             </button>
           </div>
 
@@ -221,15 +232,15 @@ const Shop = () => {
 
             {selected.description && <RichTextContent html={selected.description} className="font-sans text-[13.5px] leading-[1.65] text-foreground/60 [&_p]:mb-2" />}
 
-            <button onClick={() => { if (variant) { setCart((c) => [...c, { product: selected, variant }]); setView('shop'); } }} disabled={!variant}
+            <button onClick={() => { if (variant) addToCart(selected, variant); }} disabled={!variant}
               className="mt-1 hidden h-[52px] items-center justify-center rounded-full font-sans text-[13.5px] font-bold tracking-[0.04em] text-[#070708] disabled:opacity-40 lg:flex" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>{t('shop.add')} · {money(variant?.price ?? selected.price_cents)}</button>
           </div>
         </div>
 
           {/* Mobile sticky add bar */}
           <div className="fixed inset-x-0 bottom-[76px] left-1/2 z-30 flex w-full max-w-[520px] -translate-x-1/2 items-center gap-3 px-5 pb-4 pt-3 lg:hidden" style={{ background: 'linear-gradient(to top,#070708 55%,rgba(7,7,8,0))' }}>
-            <button onClick={() => { if (variant) { setCart((c) => [...c, { product: selected, variant }]); setView('shop'); } }} disabled={!variant} className="flex h-[52px] flex-1 items-center justify-center rounded-full font-sans text-[13.5px] font-bold tracking-[0.04em] text-[#070708] disabled:opacity-40" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>{t('shop.add')} · {money(variant?.price ?? selected.price_cents)}</button>
-            <button onClick={() => setView('cart')} className="flex h-[52px] w-[52px] items-center justify-center rounded-full border border-white/[0.16] font-sans text-[11px] text-foreground/75">{cart.length}</button>
+            <button onClick={() => { if (variant) addToCart(selected, variant); }} disabled={!variant} className="flex h-[52px] flex-1 items-center justify-center rounded-full font-sans text-[13.5px] font-bold tracking-[0.04em] text-[#070708] disabled:opacity-40" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>{t('shop.add')} · {money(variant?.price ?? selected.price_cents)}</button>
+            <button onClick={() => setView('cart')} className="flex h-[52px] w-[52px] items-center justify-center rounded-full border border-white/[0.16] font-sans text-[11px] text-foreground/75">{cartCount}</button>
           </div>
         </div>
       )}
@@ -249,7 +260,14 @@ const Shop = () => {
                   <div className="flex flex-1 flex-col gap-1.5">
                     <span className="font-sans text-[13px] font-medium leading-[1.3]">{l.product.title}</span>
                     <span className="font-sans text-[11px] text-foreground/40">{l.variant.title}</span>
-                    <span className="font-sans text-[12.5px] text-primary">{money(l.variant.price)}</span>
+                    <div className="mt-1 flex items-center gap-3">
+                      <div className="flex items-center rounded-full border border-white/[0.14]">
+                        <button onClick={() => setQty(i, -1)} disabled={l.qty <= 1} aria-label="−" className="flex h-7 w-7 items-center justify-center font-sans text-[16px] leading-none text-foreground/70 transition-colors hover:text-primary disabled:opacity-30">−</button>
+                        <span className="min-w-[22px] text-center font-sans text-[12.5px] font-medium">{l.qty}</span>
+                        <button onClick={() => setQty(i, 1)} aria-label="+" className="flex h-7 w-7 items-center justify-center font-sans text-[16px] leading-none text-foreground/70 transition-colors hover:text-primary">+</button>
+                      </div>
+                      <span className="font-sans text-[12.5px] text-primary">{money(l.variant.price * l.qty)}</span>
+                    </div>
                   </div>
                   <button onClick={() => removeLine(i)} aria-label={t('shop.remove')} className="flex h-8 w-8 flex-none items-center justify-center self-start rounded-full text-foreground/40 transition-colors hover:bg-white/[0.06] hover:text-primary">
                     <X className="h-[17px] w-[17px]" />
