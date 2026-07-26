@@ -111,17 +111,17 @@ export function EngagementBar({ eng }: { eng: Eng }) {
   const scrollToComments = () => document.getElementById('article-comments')?.scrollIntoView({ behavior: 'smooth' });
   return (
     <div className="flex items-center gap-1 border-y border-white/[0.08] py-2">
-      <span className="mr-auto flex items-center gap-1.5 font-sans text-[12px] text-foreground/45"><Eye className="h-[15px] w-[15px]" /> {eng.views}</span>
-      <button onClick={eng.toggleLike} aria-label="like" className={`flex items-center gap-1.5 rounded-full px-2.5 py-1.5 font-sans text-[12px] transition-colors ${eng.liked ? 'text-primary' : 'text-foreground/60 hover:text-primary'}`}>
+      <span className="mr-auto flex items-center gap-1.5 font-sans text-[12px] text-primary/70"><Eye className="h-[15px] w-[15px]" /> {eng.views}</span>
+      <button onClick={eng.toggleLike} aria-label="like" className={`flex items-center gap-1.5 rounded-full px-2.5 py-1.5 font-sans text-[12px] transition-colors ${eng.liked ? 'text-primary' : 'text-primary/70 hover:text-primary'}`}>
         <Heart className={`h-[15px] w-[15px] ${eng.liked ? 'fill-current' : ''}`} /> {eng.likes}
       </button>
-      <button onClick={scrollToComments} aria-label="comments" className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5 font-sans text-[12px] text-foreground/60 hover:text-primary">
+      <button onClick={scrollToComments} aria-label="comments" className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5 font-sans text-[12px] text-primary/70 hover:text-primary">
         <MessageCircle className="h-[15px] w-[15px]" /> {eng.comments.length}
       </button>
-      <button onClick={eng.toggleBookmark} aria-label="bookmark" className={`rounded-full px-2 py-1.5 transition-colors ${eng.bookmarked ? 'text-primary' : 'text-foreground/60 hover:text-primary'}`}>
+      <button onClick={eng.toggleBookmark} aria-label="bookmark" className={`rounded-full px-2 py-1.5 transition-colors ${eng.bookmarked ? 'text-primary' : 'text-primary/70 hover:text-primary'}`}>
         <Bookmark className={`h-[15px] w-[15px] ${eng.bookmarked ? 'fill-current' : ''}`} />
       </button>
-      <button onClick={eng.copyLink} aria-label="copy link" className="rounded-full px-2 py-1.5 text-foreground/60 hover:text-primary">
+      <button onClick={eng.copyLink} aria-label="copy link" className="rounded-full px-2 py-1.5 text-primary/70 hover:text-primary">
         <Share2 className="h-[15px] w-[15px]" />
       </button>
     </div>

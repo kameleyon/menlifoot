@@ -55,7 +55,7 @@ const Article = () => {
             <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-primary">{art.category ?? 'Analysis'}</span>
             <h2 className="m-0 font-display text-[28px] uppercase leading-[1.08]">{art.title}</h2>
             <div className="flex items-center gap-2.5 border-b border-white/[0.08] pb-1.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.12] text-foreground/55"><User className="h-[15px] w-[15px]" /></div>
+              <div className="flex h-7 w-7 items-center justify-center rounded-full border border-primary/40 text-primary"><User className="h-[15px] w-[15px]" /></div>
               <span className="font-sans text-[11.5px] text-foreground/50">{[art.author ?? 'Menlifoot desk', art.published_at ? new Date(art.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : null].filter(Boolean).join(' · ')}</span>
             </div>
             {/* Engagement (top) */}
