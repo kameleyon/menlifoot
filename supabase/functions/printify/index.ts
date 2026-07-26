@@ -18,17 +18,23 @@ function mapProduct(p: any, full = false) {
   const enabled = (p.variants ?? []).filter((v: any) => v.is_enabled);
   const prices = enabled.map((v: any) => v.price).filter((n: number) => typeof n === "number");
   const img = p.images?.find((i: any) => i.is_default)?.src ?? p.images?.[0]?.src ?? null;
-  return {
+  const base = {
     id: p.id,
     title: p.title,
     image: img,
     price_cents: prices.length ? Math.min(...prices) : null,
     tags: p.tags ?? [],
-    ...(full && {
-      description: p.description ?? "",
-      images: (p.images ?? []).map((i: any) => i.src),
-      variants: enabled.map((v: any) => ({ id: v.id, title: v.title, price: v.price })),
-    }),
+  };
+  if (!full) return base;
+  const colorOpt = (p.options ?? []).find((o: any) => o.type === "color");
+  const sizeOpt = (p.options ?? []).find((o: any) => o.type === "size");
+  return {
+    ...base,
+    description: p.description ?? "",
+    images: (p.images ?? []).map((i: any) => ({ src: i.src, variant_ids: i.variant_ids ?? [] })),
+    colors: (colorOpt?.values ?? []).map((v: any) => ({ id: v.id, title: v.title, hex: (v.colors && v.colors[0]) || null })),
+    sizes: (sizeOpt?.values ?? []).map((v: any) => ({ id: v.id, title: v.title })),
+    variants: enabled.map((v: any) => ({ id: v.id, title: v.title, price: v.price, options: v.options })),
   };
 }
 

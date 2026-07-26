@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { RichTextContent } from '@/components/RichTextContent';
@@ -6,14 +6,17 @@ import AppShell from '@/components/mobile/AppShell';
 
 const stripe = 'repeating-linear-gradient(135deg,#1b1b1f 0 7px,#131316 7px 14px)';
 const money = (cents: number | null) => (cents == null ? '' : `$${(cents / 100).toFixed(2)}`);
+const EMPTY_ADDR = { first_name: '', last_name: '', email: '', phone: '', country: 'US', region: '', address1: '', address2: '', city: '', zip: '' };
 
+interface Color { id: number; title: string; hex: string | null }
+interface Size { id: number; title: string }
+interface Variant { id: number; title: string; price: number; options: number[] }
+interface Img { src: string; variant_ids: number[] }
 interface Product {
   id: string; title: string; image: string | null; price_cents: number | null; tags?: string[];
-  description?: string; images?: string[]; variants?: { id: number; title: string; price: number }[];
+  description?: string; images?: Img[]; colors?: Color[]; sizes?: Size[]; variants?: Variant[];
 }
-interface CartLine { product: Product; variant: { id: number; title: string; price: number } }
-
-const EMPTY_ADDR = { first_name: '', last_name: '', email: '', phone: '', country: 'US', region: '', address1: '', address2: '', city: '', zip: '' };
+interface CartLine { product: Product; variant: Variant }
 
 const Field = ({ label, value, onChange, className = '' }: { label: string; value: string; onChange: (v: string) => void; className?: string }) => (
   <div className={`flex flex-col gap-1 ${className}`}>
@@ -29,7 +32,9 @@ const Shop = () => {
   const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [selected, setSelected] = useState<Product | null>(null);
-  const [variantId, setVariantId] = useState<number | null>(null);
+  const [colorId, setColorId] = useState<number | null>(null);
+  const [sizeId, setSizeId] = useState<number | null>(null);
+  const [imgIdx, setImgIdx] = useState(0);
   const [address, setAddress] = useState({ ...EMPTY_ADDR });
   const [placing, setPlacing] = useState(false);
 
@@ -43,6 +48,51 @@ const Shop = () => {
       setLoading(false);
     })();
   }, []);
+
+  // color/size lookups (variant.options order isn't fixed — match ids against each set)
+  const colorIds = useMemo(() => new Set((selected?.colors ?? []).map((c) => c.id)), [selected]);
+  const sizeIds = useMemo(() => new Set((selected?.sizes ?? []).map((s) => s.id)), [selected]);
+  const vColor = (v: Variant) => v.options.find((id) => colorIds.has(id));
+  const vSize = (v: Variant) => v.options.find((id) => sizeIds.has(id));
+  const variants = selected?.variants ?? [];
+
+  const availColors = useMemo(() => {
+    const used = new Set(variants.map(vColor).filter(Boolean));
+    return (selected?.colors ?? []).filter((c) => used.has(c.id));
+  }, [selected]);
+  const availSizes = useMemo(() => {
+    const sizesForColor = new Set(variants.filter((v) => vColor(v) === colorId).map(vSize));
+    return (selected?.sizes ?? []).filter((s) => sizesForColor.has(s.id));
+  }, [selected, colorId]);
+  const variant = useMemo(() => variants.find((v) => vColor(v) === colorId && vSize(v) === sizeId) ?? null, [selected, colorId, sizeId]);
+  const gallery = useMemo(() => {
+    const ids = new Set(variants.filter((v) => vColor(v) === colorId).map((v) => v.id));
+    const imgs = (selected?.images ?? []).filter((im) => im.variant_ids.some((id) => ids.has(id)));
+    return imgs.length ? imgs : (selected?.images ?? []);
+  }, [selected, colorId]);
+
+  const openProduct = async (p: Product) => {
+    setSelected(p); setColorId(null); setSizeId(null); setImgIdx(0); setView('product');
+    const { data } = await supabase.functions.invoke('printify', { body: { action: 'product', id: p.id } });
+    const full = (data as { product?: Product })?.product;
+    if (!full) return;
+    setSelected(full);
+    const cIds = new Set((full.colors ?? []).map((c) => c.id));
+    const sIds = new Set((full.sizes ?? []).map((s) => s.id));
+    const vc = (v: Variant) => v.options.find((id) => cIds.has(id));
+    const vsz = (v: Variant) => v.options.find((id) => sIds.has(id));
+    const firstColor = (full.colors ?? []).find((c) => (full.variants ?? []).some((v) => vc(v) === c.id))?.id ?? null;
+    const firstSize = (full.sizes ?? []).find((s) => (full.variants ?? []).some((v) => vc(v) === firstColor && vsz(v) === s.id))?.id ?? null;
+    setColorId(firstColor); setSizeId(firstSize); setImgIdx(0);
+  };
+
+  const pickColor = (id: number) => {
+    setColorId(id); setImgIdx(0);
+    const firstSize = (selected?.sizes ?? []).find((s) => variants.some((v) => vColor(v) === id && vSize(v) === s.id))?.id ?? null;
+    setSizeId(firstSize);
+  };
+
+  const subtotal = cart.reduce((s, l) => s + l.variant.price, 0);
 
   const placeOrder = async () => {
     setPlacing(true);
@@ -60,25 +110,15 @@ const Shop = () => {
   };
   const addrValid = address.first_name && address.last_name && address.email && address.address1 && address.city && address.country && address.zip;
 
-  const openProduct = async (p: Product) => {
-    setSelected(p); setVariantId(null); setView('product');
-    const { data } = await supabase.functions.invoke('printify', { body: { action: 'product', id: p.id } });
-    const full = (data as { product?: Product })?.product;
-    if (full) { setSelected(full); setVariantId(full.variants?.[0]?.id ?? null); }
-  };
-
-  const variant = selected?.variants?.find((v) => v.id === variantId) ?? selected?.variants?.[0] ?? null;
-  const subtotal = cart.reduce((s, l) => s + l.variant.price, 0);
-
   return (
     <AppShell wide>
       {/* SHOP */}
       {view === 'shop' && (
-        <div className="pt-14">
-          <div className="flex items-end justify-between px-5 pb-[18px]">
+        <div className="mx-auto max-w-[1180px] px-5 pt-14 lg:px-10 lg:pt-10">
+          <div className="flex items-end justify-between pb-[18px]">
             <div className="flex flex-col gap-2">
               <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.18em] text-primary">{t('shop.nowOpen')}</span>
-              <span className="font-display text-[30px] uppercase">{t('shop.store')}</span>
+              <span className="font-display text-[30px] uppercase lg:text-[42px]">{t('shop.store')}</span>
             </div>
             <button onClick={() => setView('cart')} className="relative flex h-[38px] w-[38px] items-center justify-center rounded-full border border-white/[0.14]">
               <span className="font-sans text-[11px] font-medium text-foreground/80">{t('shop.bag')}</span>
@@ -87,21 +127,21 @@ const Shop = () => {
           </div>
 
           {loading ? (
-            <div className="grid grid-cols-2 gap-4 px-5 lg:mx-auto lg:max-w-[1180px] lg:grid-cols-4 lg:gap-6">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
               {[0, 1, 2, 3].map((i) => <div key={i} className="h-[176px] animate-pulse rounded-xl bg-white/[0.05]" />)}
             </div>
           ) : products.length === 0 ? (
-            <div className="flex flex-col items-center gap-3.5 px-[30px] py-[70px] text-center">
+            <div className="flex flex-col items-center gap-3.5 py-[70px] text-center">
               <img src="/logo.png" alt="" className="h-[52px] w-auto opacity-50" />
               <span className="font-display text-[20px] uppercase">{t('shop.soon')}</span>
               <span className="font-sans text-[12.5px] leading-[1.6] text-foreground/50">{t('shop.soonDesc')}</span>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 px-5 lg:mx-auto lg:max-w-[1180px] lg:grid-cols-4 lg:gap-6">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
               {products.map((p) => (
-                <button key={p.id} onClick={() => openProduct(p)} className="flex flex-col gap-2 text-left">
-                  <div className="relative flex h-[176px] items-end justify-center overflow-hidden rounded-xl" style={{ background: p.image ? undefined : stripe }}>
-                    {p.image && <img src={p.image} alt={p.title} className="h-full w-full object-cover" />}
+                <button key={p.id} onClick={() => openProduct(p)} className="group flex flex-col gap-2 text-left">
+                  <div className="aspect-square w-full overflow-hidden rounded-xl bg-white" style={{ background: p.image ? undefined : stripe }}>
+                    {p.image && <img src={p.image} alt={p.title} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />}
                   </div>
                   <span className="font-sans text-[12.5px] font-medium leading-[1.3]">{p.title}</span>
                   <span className="font-sans text-[12px] text-primary">{money(p.price_cents)}</span>
@@ -114,31 +154,69 @@ const Shop = () => {
 
       {/* PRODUCT */}
       {view === 'product' && selected && (
-        <div className="pb-28">
-          <div className="relative flex h-[400px] items-center justify-center overflow-hidden" style={{ background: selected.image ? undefined : stripe }}>
-            {selected.image && <img src={selected.image} alt={selected.title} className="h-full w-full object-cover" />}
-            <button onClick={() => setView('shop')} className="absolute left-4 top-[52px] flex h-[34px] w-[34px] items-center justify-center rounded-full bg-[#070708]/65 font-display text-[15px]">←</button>
-          </div>
-          <div className="flex flex-col gap-[18px] px-5 pt-[22px]">
-            <div className="flex flex-col gap-2">
-              <span className="font-display text-[26px] uppercase leading-[1.05]">{selected.title}</span>
-              <span className="font-sans text-[16px] font-medium">{money(variant?.price ?? selected.price_cents)}</span>
+        <div className="mx-auto max-w-[1080px] pb-28 lg:px-10 lg:pt-8 lg:pb-16">
+          <button onClick={() => setView('shop')} className="absolute left-4 top-[52px] z-10 flex h-[34px] w-[34px] items-center justify-center rounded-full bg-[#070708]/65 font-display text-[15px] backdrop-blur-md lg:relative lg:left-0 lg:top-0 lg:mb-4">←</button>
+        <div className="lg:flex lg:gap-10">
+          {/* Gallery */}
+          <div className="lg:w-[52%] lg:flex-none">
+            <div className="aspect-square w-full overflow-hidden bg-white lg:rounded-2xl" style={{ background: gallery.length ? undefined : stripe }}>
+              {gallery[imgIdx] && <img src={gallery[imgIdx].src} alt={selected.title} className="h-full w-full object-cover" />}
             </div>
-            {selected.description && <RichTextContent html={selected.description} className="font-sans text-[13.5px] leading-[1.65] text-foreground/60 [&_p]:mb-2" />}
-            {selected.variants && selected.variants.length > 1 && (
+            {gallery.length > 1 && (
+              <div className="mt-3 flex gap-2 overflow-x-auto px-5 lg:px-0 [scrollbar-width:none]">
+                {gallery.map((im, i) => (
+                  <button key={i} onClick={() => setImgIdx(i)} className={`h-16 w-16 flex-none overflow-hidden rounded-lg border bg-white ${i === imgIdx ? 'border-primary' : 'border-white/[0.1]'}`}>
+                    <img src={im.src} alt="" className="h-full w-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Details */}
+          <div className="flex flex-1 flex-col gap-[18px] px-5 pt-[22px] lg:px-0 lg:pt-0">
+            <div className="flex flex-col gap-2">
+              <span className="font-display text-[26px] uppercase leading-[1.05] lg:text-[34px]">{selected.title}</span>
+              <span className="font-sans text-[18px] font-medium">{money(variant?.price ?? selected.price_cents)}</span>
+            </div>
+
+            {/* Colors */}
+            {availColors.length > 1 && (
               <div className="flex flex-col gap-2.5">
-                <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.14em] text-foreground/45">{t('shop.size')}</span>
+                <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.14em] text-foreground/45">{t('shop.color')}: <span className="text-foreground/80">{availColors.find((c) => c.id === colorId)?.title}</span></span>
                 <div className="flex flex-wrap gap-2">
-                  {selected.variants.map((v) => (
-                    <button key={v.id} onClick={() => setVariantId(v.id)} className="flex h-[42px] min-w-[46px] items-center justify-center rounded-[10px] px-3 font-sans text-[12.5px] font-medium"
-                      style={variantId === v.id ? { background: '#f4f2ee', color: '#070708' } : { border: '1px solid rgba(255,255,255,.14)', color: 'rgba(244,242,238,.75)' }}>{v.title}</button>
+                  {availColors.map((c) => (
+                    <button key={c.id} onClick={() => pickColor(c.id)} title={c.title}
+                      className={`h-8 w-8 rounded-full border-2 transition-transform ${c.id === colorId ? 'border-primary scale-110' : 'border-white/20'}`}
+                      style={{ background: c.hex ?? '#888' }} />
                   ))}
                 </div>
               </div>
             )}
+
+            {/* Sizes */}
+            {availSizes.length > 0 && (
+              <div className="flex flex-col gap-2.5">
+                <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.14em] text-foreground/45">{t('shop.size')}</span>
+                <div className="flex flex-wrap gap-2">
+                  {availSizes.map((s) => (
+                    <button key={s.id} onClick={() => setSizeId(s.id)} className="flex h-[42px] min-w-[46px] items-center justify-center rounded-[10px] px-3 font-sans text-[12.5px] font-medium"
+                      style={sizeId === s.id ? { background: '#f4f2ee', color: '#070708' } : { border: '1px solid rgba(255,255,255,.14)', color: 'rgba(244,242,238,.75)' }}>{s.title}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {selected.description && <RichTextContent html={selected.description} className="font-sans text-[13.5px] leading-[1.65] text-foreground/60 [&_p]:mb-2" />}
+
+            <button onClick={() => { if (variant) { setCart((c) => [...c, { product: selected, variant }]); setView('shop'); } }} disabled={!variant}
+              className="mt-1 hidden h-[52px] items-center justify-center rounded-full font-sans text-[13.5px] font-bold tracking-[0.04em] text-[#070708] disabled:opacity-40 lg:flex" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>{t('shop.add')} · {money(variant?.price ?? selected.price_cents)}</button>
           </div>
-          <div className="fixed inset-x-0 bottom-[76px] left-1/2 z-30 flex w-full max-w-[520px] -translate-x-1/2 items-center gap-3 px-5 pb-4 pt-3" style={{ background: 'linear-gradient(to top,#070708 55%,rgba(7,7,8,0))' }}>
-            <button onClick={() => { if (variant) { setCart((c) => [...c, { product: selected, variant }]); setView('shop'); } }} className="flex h-[52px] flex-1 items-center justify-center rounded-full font-sans text-[13.5px] font-bold tracking-[0.04em] text-[#070708]" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>{t('shop.add')} · {money(variant?.price ?? selected.price_cents)}</button>
+        </div>
+
+          {/* Mobile sticky add bar */}
+          <div className="fixed inset-x-0 bottom-[76px] left-1/2 z-30 flex w-full max-w-[520px] -translate-x-1/2 items-center gap-3 px-5 pb-4 pt-3 lg:hidden" style={{ background: 'linear-gradient(to top,#070708 55%,rgba(7,7,8,0))' }}>
+            <button onClick={() => { if (variant) { setCart((c) => [...c, { product: selected, variant }]); setView('shop'); } }} disabled={!variant} className="flex h-[52px] flex-1 items-center justify-center rounded-full font-sans text-[13.5px] font-bold tracking-[0.04em] text-[#070708] disabled:opacity-40" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>{t('shop.add')} · {money(variant?.price ?? selected.price_cents)}</button>
             <button onClick={() => setView('cart')} className="flex h-[52px] w-[52px] items-center justify-center rounded-full border border-white/[0.16] font-sans text-[11px] text-foreground/75">{cart.length}</button>
           </div>
         </div>
@@ -146,7 +224,7 @@ const Shop = () => {
 
       {/* CART */}
       {view === 'cart' && (
-        <div className="pt-14">
+        <div className="mx-auto max-w-[720px] pt-14 lg:pt-10">
           <div className="flex items-center gap-3 px-4 pb-5">
             <button onClick={() => setView('shop')} className="flex h-[34px] w-[34px] items-center justify-center rounded-full border border-white/[0.12] font-display text-[15px]">←</button>
             <span className="font-display text-[22px] uppercase">{t('shop.yourBag')}</span>
@@ -155,7 +233,7 @@ const Shop = () => {
             <div>
               {cart.map((l, i) => (
                 <div key={i} className="flex gap-3.5 border-t border-white/[0.06] px-5 py-3.5">
-                  <div className="h-[74px] w-16 flex-none overflow-hidden rounded-lg" style={{ background: l.product.image ? undefined : stripe }}>{l.product.image && <img src={l.product.image} alt="" className="h-full w-full object-cover" />}</div>
+                  <div className="h-[74px] w-16 flex-none overflow-hidden rounded-lg bg-white" style={{ background: l.product.image ? undefined : stripe }}>{l.product.image && <img src={l.product.image} alt="" className="h-full w-full object-cover" />}</div>
                   <div className="flex flex-1 flex-col gap-1.5">
                     <span className="font-sans text-[13px] font-medium leading-[1.3]">{l.product.title}</span>
                     <span className="font-sans text-[11px] text-foreground/40">{l.variant.title}</span>
@@ -165,7 +243,7 @@ const Shop = () => {
               ))}
               <div className="m-5 flex flex-col gap-2.5 rounded-2xl border border-white/[0.07] bg-[#101012] p-4">
                 <div className="flex justify-between font-sans text-[12.5px] text-foreground/60"><span>{t('shop.subtotal')}</span><span>{money(subtotal)}</span></div>
-                <div className="flex justify-between font-sans text-[12.5px] text-foreground/60"><span>{t('shop.shipping')}</span><span>$0.00</span></div>
+                <div className="flex justify-between font-sans text-[12.5px] text-foreground/60"><span>{t('shop.shipping')}</span><span>—</span></div>
                 <div className="h-px bg-white/[0.07]" />
                 <div className="flex items-baseline justify-between"><span className="font-sans text-[13px] font-semibold">{t('shop.total')}</span><span className="font-display text-[20px] text-primary">{money(subtotal)}</span></div>
               </div>
@@ -184,7 +262,7 @@ const Shop = () => {
 
       {/* ADDRESS */}
       {view === 'address' && (
-        <div className="pt-14 lg:mx-auto lg:max-w-[560px]">
+        <div className="mx-auto max-w-[560px] pt-14 lg:pt-10">
           <div className="flex items-center gap-3 px-5 pb-5">
             <button onClick={() => setView('cart')} className="flex h-[34px] w-[34px] items-center justify-center rounded-full border border-white/[0.12] font-display text-[15px]">←</button>
             <span className="font-display text-[22px] uppercase">{t('shop.shippingTo')}</span>
@@ -210,7 +288,7 @@ const Shop = () => {
 
       {/* DONE */}
       {view === 'done' && (
-        <div className="flex min-h-[80dvh] flex-col items-center justify-center gap-4 px-[34px] text-center">
+        <div className="flex min-h-[70dvh] flex-col items-center justify-center gap-4 px-[34px] text-center">
           <div className="flex h-[72px] w-[72px] items-center justify-center rounded-full font-display text-[26px] text-[#070708]" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>✓</div>
           <span className="font-display text-[26px] uppercase leading-[1.05]">{t('shop.confirmed')}</span>
           <span className="font-sans text-[13px] leading-[1.6] text-foreground/55">{t('shop.confirmedDesc')}</span>
