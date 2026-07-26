@@ -42,18 +42,15 @@ serve(async (req) => {
       validated.push({ product_id: it.product_id, variant_id: v.id, quantity: qty, title: `${p.title} — ${v.title}`, price: v.price });
     }
 
-    // Shipping cost from Printify for this address.
-    let shippingCents = 0;
-    try {
-      const sr = await fetch(`${PRINTIFY_API}/shops/${SHOP_ID}/orders/shipping.json`, {
-        method: "POST", headers: pfHeaders,
-        body: JSON.stringify({
-          line_items: validated.map((v) => ({ product_id: v.product_id, variant_id: v.variant_id, quantity: v.quantity })),
-          address_to: address,
-        }),
-      });
-      if (sr.ok) { const sd = await sr.json(); shippingCents = sd.standard ?? 0; }
-    } catch { /* fall back to free shipping if calc fails */ }
+    // Shipping is free to the customer. Show an estimated delivery window (US vs international).
+    const isUS = String(address.country ?? "").toUpperCase() === "US";
+    const minDays = isUS ? 3 : 10;
+    const maxDays = isUS ? 7 : 20;
+    const addDays = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return d; };
+    const fmtDate = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    // Approximate calendar dates (business days padded ~1.4x to span weekends).
+    const arriveEarly = fmtDate(addDays(Math.ceil(minDays * 1.4)));
+    const arriveLate = fmtDate(addDays(Math.ceil(maxDays * 1.4)));
 
     const origin = req.headers.get("origin") ?? "https://menlifoot-mvp.vercel.app";
     const stripe = new Stripe(STRIPE_KEY, { apiVersion: "2024-06-20", httpClient: Stripe.createFetchHttpClient() });
@@ -64,9 +61,17 @@ serve(async (req) => {
         price_data: { currency: "usd", product_data: { name: v.title.slice(0, 250) }, unit_amount: v.price },
         quantity: v.quantity,
       })),
-      shipping_options: shippingCents > 0
-        ? [{ shipping_rate_data: { type: "fixed_amount", fixed_amount: { amount: shippingCents, currency: "usd" }, display_name: "Standard shipping" } }]
-        : undefined,
+      shipping_options: [{
+        shipping_rate_data: {
+          type: "fixed_amount",
+          fixed_amount: { amount: 0, currency: "usd" },
+          display_name: `Free shipping · arrives ${arriveEarly}–${arriveLate}`,
+          delivery_estimate: {
+            minimum: { unit: "business_day", value: minDays },
+            maximum: { unit: "business_day", value: maxDays },
+          },
+        },
+      }],
       customer_email: address.email || undefined,
       success_url: `${origin}/shop?checkout=success`,
       cancel_url: `${origin}/shop`,

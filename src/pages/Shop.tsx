@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { RichTextContent } from '@/components/RichTextContent';
@@ -39,8 +40,11 @@ const Shop = () => {
   const [placing, setPlacing] = useState(false);
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('checkout') === 'success') {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('checkout') === 'success') {
       setView('done'); setCart([]); window.history.replaceState({}, '', '/shop');
+    } else if (params.get('cart') === '1') {
+      setView('cart'); window.history.replaceState({}, '', '/shop');
     }
     (async () => {
       const { data } = await supabase.functions.invoke('printify', { body: { action: 'products' } });
@@ -93,6 +97,9 @@ const Shop = () => {
   };
 
   const subtotal = cart.reduce((s, l) => s + l.variant.price, 0);
+  const removeLine = (i: number) => setCart((c) => c.filter((_, idx) => idx !== i));
+  const cartProductIds = useMemo(() => new Set(cart.map((l) => l.product.id)), [cart]);
+  const similar = useMemo(() => products.filter((p) => !cartProductIds.has(p.id)).slice(0, 6), [products, cartProductIds]);
 
   const placeOrder = async () => {
     setPlacing(true);
@@ -239,6 +246,9 @@ const Shop = () => {
                     <span className="font-sans text-[11px] text-foreground/40">{l.variant.title}</span>
                     <span className="font-sans text-[12.5px] text-primary">{money(l.variant.price)}</span>
                   </div>
+                  <button onClick={() => removeLine(i)} aria-label={t('shop.remove')} className="flex h-8 w-8 flex-none items-center justify-center self-start rounded-full text-foreground/40 transition-colors hover:bg-white/[0.06] hover:text-primary">
+                    <X className="h-[17px] w-[17px]" />
+                  </button>
                 </div>
               ))}
               <div className="m-5 flex flex-col gap-2.5 rounded-2xl border border-white/[0.07] bg-[#101012] p-4">
@@ -249,6 +259,21 @@ const Shop = () => {
               </div>
               <button onClick={() => setView('address')} className="mx-5 flex h-[52px] w-[calc(100%-40px)] items-center justify-center rounded-full font-sans text-[13.5px] font-bold tracking-[0.04em] text-[#070708]" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>{t('shop.checkout')}</button>
               <div className="mt-3.5 text-center font-sans text-[11px] text-foreground/35">{t('shop.secure')}</div>
+
+              {similar.length > 0 && (
+                <div className="mt-10 px-5 pb-6">
+                  <span className="font-display text-[15px] uppercase tracking-[0.04em]">{t('shop.similar')}</span>
+                  <div className="mt-3.5 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none]">
+                    {similar.map((p) => (
+                      <button key={p.id} onClick={() => openProduct(p)} className="w-[130px] flex-none text-left">
+                        <div className="aspect-square w-full overflow-hidden rounded-xl bg-white" style={{ background: p.image ? undefined : stripe }}>{p.image && <img src={p.image} alt={p.title} className="h-full w-full object-cover" />}</div>
+                        <div className="mt-2 line-clamp-1 font-sans text-[12px] font-medium">{p.title}</div>
+                        <div className="mt-0.5 font-sans text-[12px] text-primary">{money(p.price_cents)}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex flex-col items-center gap-3.5 px-[30px] py-[60px] text-center">

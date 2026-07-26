@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CartProvider } from "./contexts/CartContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { AuthProvider } from "./contexts/AuthContext";
+import { AuthModalProvider } from "./components/AuthModal";
 import Index from "./pages/Index";
 import Home from "./pages/Home";
 import Article from "./pages/Article";
@@ -41,6 +42,7 @@ const App = () => (
             <Toaster />
             <Sonner />
             <BrowserRouter>
+              <AuthModalProvider>
               <PaymentTestModeBanner />
               <Routes>
                 <Route path="/" element={<Home />} />
@@ -65,6 +67,7 @@ const App = () => (
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
+              </AuthModalProvider>
             </BrowserRouter>
           </TooltipProvider>
         </CartProvider>

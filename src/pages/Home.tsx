@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useAuthModal } from '@/components/AuthModal';
+import { MessageCircle, User } from 'lucide-react';
 import wordmark from '@/assets/wordmark.png';
 import AppShell from '@/components/mobile/AppShell';
 import { podcastThumb } from '@/lib/podcast';
@@ -43,6 +46,8 @@ interface ShopProduct { id: string; title: string; image: string | null; price_c
 const Home = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const { user } = useAuth();
+  const { open: openAuth } = useAuthModal();
   const [articles, setArticles] = useState<Article[]>([]);
   const [podcast, setPodcast] = useState<Podcast | null>(null);
   const [shop, setShop] = useState<ShopProduct[]>([]);
@@ -67,15 +72,17 @@ const Home = () => {
   return (
     <AppShell wide>
       {/* ===== Mobile ===== */}
-      <div className="pb-2 pt-14 lg:hidden">
+      <div className="pb-2 pt-20 lg:hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 pb-4">
-          <img src={wordmark} alt="Menlifoot" className="h-6 w-auto" />
-          <div className="flex gap-2">
-            <button onClick={() => navigate('/ask')} className="flex h-[34px] w-[34px] items-center justify-center rounded-full border border-white/[0.12] transition-colors hover:border-primary/60">
-              <span className="font-sans text-[12px] font-bold text-primary">AI</span>
+        <div className="flex items-center justify-between px-5 pb-5">
+          <img src={wordmark} alt="Menlifoot" className="h-9 w-auto" />
+          <div className="flex gap-2.5">
+            <button onClick={() => navigate('/ask')} aria-label={t('home.askTitle')} className="flex h-[38px] w-[38px] items-center justify-center rounded-full border border-white/[0.12] text-primary transition-colors hover:border-primary/60">
+              <MessageCircle className="h-[19px] w-[19px]" strokeWidth={2} />
             </button>
-            <Link to="/me" className="h-[34px] w-[34px] rounded-full border border-white/10" style={{ background: 'repeating-linear-gradient(135deg,#1c1c20 0 6px,#141417 6px 12px)' }} />
+            <button onClick={() => (user ? navigate('/me') : openAuth('signin'))} aria-label={t('auth.signin')} className="flex h-[38px] w-[38px] items-center justify-center rounded-full border border-white/[0.12] text-foreground/70 transition-colors hover:border-primary/60 hover:text-primary">
+              <User className="h-[19px] w-[19px]" strokeWidth={2} />
+            </button>
           </div>
         </div>
 
@@ -97,7 +104,7 @@ const Home = () => {
         {/* Ask Menli */}
         <button onClick={() => navigate('/ask')} className="mx-5 mb-[26px] flex w-[calc(100%-40px)] items-center gap-3.5 rounded-2xl border border-primary/30 px-[18px] py-4 text-left" style={{ background: 'linear-gradient(135deg,rgba(200,154,60,.1),rgba(200,154,60,.02))' }}>
           <div className="flex flex-1 flex-col gap-[5px]">
-            <div className="text-gradient-gold font-sans text-[15px] font-bold">{t('home.askTitle')}</div>
+            <div className="font-sans text-[15px] font-bold text-[#e9c877]">{t('home.askTitle')}</div>
             <div className="font-sans text-[12px] leading-[1.45] text-foreground/60">{t('home.askSub')}</div>
           </div>
           <span className="font-display text-[22px] text-primary">→</span>
