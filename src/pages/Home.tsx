@@ -62,7 +62,7 @@ const Home = () => {
 
   const lead = articles[0];
   const latest = articles.slice(1, 5);
-  const deskLatest = articles.slice(1, 11);
+  const deskLatest = articles.slice(1, 9);
 
   return (
     <AppShell wide>

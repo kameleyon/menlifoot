@@ -13,22 +13,52 @@ interface Product {
 }
 interface CartLine { product: Product; variant: { id: number; title: string; price: number } }
 
+const EMPTY_ADDR = { first_name: '', last_name: '', email: '', phone: '', country: 'US', region: '', address1: '', address2: '', city: '', zip: '' };
+
+const Field = ({ label, value, onChange, className = '' }: { label: string; value: string; onChange: (v: string) => void; className?: string }) => (
+  <div className={`flex flex-col gap-1 ${className}`}>
+    <label className="font-sans text-[10px] uppercase tracking-wide text-foreground/40">{label}</label>
+    <input value={value} onChange={(e) => onChange(e.target.value)} className="rounded-xl border border-white/[0.12] bg-[#101012] px-3.5 py-2.5 font-sans text-[14px] text-foreground focus:border-primary/50 focus:outline-none" />
+  </div>
+);
+
 const Shop = () => {
   const { t } = useLanguage();
-  const [view, setView] = useState<'shop' | 'product' | 'cart' | 'done'>('shop');
+  const [view, setView] = useState<'shop' | 'product' | 'cart' | 'address' | 'done'>('shop');
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [selected, setSelected] = useState<Product | null>(null);
   const [variantId, setVariantId] = useState<number | null>(null);
+  const [address, setAddress] = useState({ ...EMPTY_ADDR });
+  const [placing, setPlacing] = useState(false);
 
   useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('checkout') === 'success') {
+      setView('done'); setCart([]); window.history.replaceState({}, '', '/shop');
+    }
     (async () => {
       const { data } = await supabase.functions.invoke('printify', { body: { action: 'products' } });
       setProducts(((data as { products?: Product[] })?.products) ?? []);
       setLoading(false);
     })();
   }, []);
+
+  const placeOrder = async () => {
+    setPlacing(true);
+    const agg: Record<string, { product_id: string; variant_id: number; quantity: number }> = {};
+    cart.forEach((l) => {
+      const k = `${l.product.id}_${l.variant.id}`;
+      if (!agg[k]) agg[k] = { product_id: l.product.id, variant_id: l.variant.id, quantity: 0 };
+      agg[k].quantity += 1;
+    });
+    const { data, error } = await supabase.functions.invoke('checkout', { body: { items: Object.values(agg), address } });
+    setPlacing(false);
+    const url = (data as { url?: string })?.url;
+    if (url) window.location.href = url;
+    else alert((data as { error?: string })?.error ?? error?.message ?? 'Checkout failed');
+  };
+  const addrValid = address.first_name && address.last_name && address.email && address.address1 && address.city && address.country && address.zip;
 
   const openProduct = async (p: Product) => {
     setSelected(p); setVariantId(null); setView('product');
@@ -139,7 +169,7 @@ const Shop = () => {
                 <div className="h-px bg-white/[0.07]" />
                 <div className="flex items-baseline justify-between"><span className="font-sans text-[13px] font-semibold">{t('shop.total')}</span><span className="font-display text-[20px] text-primary">{money(subtotal)}</span></div>
               </div>
-              <button onClick={() => { setView('done'); setCart([]); }} className="mx-5 flex h-[52px] w-[calc(100%-40px)] items-center justify-center rounded-full font-sans text-[13.5px] font-bold tracking-[0.04em] text-[#070708]" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>{t('shop.checkout')}</button>
+              <button onClick={() => setView('address')} className="mx-5 flex h-[52px] w-[calc(100%-40px)] items-center justify-center rounded-full font-sans text-[13.5px] font-bold tracking-[0.04em] text-[#070708]" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>{t('shop.checkout')}</button>
               <div className="mt-3.5 text-center font-sans text-[11px] text-foreground/35">{t('shop.secure')}</div>
             </div>
           ) : (
@@ -149,6 +179,32 @@ const Shop = () => {
               <button onClick={() => setView('shop')} className="mt-1.5 rounded-full border border-primary/50 px-5 py-3 font-sans text-[12px] font-semibold text-primary">{t('shop.browse')}</button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ADDRESS */}
+      {view === 'address' && (
+        <div className="pt-14 lg:mx-auto lg:max-w-[560px]">
+          <div className="flex items-center gap-3 px-5 pb-5">
+            <button onClick={() => setView('cart')} className="flex h-[34px] w-[34px] items-center justify-center rounded-full border border-white/[0.12] font-display text-[15px]">←</button>
+            <span className="font-display text-[22px] uppercase">{t('shop.shippingTo')}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2.5 px-5 pb-6">
+            <Field label={t('shop.firstName')} value={address.first_name} onChange={(v) => setAddress((a) => ({ ...a, first_name: v }))} />
+            <Field label={t('shop.lastName')} value={address.last_name} onChange={(v) => setAddress((a) => ({ ...a, last_name: v }))} />
+            <Field className="col-span-2" label={t('shop.email')} value={address.email} onChange={(v) => setAddress((a) => ({ ...a, email: v }))} />
+            <Field className="col-span-2" label={t('shop.phone')} value={address.phone} onChange={(v) => setAddress((a) => ({ ...a, phone: v }))} />
+            <Field className="col-span-2" label={t('shop.address')} value={address.address1} onChange={(v) => setAddress((a) => ({ ...a, address1: v }))} />
+            <Field className="col-span-2" label={t('shop.address2')} value={address.address2} onChange={(v) => setAddress((a) => ({ ...a, address2: v }))} />
+            <Field label={t('shop.city')} value={address.city} onChange={(v) => setAddress((a) => ({ ...a, city: v }))} />
+            <Field label={t('shop.zip')} value={address.zip} onChange={(v) => setAddress((a) => ({ ...a, zip: v }))} />
+            <Field label={t('shop.region')} value={address.region} onChange={(v) => setAddress((a) => ({ ...a, region: v }))} />
+            <Field label={t('shop.country')} value={address.country} onChange={(v) => setAddress((a) => ({ ...a, country: v }))} />
+          </div>
+          <button onClick={placeOrder} disabled={!addrValid || placing}
+            className="mx-5 flex h-[52px] w-[calc(100%-40px)] items-center justify-center rounded-full font-sans text-[13.5px] font-bold tracking-[0.04em] text-[#070708] disabled:opacity-40"
+            style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>{placing ? '…' : t('shop.pay')}</button>
+          <div className="mt-3.5 text-center font-sans text-[11px] text-foreground/35">{t('shop.secure')}</div>
         </div>
       )}
 
