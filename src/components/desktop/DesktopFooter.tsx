@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { SocialLinks } from '@/components/SocialLinks';
 
 const DesktopFooter = () => {
   const { t } = useLanguage();
@@ -10,6 +11,7 @@ const DesktopFooter = () => {
           <div className="flex flex-col gap-3">
             <span className="text-gradient-gold font-display text-[26px] uppercase leading-none tracking-wide">Menlifoot</span>
             <span className="max-w-[280px] font-sans text-[12px] leading-[1.6] text-foreground/45">Soccer media — analysis, interviews, the MVP Podcast, and Les Grenadiers coverage.</span>
+            <SocialLinks className="mt-2" size={19} />
           </div>
           <div className="flex gap-16">
             <div className="flex flex-col gap-3">
