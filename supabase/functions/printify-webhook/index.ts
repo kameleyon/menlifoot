@@ -9,7 +9,14 @@ const HANDLE = "https://menlifoot-mvp.vercel.app/shop";
 
 serve(async (req) => {
   const KEY = Deno.env.get("PRINTIFY_API_KEY");
-  if (!KEY) return new Response("not configured", { status: 500 });
+  const TOKEN = Deno.env.get("PRINTIFY_WEBHOOK_TOKEN");
+  if (!KEY || !TOKEN) return new Response("not configured", { status: 500 });
+
+  // Authenticate: Printify calls the exact URL we registered, which carries a shared
+  // secret token. Reject anything that doesn't present it (fail closed).
+  if (new URL(req.url).searchParams.get("token") !== TOKEN) {
+    return new Response("unauthorized", { status: 401 });
+  }
 
   const raw = await req.text();
   // deno-lint-ignore no-explicit-any
