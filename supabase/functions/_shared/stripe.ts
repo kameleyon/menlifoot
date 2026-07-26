@@ -1,37 +1,23 @@
-import Stripe from "https://esm.sh/stripe@22.0.2";
-
-const getEnv = (key: string): string => {
-  const value = Deno.env.get(key);
-  if (!value) throw new Error(`${key} is not configured`);
-  return value;
-};
+import Stripe from "https://esm.sh/stripe@16.12.0?target=deno";
 
 export type StripeEnv = "sandbox" | "live";
 
-const GATEWAY_STRIPE_BASE = "https://connector-gateway.lovable.dev/stripe";
-
-export function getConnectionApiKey(env: StripeEnv): string {
-  return env === "sandbox"
-    ? getEnv("STRIPE_SANDBOX_API_KEY")
-    : getEnv("STRIPE_LIVE_API_KEY");
+// This project talks to Stripe directly with its own secret key (STRIPE_SECRET_KEY) —
+// the Lovable connector gateway is not used here. The env argument is accepted for
+// backwards compatibility with callers but does not change which key is used.
+function getKey(): string {
+  const key = Deno.env.get("STRIPE_SECRET_KEY");
+  if (!key) throw new Error("STRIPE_SECRET_KEY is not configured");
+  return key;
 }
 
-export function createStripeClient(env: StripeEnv): Stripe {
-  const connectionApiKey = getConnectionApiKey(env);
-  const lovableApiKey = getEnv("LOVABLE_API_KEY");
+export function getConnectionApiKey(_env: StripeEnv): string {
+  return getKey();
+}
 
-  return new Stripe(connectionApiKey, {
-    apiVersion: "2026-03-25.dahlia",
-    httpClient: Stripe.createFetchHttpClient((url: string | URL, init?: RequestInit) => {
-      const gatewayUrl = url.toString().replace("https://api.stripe.com", GATEWAY_STRIPE_BASE);
-      return fetch(gatewayUrl, {
-        ...init,
-        headers: {
-          ...Object.fromEntries(new Headers(init?.headers).entries()),
-          "X-Connection-Api-Key": connectionApiKey,
-          "Lovable-API-Key": lovableApiKey,
-        },
-      });
-    }),
+export function createStripeClient(_env: StripeEnv): Stripe {
+  return new Stripe(getKey(), {
+    apiVersion: "2024-06-20",
+    httpClient: Stripe.createFetchHttpClient(),
   });
 }
