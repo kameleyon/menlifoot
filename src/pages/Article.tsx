@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { RichTextContent } from '@/components/RichTextContent';
 import AppShell from '@/components/mobile/AppShell';
+import { useArticleEngagement, EngagementBar, CommentsSection } from '@/components/ArticleEngagement';
 
 interface Art {
   title: string; content: string; summary: string | null; category: string | null;
@@ -18,6 +19,7 @@ const Article = () => {
   const { language, t } = useLanguage();
   const [art, setArt] = useState<Art | null>(null);
   const [loading, setLoading] = useState(true);
+  const eng = useArticleEngagement(id ?? '', { title: art?.title ?? '', summary: art?.summary ?? null });
 
   useEffect(() => {
     (async () => {
@@ -55,6 +57,8 @@ const Article = () => {
               <div className="h-7 w-7 rounded-full" style={{ background: 'repeating-linear-gradient(135deg,#1c1c20 0 6px,#141417 6px 12px)' }} />
               <span className="font-sans text-[11.5px] text-foreground/50">{[art.author ?? 'Menlifoot desk', art.published_at ? new Date(art.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : null].filter(Boolean).join(' · ')}</span>
             </div>
+            {/* Engagement (top) */}
+            <EngagementBar eng={eng} />
             {/* Body */}
             <RichTextContent
               html={art.content}
@@ -71,6 +75,9 @@ const Article = () => {
               <span className="font-sans text-[12.5px] leading-[1.4] text-foreground/80">{t('art.askPiece')}</span>
               <span className="font-display text-[18px] text-primary">→</span>
             </button>
+            {/* Engagement (bottom) + comments */}
+            <div className="mt-4"><EngagementBar eng={eng} /></div>
+            <CommentsSection eng={eng} />
           </div>
         </div>
       )}
