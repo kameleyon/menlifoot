@@ -43,6 +43,13 @@ export default async function handler(req, res) {
     }
   }
 
+  // Crawlers (esp. WhatsApp) drop preview images over a few hundred KB and prefer JPEG.
+  // Article thumbnails are large PNGs, so route them through an image CDN that returns a
+  // compact 1200x630 JPEG. The site's own og.png is already small — use it as-is.
+  const ogImage = image.includes(`${host}/og.png`)
+    ? image
+    : `https://images.weserv.nl/?url=${encodeURIComponent(image.replace(/^https?:\/\//, ''))}&w=1200&h=630&fit=cover&output=jpg&q=75`;
+
   const html = `<!doctype html><html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -52,12 +59,15 @@ export default async function handler(req, res) {
 <meta property="og:site_name" content="Menlifoot">
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(desc)}">
-<meta property="og:image" content="${esc(image)}">
+<meta property="og:image" content="${esc(ogImage)}">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta property="og:url" content="${esc(articleUrl)}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${esc(title)}">
 <meta name="twitter:description" content="${esc(desc)}">
-<meta name="twitter:image" content="${esc(image)}">
+<meta name="twitter:image" content="${esc(ogImage)}">
 </head><body>
 <h1>${esc(title)}</h1>
 <p>${esc(desc)}</p>
