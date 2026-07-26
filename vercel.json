@@ -11,6 +11,18 @@
       ],
       "destination": "/api/article-og?id=:id"
     },
+    {
+      "source": "/shop",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|Facebot|Twitterbot|WhatsApp|Slackbot|LinkedInBot|TelegramBot|Discordbot|Pinterest|redditbot|Applebot|SkypeUriPreview|vkShare|Embedly|Google-InspectionTool|Googlebot|bingbot|DuckDuckBot).*"
+        },
+        { "type": "query", "key": "product" }
+      ],
+      "destination": "/api/product-og?id=:product"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
