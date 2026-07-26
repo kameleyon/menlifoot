@@ -63,7 +63,7 @@ serve(async (req) => {
           currency: "usd",
           // Personalization is appended to the name so it surfaces on the checkout page,
           // the Stripe dashboard, and the admin Orders list (which reads the line-item name).
-          product_data: { name: (v.personalization ? `${v.title} (✎ ${v.personalization})` : v.title).slice(0, 250) },
+          product_data: { name: (v.personalization ? `${v.title} [Personalized: ${v.personalization}]` : v.title).slice(0, 250) },
           unit_amount: v.price,
         },
         quantity: v.quantity,

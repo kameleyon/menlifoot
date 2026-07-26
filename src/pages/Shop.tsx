@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { X, Search } from 'lucide-react';
+import { X, Search, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { RichTextContent } from '@/components/RichTextContent';
@@ -335,7 +335,7 @@ const Shop = () => {
                   <div className="flex flex-1 flex-col gap-1.5">
                     <span className="font-sans text-[13px] font-medium leading-[1.3]">{l.product.title}</span>
                     <span className="font-sans text-[11px] text-foreground/40">{l.variant.title}</span>
-                    {l.personalization && <span className="font-sans text-[11px] text-primary/85">✎ {l.personalization}</span>}
+                    {l.personalization && <span className="font-sans text-[11px] text-primary/85">{t('shop.personalized')}: {l.personalization}</span>}
                     <div className="mt-1 flex items-center gap-3">
                       <div className="flex items-center rounded-full border border-white/[0.14]">
                         <button onClick={() => setQty(i, -1)} disabled={l.qty <= 1} aria-label="−" className="flex h-7 w-7 items-center justify-center font-sans text-[16px] leading-none text-foreground/70 transition-colors hover:text-primary disabled:opacity-30">−</button>
@@ -413,7 +413,7 @@ const Shop = () => {
       {/* DONE */}
       {view === 'done' && (
         <div className="flex min-h-[70dvh] flex-col items-center justify-center gap-4 px-[34px] text-center">
-          <div className="flex h-[72px] w-[72px] items-center justify-center rounded-full font-display text-[26px] text-[#070708]" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>✓</div>
+          <div className="flex h-[72px] w-[72px] items-center justify-center rounded-full text-[#070708]" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}><Check className="h-8 w-8" strokeWidth={2.5} /></div>
           <span className="font-display text-[26px] uppercase leading-[1.05]">{t('shop.confirmed')}</span>
           <span className="font-sans text-[13px] leading-[1.6] text-foreground/55">{t('shop.confirmedDesc')}</span>
           <button onClick={() => setView('shop')} className="mt-2 rounded-full border border-white/[0.16] px-[22px] py-[13px] font-sans text-[12.5px] font-semibold">{t('shop.backStore')}</button>

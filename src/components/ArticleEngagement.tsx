@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Eye, Heart, MessageCircle, Bookmark, Share2 } from 'lucide-react';
+import { Eye, Heart, MessageCircle, Bookmark, Share2, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthModal } from '@/components/AuthModal';
@@ -149,7 +149,7 @@ export function CommentsSection({ eng }: { eng: Eng }) {
               <div className="flex items-center gap-2">
                 <span className="font-sans text-[12.5px] font-semibold text-foreground/85">{c.author_name || 'User'}</span>
                 <span className="font-sans text-[10.5px] text-foreground/35">{new Date(c.created_at).toLocaleDateString()}</span>
-                {eng.currentUserId === c.user_id && <button onClick={() => eng.deleteComment(c.id)} aria-label="delete" className="ml-auto font-sans text-[11px] text-foreground/35 hover:text-primary">✕</button>}
+                {eng.currentUserId === c.user_id && <button onClick={() => eng.deleteComment(c.id)} aria-label="delete comment" className="ml-auto text-foreground/35 hover:text-primary"><X className="h-3.5 w-3.5" /></button>}
               </div>
               <p className="font-sans text-[13.5px] leading-[1.5] text-foreground/70">{c.body}</p>
             </div>
