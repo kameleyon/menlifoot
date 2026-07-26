@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { X } from 'lucide-react';
+import { X, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { RichTextContent } from '@/components/RichTextContent';
@@ -8,6 +8,18 @@ import AppShell from '@/components/mobile/AppShell';
 
 const stripe = 'repeating-linear-gradient(135deg,#1b1b1f 0 7px,#131316 7px 14px)';
 const money = (cents: number | null) => (cents == null ? '' : `$${(cents / 100).toFixed(2)}`);
+// Infer a customer-facing category from the product title (Printify's v1 API has no clean category field).
+const categoryOf = (p: { title: string }) => {
+  const t = p.title.toLowerCase();
+  if (/hoodie|sweatshirt|crewneck/.test(t)) return 'Hoodies';
+  if (/beanie/.test(t)) return 'Beanies';
+  if (/cap|hat|snapback|trucker/.test(t)) return 'Hats';
+  if (/tank/.test(t)) return 'Tanks';
+  if (/tee|t-shirt|tshirt| shirt/.test(t)) return 'T-Shirts';
+  if (/mug|bottle|cup|tumbler/.test(t)) return 'Drinkware';
+  if (/bag|tote|backpack/.test(t)) return 'Bags';
+  return 'Other';
+};
 const EMPTY_ADDR = { first_name: '', last_name: '', email: '', phone: '', country: 'US', region: '', address1: '', address2: '', city: '', zip: '' };
 
 interface Color { id: number; title: string; hex: string | null }
@@ -39,6 +51,10 @@ const Shop = () => {
   const [sizeId, setSizeId] = useState<number | null>(null);
   const [imgIdx, setImgIdx] = useState(0);
   const [personalization, setPersonalization] = useState('');
+  const [pqty, setPqty] = useState(1);
+  const [query, setQuery] = useState('');
+  const [category, setCategory] = useState('all');
+  const [sortBy, setSortBy] = useState('featured');
   const [address, setAddress] = useState({ ...EMPTY_ADDR });
   const [placing, setPlacing] = useState(false);
 
@@ -82,7 +98,7 @@ const Shop = () => {
   }, [selected, colorId]);
 
   const openProduct = async (p: Product) => {
-    setSelected(p); setColorId(null); setSizeId(null); setImgIdx(0); setPersonalization(''); setView('product');
+    setSelected(p); setColorId(null); setSizeId(null); setImgIdx(0); setPersonalization(''); setPqty(1); setView('product');
     const { data } = await supabase.functions.invoke('printify', { body: { action: 'product', id: p.id } });
     const full = (data as { product?: Product })?.product;
     if (!full) return;
@@ -107,19 +123,30 @@ const Shop = () => {
   const removeLine = (i: number) => setCart((c) => c.filter((_, idx) => idx !== i));
   const setQty = (i: number, delta: number) =>
     setCart((c) => c.map((l, idx) => (idx === i ? { ...l, qty: Math.max(1, Math.min(20, l.qty + delta)) } : l)));
-  const addToCart = (product: Product, variant: Variant, note?: string) => {
+  const addToCart = (product: Product, variant: Variant, note?: string, quantity = 1) => {
+    const q = Math.max(1, Math.min(20, quantity));
     setCart((c) => {
       // Personalized items are always their own line (each has unique text).
-      if (note) return [...c, { product, variant, qty: 1, personalization: note }];
+      if (note) return [...c, { product, variant, qty: q, personalization: note }];
       const i = c.findIndex((l) => l.product.id === product.id && l.variant.id === variant.id && !l.personalization);
-      if (i >= 0) { const n = [...c]; n[i] = { ...n[i], qty: Math.min(20, n[i].qty + 1) }; return n; }
-      return [...c, { product, variant, qty: 1 }];
+      if (i >= 0) { const n = [...c]; n[i] = { ...n[i], qty: Math.min(20, n[i].qty + q) }; return n; }
+      return [...c, { product, variant, qty: q }];
     });
     setPersonalization('');
     setView('shop');
   };
   const cartProductIds = useMemo(() => new Set(cart.map((l) => l.product.id)), [cart]);
   const similar = useMemo(() => products.filter((p) => !cartProductIds.has(p.id)).slice(0, 6), [products, cartProductIds]);
+  const categories = useMemo(() => Array.from(new Set(products.map(categoryOf))).sort(), [products]);
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    let list = products.filter((p) => (!q || p.title.toLowerCase().includes(q)) && (category === 'all' || categoryOf(p) === category));
+    list = [...list];
+    if (sortBy === 'price-asc') list.sort((a, b) => (a.price_cents ?? 0) - (b.price_cents ?? 0));
+    else if (sortBy === 'price-desc') list.sort((a, b) => (b.price_cents ?? 0) - (a.price_cents ?? 0));
+    else if (sortBy === 'name') list.sort((a, b) => a.title.localeCompare(b.title));
+    return list;
+  }, [products, query, category, sortBy]);
 
   const placeOrder = async () => {
     setPlacing(true);
@@ -152,6 +179,26 @@ const Shop = () => {
             </button>
           </div>
 
+          {!loading && products.length > 0 && (
+            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/40" />
+                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('shop.search')}
+                  className="w-full rounded-full border border-white/[0.12] bg-[#101012] py-2.5 pl-10 pr-4 font-sans text-[13px] text-foreground placeholder:text-foreground/35 focus:border-primary/50 focus:outline-none" />
+              </div>
+              <select value={category} onChange={(e) => setCategory(e.target.value)} className="rounded-full border border-white/[0.12] bg-[#101012] px-4 py-2.5 font-sans text-[13px] text-foreground focus:border-primary/50 focus:outline-none">
+                <option value="all">{t('shop.all')}</option>
+                {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="rounded-full border border-white/[0.12] bg-[#101012] px-4 py-2.5 font-sans text-[13px] text-foreground focus:border-primary/50 focus:outline-none">
+                <option value="featured">{t('shop.featured')}</option>
+                <option value="price-asc">{t('shop.priceLow')}</option>
+                <option value="price-desc">{t('shop.priceHigh')}</option>
+                <option value="name">{t('shop.nameAz')}</option>
+              </select>
+            </div>
+          )}
+
           {loading ? (
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
               {[0, 1, 2, 3].map((i) => <div key={i} className="h-[176px] animate-pulse rounded-xl bg-white/[0.05]" />)}
@@ -162,9 +209,11 @@ const Shop = () => {
               <span className="font-display text-[20px] uppercase">{t('shop.soon')}</span>
               <span className="font-sans text-[12.5px] leading-[1.6] text-foreground/50">{t('shop.soonDesc')}</span>
             </div>
+          ) : visible.length === 0 ? (
+            <p className="py-16 text-center font-sans text-foreground/45">{t('shop.noResults')}</p>
           ) : (
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
-              {products.map((p) => (
+              {visible.map((p) => (
                 <button key={p.id} onClick={() => openProduct(p)} className="group flex flex-col gap-2 text-left">
                   <div className="aspect-square w-full overflow-hidden rounded-xl bg-white" style={{ background: p.image ? undefined : stripe }}>
                     {p.image && <img src={p.image} alt={p.title} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />}
@@ -246,16 +295,26 @@ const Shop = () => {
               </div>
             )}
 
+            {/* Quantity */}
+            <div className="flex flex-col gap-2.5">
+              <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.14em] text-foreground/45">{t('shop.qty')}</span>
+              <div className="flex w-fit items-center rounded-full border border-white/[0.14]">
+                <button onClick={() => setPqty((q) => Math.max(1, q - 1))} disabled={pqty <= 1} aria-label="−" className="flex h-9 w-11 items-center justify-center font-sans text-[18px] leading-none text-foreground/70 transition-colors hover:text-primary disabled:opacity-30">−</button>
+                <span className="min-w-[30px] text-center font-sans text-[14px] font-medium">{pqty}</span>
+                <button onClick={() => setPqty((q) => Math.min(20, q + 1))} aria-label="+" className="flex h-9 w-11 items-center justify-center font-sans text-[18px] leading-none text-foreground/70 transition-colors hover:text-primary">+</button>
+              </div>
+            </div>
+
             {selected.description && <RichTextContent html={selected.description} className="font-sans text-[13.5px] leading-[1.65] text-foreground/60 [&_p]:mb-2" />}
 
-            <button onClick={() => { if (variant) addToCart(selected, variant, selected.personalize ? personalization.trim() || undefined : undefined); }} disabled={!variant}
-              className="mt-1 hidden h-[52px] items-center justify-center rounded-full font-sans text-[13.5px] font-bold tracking-[0.04em] text-[#070708] disabled:opacity-40 lg:flex" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>{t('shop.add')} · {money(variant?.price ?? selected.price_cents)}</button>
+            <button onClick={() => { if (variant) addToCart(selected, variant, selected.personalize ? personalization.trim() || undefined : undefined, pqty); }} disabled={!variant}
+              className="mt-1 hidden h-[52px] items-center justify-center rounded-full font-sans text-[13.5px] font-bold tracking-[0.04em] text-[#070708] disabled:opacity-40 lg:flex" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>{t('shop.add')} · {money((variant?.price ?? selected.price_cents ?? 0) * pqty)}</button>
           </div>
         </div>
 
           {/* Mobile sticky add bar */}
           <div className="fixed inset-x-0 bottom-[76px] left-1/2 z-30 flex w-full max-w-[520px] -translate-x-1/2 items-center gap-3 px-5 pb-4 pt-3 lg:hidden" style={{ background: 'linear-gradient(to top,#070708 55%,rgba(7,7,8,0))' }}>
-            <button onClick={() => { if (variant) addToCart(selected, variant, selected.personalize ? personalization.trim() || undefined : undefined); }} disabled={!variant} className="flex h-[52px] flex-1 items-center justify-center rounded-full font-sans text-[13.5px] font-bold tracking-[0.04em] text-[#070708] disabled:opacity-40" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>{t('shop.add')} · {money(variant?.price ?? selected.price_cents)}</button>
+            <button onClick={() => { if (variant) addToCart(selected, variant, selected.personalize ? personalization.trim() || undefined : undefined, pqty); }} disabled={!variant} className="flex h-[52px] flex-1 items-center justify-center rounded-full font-sans text-[13.5px] font-bold tracking-[0.04em] text-[#070708] disabled:opacity-40" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>{t('shop.add')} · {money((variant?.price ?? selected.price_cents ?? 0) * pqty)}</button>
             <button onClick={() => setView('cart')} className="flex h-[52px] w-[52px] items-center justify-center rounded-full border border-white/[0.16] font-sans text-[11px] text-foreground/75">{cartCount}</button>
           </div>
         </div>
