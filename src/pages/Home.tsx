@@ -72,7 +72,7 @@ const Home = () => {
   return (
     <AppShell wide>
       {/* ===== Mobile ===== */}
-      <div className="pb-2 pt-20 lg:hidden">
+      <div className="pb-2 pt-4 lg:hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 pb-5">
           <img src={wordmark} alt="Menlifoot" className="h-9 w-auto" />
