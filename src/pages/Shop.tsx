@@ -8,6 +8,7 @@ import { useAuthModal } from '@/components/AuthModal';
 import { useToast } from '@/hooks/use-toast';
 import { RichTextContent } from '@/components/RichTextContent';
 import AppShell from '@/components/mobile/AppShell';
+import { useStoreCart, type Product, type Variant } from '@/contexts/StoreCartContext';
 
 const stripe = 'repeating-linear-gradient(135deg,#1b1b1f 0 7px,#131316 7px 14px)';
 const money = (cents: number | null) => (cents == null ? '' : `$${(cents / 100).toFixed(2)}`);
@@ -25,15 +26,6 @@ const categoryOf = (p: { title: string }) => {
 };
 const EMPTY_ADDR = { first_name: '', last_name: '', email: '', phone: '', country: 'US', region: '', address1: '', address2: '', city: '', zip: '' };
 
-interface Color { id: number; title: string; hex: string | null }
-interface Size { id: number; title: string }
-interface Variant { id: number; title: string; price: number; options: number[] }
-interface Img { src: string; variant_ids: number[] }
-interface Product {
-  id: string; title: string; image: string | null; price_cents: number | null; tags?: string[]; personalize?: boolean;
-  description?: string; images?: Img[]; colors?: Color[]; sizes?: Size[]; variants?: Variant[];
-}
-interface CartLine { product: Product; variant: Variant; qty: number; personalization?: string }
 
 const Field = ({ label, value, onChange, className = '' }: { label: string; value: string; onChange: (v: string) => void; className?: string }) => (
   <div className={`flex flex-col gap-1 ${className}`}>
@@ -54,7 +46,7 @@ const Shop = () => {
   const [view, setView] = useState<'shop' | 'product' | 'cart' | 'address' | 'done'>('shop');
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [cart, setCart] = useState<CartLine[]>([]);
+  const { cart, setCart } = useStoreCart();
   const [selected, setSelected] = useState<Product | null>(null);
   const [colorId, setColorId] = useState<number | null>(null);
   const [sizeId, setSizeId] = useState<number | null>(null);
@@ -187,6 +179,7 @@ const Shop = () => {
       return [...c, { product, variant, qty: q }];
     });
     setPersonalization('');
+    toast({ title: t('shop.addedToCart') });
     setView('shop');
   };
   const cartProductIds = useMemo(() => new Set(cart.map((l) => l.product.id)), [cart]);

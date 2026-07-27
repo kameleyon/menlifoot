@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CartProvider } from "./contexts/CartContext";
+import { StoreCartProvider } from "./contexts/StoreCartContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { AuthModalProvider } from "./components/AuthModal";
@@ -38,6 +39,7 @@ const App = () => (
     <LanguageProvider>
       <AuthProvider>
         <CartProvider>
+          <StoreCartProvider>
           <TooltipProvider>
             <Toaster />
             <Sonner />
@@ -70,6 +72,7 @@ const App = () => (
               </AuthModalProvider>
             </BrowserRouter>
           </TooltipProvider>
+          </StoreCartProvider>
         </CartProvider>
       </AuthProvider>
     </LanguageProvider>

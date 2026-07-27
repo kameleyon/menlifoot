@@ -3,6 +3,7 @@ import { Home, Headphones, Palmtree, ShoppingBag, User } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthModal } from '@/components/AuthModal';
+import { useStoreCart } from '@/contexts/StoreCartContext';
 
 const TABS = [
   { key: 'nav.home', to: '/', Icon: Home },
@@ -17,6 +18,7 @@ const BottomNav = () => {
   const { t } = useLanguage();
   const { user, isAdmin, isEditor } = useAuth();
   const { open: openAuth } = useAuthModal();
+  const { count } = useStoreCart();
   const navigate = useNavigate();
   const isActive = (to: string) => (to === '/' ? pathname === '/' : pathname.startsWith(to));
 
@@ -33,7 +35,10 @@ const BottomNav = () => {
         const Icon = tab.Icon;
         const inner = (
           <>
-            <Icon className={`h-[22px] w-[22px] transition-colors ${active ? 'text-primary' : 'text-primary/70'}`} strokeWidth={active ? 2.4 : 2} />
+            <span className="relative">
+              <Icon className={`h-[22px] w-[22px] transition-colors ${active ? 'text-primary' : 'text-primary/70'}`} strokeWidth={active ? 2.4 : 2} />
+              {tab.key === 'nav.shop' && count > 0 && <span className="absolute -right-2 -top-1.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-primary px-1 font-sans text-[8.5px] font-bold text-[#070708]">{count}</span>}
+            </span>
             <span className={`font-sans text-[9.5px] font-semibold uppercase tracking-[0.12em] transition-colors ${active ? 'text-primary' : 'text-primary/60'}`}>
               {t(tab.key)}
             </span>
