@@ -43,15 +43,29 @@ serve(async (req) => {
       validated.push({ product_id: it.product_id, variant_id: v.id, quantity: qty, title: `${p.title} — ${v.title}`, price: v.price, ...(personalization ? { personalization } : {}) });
     }
 
-    // Shipping is free to the customer. Show an estimated delivery window (US vs international).
+    // Delivery estimate window (US vs international).
     const isUS = String(address.country ?? "").toUpperCase() === "US";
     const minDays = isUS ? 3 : 10;
     const maxDays = isUS ? 7 : 20;
     const addDays = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return d; };
     const fmtDate = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    // Approximate calendar dates (business days padded ~1.4x to span weekends).
     const arriveEarly = fmtDate(addDays(Math.ceil(minDays * 1.4)));
     const arriveLate = fmtDate(addDays(Math.ceil(maxDays * 1.4)));
+
+    // Real shipping cost from Printify for this address + cart (customer pays shipping).
+    let shippingCents = 0;
+    try {
+      const sr = await fetch(`${PRINTIFY_API}/shops/${SHOP_ID}/orders/shipping.json`, {
+        method: "POST", headers: pfHeaders,
+        body: JSON.stringify({
+          line_items: validated.map((v) => ({ product_id: v.product_id, variant_id: v.variant_id, quantity: v.quantity })),
+          address_to: address,
+        }),
+      });
+      if (sr.ok) { const sd = await sr.json(); shippingCents = Number(sd.standard) || 0; }
+    } catch { /* fall back below */ }
+    // If Printify's shipping calc is unavailable, charge a conservative flat rate — never free.
+    if (shippingCents <= 0) shippingCents = isUS ? 599 : 1499;
 
     const origin = req.headers.get("origin") ?? "https://menlifoot-mvp.vercel.app";
     const stripe = new Stripe(STRIPE_KEY, { apiVersion: "2024-06-20", httpClient: Stripe.createFetchHttpClient() });
@@ -71,8 +85,8 @@ serve(async (req) => {
       shipping_options: [{
         shipping_rate_data: {
           type: "fixed_amount",
-          fixed_amount: { amount: 0, currency: "usd" },
-          display_name: `Free shipping · arrives ${arriveEarly}–${arriveLate}`,
+          fixed_amount: { amount: shippingCents, currency: "usd" },
+          display_name: `Standard shipping · arrives ${arriveEarly}–${arriveLate}`,
           delivery_estimate: {
             minimum: { unit: "business_day", value: minDays },
             maximum: { unit: "business_day", value: maxDays },
