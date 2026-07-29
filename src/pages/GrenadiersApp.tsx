@@ -13,13 +13,6 @@ const fxTitle = (f: Fixture) => (f.opponent ? `Haiti ${f.home === false ? '@' : 
 const fxSub = (f: Fixture) => (f.opponent ? [f.competition, f.note, f.venue] : [f.competition, f.venue]).filter(Boolean).join(' · ');
 const POS_KEY: Record<PositionGroup, string> = { Gardiens: 'gren.posGk', Défenseurs: 'gren.posDef', Milieux: 'gren.posMid', Attaquants: 'gren.posAtt', Autres: 'gren.posOther' };
 const TAB_KEY: Record<string, string> = { calendar: 'gren.rUpcoming', records: 'gren.rRecords', results: 'gren.rResults', squad: 'gren.rSquad' };
-const resultColor = (r: string | null) => {
-  const c = (r ?? '').toUpperCase();
-  if (c.includes('(V)') || c.includes('(W)')) return { bg: 'rgba(88,190,120,.16)', fg: '#7fd69a', res: 'W' };
-  if (c.includes('(N)') || c.includes('(D)') && c.includes('–')) return { bg: 'rgba(255,255,255,.1)', fg: 'rgba(244,242,238,.7)', res: 'D' };
-  if (c.includes('(N)')) return { bg: 'rgba(255,255,255,.1)', fg: 'rgba(244,242,238,.7)', res: 'D' };
-  return { bg: 'rgba(226,72,63,.16)', fg: '#e2726b', res: 'L' };
-};
 
 const GrenadiersApp = () => {
   const [players, setPlayers] = useState<HaitiPlayer[]>([]);
@@ -27,7 +20,7 @@ const GrenadiersApp = () => {
   const [allStats, setAllStats] = useState<HaitiStat[]>([]);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const { t } = useLanguage();
-  const [tab, setTab] = useState<'calendar' | 'records' | 'results' | 'squad'>('calendar');
+  const [tab, setTab] = useState<'calendar' | 'records' | 'squad'>('calendar');
   const [following, setFollowing] = useState(false);
   const [selected, setSelected] = useState<HaitiPlayer | null>(null);
 
@@ -100,7 +93,7 @@ const GrenadiersApp = () => {
 
         {/* Tabs */}
         <div className="flex gap-2 px-5 pb-3.5">
-          {(['calendar', 'records', 'results', 'squad'] as const).map((tb) => (
+          {(['calendar', 'records', 'squad'] as const).map((tb) => (
             <button key={tb} onClick={() => setTab(tb)} className="flex-none rounded-full px-3.5 py-2 font-sans text-[11px] font-semibold uppercase tracking-[0.08em]"
               style={tab === tb ? { background: '#f4f2ee', color: '#070708' } : { border: '1px solid rgba(255,255,255,.14)', color: 'rgba(244,242,238,.7)' }}>{t(TAB_KEY[tb])}</button>
           ))}
@@ -138,22 +131,6 @@ const GrenadiersApp = () => {
                 <div className="flex flex-1 flex-col gap-1"><span className="font-sans text-[13px] font-medium">{nm(l.player_id)}</span><span className="font-sans text-[10.5px] text-foreground/40">Sélection · {l.goals ?? 0} goals</span></div>
               </div>
             ))}
-          </div>
-        )}
-
-        {/* Results */}
-        {tab === 'results' && (
-          <div className="flex flex-col">
-            {matches.slice(0, 12).map((r, i) => {
-              const rc = resultColor(r.result);
-              return (
-                <div key={i} className="flex items-center gap-3.5 border-t border-white/[0.06] px-5 py-3.5">
-                  <span className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-full font-sans text-[11px] font-bold" style={{ background: rc.bg, color: rc.fg }}>{rc.res}</span>
-                  <div className="flex flex-1 flex-col gap-1.5"><span className="font-sans text-[13px] font-medium">Haiti {(r.result ?? '').replace(/\s*\(.\)/, '')} {r.opponent}</span><span className="font-sans text-[10.5px] text-foreground/40">{r.tournament}</span></div>
-                  <span className="font-mono text-[10px] text-foreground/40">{r.date ? new Date(r.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: 'UTC' }) : ''}</span>
-                </div>
-              );
-            })}
           </div>
         )}
 
@@ -207,19 +184,6 @@ const GrenadiersApp = () => {
                 <span className="font-mono text-[10.5px] text-foreground/40">{fxWhen(f)}</span>
               </div>
             ))}
-          </div>
-          <div className="flex flex-col gap-3.5">
-            <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[0.18em] text-foreground/40">{t('gren.rResults')}</span>
-            {matches.slice(0, 8).map((r, i) => {
-              const rc = resultColor(r.result);
-              return (
-                <div key={i} className="flex items-center gap-4 border-b border-white/[0.06] pb-3.5">
-                  <span className="flex h-7 w-7 flex-none items-center justify-center rounded-full font-sans text-[12px] font-bold" style={{ background: rc.bg, color: rc.fg }}>{rc.res}</span>
-                  <div className="flex flex-1 flex-col gap-1"><span className="font-sans text-[14px] font-medium">Haiti {(r.result ?? '').replace(/\s*\(.\)/, '')} {r.opponent}</span><span className="font-sans text-[11px] text-foreground/40">{r.tournament}</span></div>
-                  <span className="font-mono text-[10.5px] text-foreground/40">{r.date ? new Date(r.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: 'UTC' }) : ''}</span>
-                </div>
-              );
-            })}
           </div>
         </div>
 
