@@ -5,7 +5,6 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthModal } from '@/components/AuthModal';
 import { MessageCircle, User } from 'lucide-react';
-import wordmark from '@/assets/wordmark.png';
 import AppShell from '@/components/mobile/AppShell';
 import { podcastThumb } from '@/lib/podcast';
 
@@ -75,7 +74,7 @@ const Home = () => {
       <div className="pb-2 pt-4 lg:hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 pb-5">
-          <img src={wordmark} alt="Menlifoot" className="h-9 w-auto" />
+          <img src="/menlifootca.png" alt="Menlifoot" className="h-8 w-auto" />
           <div className="flex gap-2.5">
             <button onClick={() => navigate('/ask')} aria-label={t('home.askTitle')} className="flex h-[38px] w-[38px] items-center justify-center rounded-full border border-white/[0.12] text-primary transition-colors hover:border-primary/60">
               <MessageCircle className="h-[19px] w-[19px]" strokeWidth={2} />
