@@ -5,7 +5,6 @@ import { useLanguage, Language } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthModal } from '@/components/AuthModal';
 import { useStoreCart } from '@/contexts/StoreCartContext';
-import wordmark from '@/assets/wordmark.png';
 
 const LINKS = [
   { key: 'nav.home', to: '/' },
@@ -35,10 +34,7 @@ const DesktopNav = () => {
   return (
     <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-[#070708]/95 backdrop-blur-xl">
       <div className="mx-auto flex max-w-[1180px] items-center justify-between gap-6 px-10 py-4">
-        <Link to="/" className="flex flex-none items-center gap-1">
-          <img src={wordmark} alt="Menlifoot" className="h-7 w-auto" />
-          <img src="/logo.png" alt="" className="h-[30px] w-auto" />
-        </Link>
+        <Link to="/" className="flex-none"><img src="/menlifootca.png" alt="Menlifoot" className="h-8 w-auto" /></Link>
         <nav className="flex gap-6">
           {LINKS.map((l) => (
             <Link key={l.to} to={l.to}
