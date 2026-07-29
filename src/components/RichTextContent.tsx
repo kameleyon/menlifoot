@@ -224,13 +224,22 @@ const isEmbedParagraph = (p: Element): string | null => {
 
   if (meaningfulNodes.length !== 1) return null;
   const only = meaningfulNodes[0];
-  if (only.nodeType !== Node.ELEMENT_NODE) return null;
 
-  const el = only as Element;
-  if (el.tagName.toLowerCase() !== "a") return null;
-  const href = el.getAttribute("href") ?? "";
-  if (!isSafeHttpUrl(href)) return null;
-  return href;
+  // A single linked URL (<p><a href="...">...</a></p>)
+  if (only.nodeType === Node.ELEMENT_NODE) {
+    const el = only as Element;
+    if (el.tagName.toLowerCase() !== "a") return null;
+    const href = el.getAttribute("href") ?? "";
+    return isSafeHttpUrl(href) ? href : null;
+  }
+
+  // A single plain-text URL (author pasted the link without it becoming a hyperlink)
+  if (only.nodeType === Node.TEXT_NODE) {
+    const text = (only.textContent ?? "").trim();
+    return isSafeHttpUrl(text) ? text : null;
+  }
+
+  return null;
 };
 
 const renderNode = (node: ChildNode, key: string): React.ReactNode => {
