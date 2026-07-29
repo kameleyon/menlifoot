@@ -6,8 +6,13 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { HaitiPlayer, HaitiStat, HaitiConvocation, fullName, positionGroup, POSITION_ORDER, PositionGroup } from '@/types/grenadiers';
 
 type Match = { tournament: string | null; opponent: string | null; date: string | null; result: string | null };
+type Fixture = { id: string; team: string; competition: string; opponent: string | null; match_date: string | null; date_label: string | null; home: boolean | null; venue: string | null; note: string | null };
+const TEAM_LABEL: Record<string, string> = { senior: 'Grenadiers', u20: 'U-20', u19: 'U-19', u17: 'U-17' };
+const fxWhen = (f: Fixture) => (f.match_date ? new Date(f.match_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: 'UTC' }) : (f.date_label ?? ''));
+const fxTitle = (f: Fixture) => (f.opponent ? `Haiti ${f.home === false ? '@' : 'vs'} ${f.opponent}` : (f.note || f.competition));
+const fxSub = (f: Fixture) => (f.opponent ? [f.competition, f.note, f.venue] : [f.competition, f.venue]).filter(Boolean).join(' · ');
 const POS_KEY: Record<PositionGroup, string> = { Gardiens: 'gren.posGk', Défenseurs: 'gren.posDef', Milieux: 'gren.posMid', Attaquants: 'gren.posAtt', Autres: 'gren.posOther' };
-const TAB_KEY: Record<string, string> = { records: 'gren.rRecords', results: 'gren.rResults', squad: 'gren.rSquad' };
+const TAB_KEY: Record<string, string> = { calendar: 'gren.rUpcoming', records: 'gren.rRecords', results: 'gren.rResults', squad: 'gren.rSquad' };
 const resultColor = (r: string | null) => {
   const c = (r ?? '').toUpperCase();
   if (c.includes('(V)') || c.includes('(W)')) return { bg: 'rgba(88,190,120,.16)', fg: '#7fd69a', res: 'W' };
@@ -20,8 +25,9 @@ const GrenadiersApp = () => {
   const [players, setPlayers] = useState<HaitiPlayer[]>([]);
   const [convs, setConvs] = useState<HaitiConvocation[]>([]);
   const [allStats, setAllStats] = useState<HaitiStat[]>([]);
+  const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const { t } = useLanguage();
-  const [tab, setTab] = useState<'records' | 'results' | 'squad'>('records');
+  const [tab, setTab] = useState<'calendar' | 'records' | 'results' | 'squad'>('calendar');
   const [following, setFollowing] = useState(false);
   const [selected, setSelected] = useState<HaitiPlayer | null>(null);
 
@@ -33,6 +39,8 @@ const GrenadiersApp = () => {
       if (c.data) setConvs(c.data as HaitiConvocation[]);
       const s = await (supabase as any).from('haiti_stats').select('*');
       if (s.data) setAllStats(s.data as HaitiStat[]);
+      const f = await (supabase as any).from('haiti_fixtures').select('*').order('sort_order', { ascending: true });
+      if (f.data) setFixtures(f.data as Fixture[]);
     })();
   }, []);
 
@@ -92,11 +100,26 @@ const GrenadiersApp = () => {
 
         {/* Tabs */}
         <div className="flex gap-2 px-5 pb-3.5">
-          {(['records', 'results', 'squad'] as const).map((tb) => (
+          {(['calendar', 'records', 'results', 'squad'] as const).map((tb) => (
             <button key={tb} onClick={() => setTab(tb)} className="flex-none rounded-full px-3.5 py-2 font-sans text-[11px] font-semibold uppercase tracking-[0.08em]"
               style={tab === tb ? { background: '#f4f2ee', color: '#070708' } : { border: '1px solid rgba(255,255,255,.14)', color: 'rgba(244,242,238,.7)' }}>{t(TAB_KEY[tb])}</button>
           ))}
         </div>
+
+        {/* Calendar */}
+        {tab === 'calendar' && (
+          <div className="flex flex-col">
+            {fixtures.length === 0 ? (
+              <p className="px-5 py-8 text-center font-sans text-[12px] text-foreground/40">—</p>
+            ) : fixtures.map((f) => (
+              <div key={f.id} className="flex items-center gap-3 border-t border-white/[0.06] px-5 py-3.5">
+                <span className="flex-none rounded-full border border-primary/40 px-2 py-[3px] font-sans text-[9px] font-bold uppercase tracking-[0.04em] text-primary">{TEAM_LABEL[f.team] ?? f.team}</span>
+                <div className="flex flex-1 flex-col gap-1"><span className="font-sans text-[13px] font-medium">{fxTitle(f)}</span><span className="font-sans text-[10.5px] text-foreground/40">{fxSub(f)}</span></div>
+                <span className="font-mono text-[10px] text-foreground/40">{fxWhen(f)}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Records */}
         {tab === 'records' && (
@@ -175,6 +198,16 @@ const GrenadiersApp = () => {
                 style={following ? { border: '1px solid rgba(255,255,255,.16)', color: 'rgba(244,242,238,.7)' } : { border: '1px solid transparent', background: 'linear-gradient(135deg,#e9c877,#c08a2a)', color: '#070708' }}>{following ? t('gren.following') : t('gren.followTeam')}</button>
             </div>
           )}
+          <div className="flex flex-col gap-3.5">
+            <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[0.18em] text-primary">{t('gren.rUpcoming')}</span>
+            {fixtures.map((f) => (
+              <div key={f.id} className="flex items-center gap-4 border-b border-white/[0.06] pb-3.5">
+                <span className="flex-none rounded-full border border-primary/40 px-2.5 py-1 font-sans text-[9px] font-bold uppercase tracking-[0.05em] text-primary">{TEAM_LABEL[f.team] ?? f.team}</span>
+                <div className="flex flex-1 flex-col gap-1"><span className="font-sans text-[14px] font-medium">{fxTitle(f)}</span><span className="font-sans text-[11px] text-foreground/40">{fxSub(f)}</span></div>
+                <span className="font-mono text-[10.5px] text-foreground/40">{fxWhen(f)}</span>
+              </div>
+            ))}
+          </div>
           <div className="flex flex-col gap-3.5">
             <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[0.18em] text-foreground/40">{t('gren.rResults')}</span>
             {matches.slice(0, 8).map((r, i) => {
