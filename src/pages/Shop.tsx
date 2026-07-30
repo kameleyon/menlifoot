@@ -82,18 +82,21 @@ const Shop = () => {
   const vColor = (v: Variant) => v.options.find((id) => colorIds.has(id));
   const vSize = (v: Variant) => v.options.find((id) => sizeIds.has(id));
   const variants = selected?.variants ?? [];
+  // Some products have no colour option (single colour). Don't gate sizes on colour then.
+  const hasColors = (selected?.colors ?? []).length > 0;
+  const matchesColor = (v: Variant) => !hasColors || vColor(v) === colorId;
 
   const availColors = useMemo(() => {
     const used = new Set(variants.map(vColor).filter(Boolean));
     return (selected?.colors ?? []).filter((c) => used.has(c.id));
   }, [selected]);
   const availSizes = useMemo(() => {
-    const sizesForColor = new Set(variants.filter((v) => vColor(v) === colorId).map(vSize));
+    const sizesForColor = new Set(variants.filter(matchesColor).map(vSize));
     return (selected?.sizes ?? []).filter((s) => sizesForColor.has(s.id));
   }, [selected, colorId]);
-  const variant = useMemo(() => variants.find((v) => vColor(v) === colorId && vSize(v) === sizeId) ?? null, [selected, colorId, sizeId]);
+  const variant = useMemo(() => variants.find((v) => matchesColor(v) && vSize(v) === sizeId) ?? null, [selected, colorId, sizeId]);
   const gallery = useMemo(() => {
-    const ids = new Set(variants.filter((v) => vColor(v) === colorId).map((v) => v.id));
+    const ids = new Set(variants.filter(matchesColor).map((v) => v.id));
     const imgs = (selected?.images ?? []).filter((im) => im.variant_ids.some((id) => ids.has(id)));
     return imgs.length ? imgs : (selected?.images ?? []);
   }, [selected, colorId]);
@@ -143,8 +146,9 @@ const Shop = () => {
     const sIds = new Set((full.sizes ?? []).map((s) => s.id));
     const vc = (v: Variant) => v.options.find((id) => cIds.has(id));
     const vsz = (v: Variant) => v.options.find((id) => sIds.has(id));
-    const firstColor = (full.colors ?? []).find((c) => (full.variants ?? []).some((v) => vc(v) === c.id))?.id ?? null;
-    const firstSize = (full.sizes ?? []).find((s) => (full.variants ?? []).some((v) => vc(v) === firstColor && vsz(v) === s.id))?.id ?? null;
+    const hasClr = (full.colors ?? []).length > 0;
+    const firstColor = hasClr ? ((full.colors ?? []).find((c) => (full.variants ?? []).some((v) => vc(v) === c.id))?.id ?? null) : null;
+    const firstSize = (full.sizes ?? []).find((s) => (full.variants ?? []).some((v) => (!hasClr || vc(v) === firstColor) && vsz(v) === s.id))?.id ?? null;
     setColorId(firstColor); setSizeId(firstSize); setImgIdx(0);
   };
 

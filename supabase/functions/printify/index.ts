@@ -25,9 +25,10 @@ function mapProduct(p: any, full = false) {
     image: img,
     price_cents: prices.length ? Math.min(...prices) : null,
     tags,
-    // The v1 API doesn't expose Printify's "Personalizable" flag, so the merchant
-    // opts a product in by adding a tag containing "personaliz" (e.g. "Personalizable").
-    personalize: tags.some((t: string) => /personaliz/i.test(String(t))),
+    // The v1 API doesn't expose Printify's "Personalizable" flag, so a product opts in
+    // via a tag containing "personaliz" (e.g. "Personalizable") OR a title that says it's
+    // customizable ("Custom Name & Number", "Personalized ...").
+    personalize: tags.some((t: string) => /personaliz/i.test(String(t))) || /personaliz|custom name/i.test(String(p.title ?? "")),
   };
   if (!full) return base;
   const colorOpt = (p.options ?? []).find((o: any) => o.type === "color");
