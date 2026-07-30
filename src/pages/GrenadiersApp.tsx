@@ -5,8 +5,7 @@ import PlayerModal from '@/components/mobile/PlayerModal';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { HaitiPlayer, HaitiStat, HaitiConvocation, fullName, positionGroup, POSITION_ORDER, PositionGroup } from '@/types/grenadiers';
 
-type Match = { tournament: string | null; opponent: string | null; date: string | null; result: string | null };
-type Fixture = { id: string; team: string; competition: string; opponent: string | null; match_date: string | null; date_label: string | null; home: boolean | null; venue: string | null; note: string | null };
+type Fixture ={ id: string; team: string; competition: string; opponent: string | null; match_date: string | null; date_label: string | null; home: boolean | null; venue: string | null; note: string | null };
 const TEAM_LABEL: Record<string, string> = { senior: 'Grenadiers', u20: 'U-20', u19: 'U-19', u17: 'U-17' };
 const fxWhen = (f: Fixture) => (f.match_date ? new Date(f.match_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: 'UTC' }) : (f.date_label ?? ''));
 const fxTitle = (f: Fixture) => (f.opponent ? `Haiti ${f.home === false ? '@' : 'vs'} ${f.opponent}` : (f.note || f.competition));
@@ -40,15 +39,6 @@ const GrenadiersApp = () => {
   const sel = useMemo(() => allStats.filter((s) => s.category === 'Sélection'), [allStats]);
   const playersById = useMemo(() => Object.fromEntries(players.map((p) => [p.id, p])), [players]);
 
-  const matches: Match[] = useMemo(() => {
-    const seen = new Set<string>(); const out: Match[] = [];
-    for (const c of convs) {
-      const k = `${c.tournament}|${c.opponent}|${c.match_date}|${c.result}`;
-      if (c.match_date && !seen.has(k)) { seen.add(k); out.push({ tournament: c.tournament, opponent: c.opponent, date: c.match_date, result: c.result }); }
-    }
-    return out;
-  }, [convs]);
-  const lastMatch = matches[0];
 
   const topScorers = useMemo(() => sel.filter((s) => (s.goals ?? 0) > 0).sort((a, b) => (b.goals ?? 0) - (a.goals ?? 0)).slice(0, 5), [sel]);
   const topCaps = useMemo(() => sel.filter((s) => (s.matches_played ?? 0) > 0).sort((a, b) => (b.matches_played ?? 0) - (a.matches_played ?? 0)).slice(0, 5), [sel]);
@@ -76,20 +66,6 @@ const GrenadiersApp = () => {
             {following ? t('gren.following') : t('gren.followTeam')}
           </button>
         </div>
-
-        {/* Last match */}
-        {lastMatch && (
-          <div className="mx-5 mb-[18px] flex flex-col gap-3 rounded-2xl border border-primary/[0.28] p-[18px]" style={{ background: 'linear-gradient(135deg,rgba(200,154,60,.12),rgba(200,154,60,.02))' }}>
-            <div className="flex items-center justify-between">
-              <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-primary">{t('gren.lastMatch')}</span>
-              <span className="font-mono text-[10px] text-foreground/50">{lastMatch.date ? new Date(lastMatch.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }) : ''}</span>
-            </div>
-            <span className="font-display text-[26px] uppercase leading-[1.02]">Haiti {(lastMatch.result ?? '').replace(/\s*\(.\)/, '')} {lastMatch.opponent}</span>
-            <div className="flex flex-col gap-[5px]">
-              <span className="font-sans text-[12px] font-medium text-foreground/70">{lastMatch.tournament}</span>
-            </div>
-          </div>
-        )}
 
         {/* Tabs */}
         <div className="flex gap-2 px-5 pb-3.5">
@@ -163,18 +139,8 @@ const GrenadiersApp = () => {
             <span className="font-display text-[52px] uppercase leading-[0.95]">Les Grenadiers</span>
             <p className="m-0 max-w-[48ch] font-sans text-[15px] leading-[1.7] text-foreground/60">{t('gren.desc')}</p>
           </div>
-          {lastMatch && (
-            <div className="flex flex-col gap-3.5 rounded-2xl border border-primary/[0.28] p-6" style={{ background: 'linear-gradient(135deg,rgba(200,154,60,.12),rgba(200,154,60,.02))' }}>
-              <div className="flex items-center justify-between">
-                <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[0.18em] text-primary">{t('gren.lastMatch')}</span>
-                <span className="font-mono text-[11px] text-foreground/50">{lastMatch.date ? new Date(lastMatch.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }) : ''}</span>
-              </div>
-              <span className="font-display text-[38px] uppercase leading-[1.02]">Haiti {(lastMatch.result ?? '').replace(/\s*\(.\)/, '')} {lastMatch.opponent}</span>
-              <span className="font-sans text-[13px] font-medium text-foreground/70">{lastMatch.tournament}</span>
-              <button onClick={() => setFollowing((f) => !f)} className="mt-1 self-start rounded-full px-5 py-3 font-sans text-[11px] font-bold uppercase tracking-[0.08em]"
-                style={following ? { border: '1px solid rgba(255,255,255,.16)', color: 'rgba(244,242,238,.7)' } : { border: '1px solid transparent', background: 'linear-gradient(135deg,#e9c877,#c08a2a)', color: '#070708' }}>{following ? t('gren.following') : t('gren.followTeam')}</button>
-            </div>
-          )}
+          <button onClick={() => setFollowing((f) => !f)} className="self-start rounded-full px-5 py-3 font-sans text-[11px] font-bold uppercase tracking-[0.08em]"
+            style={following ? { border: '1px solid rgba(255,255,255,.16)', color: 'rgba(244,242,238,.7)' } : { border: '1px solid transparent', background: 'linear-gradient(135deg,#e9c877,#c08a2a)', color: '#070708' }}>{following ? t('gren.following') : t('gren.followTeam')}</button>
           <div className="flex flex-col gap-3.5">
             <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[0.18em] text-primary">{t('gren.rUpcoming')}</span>
             {fixtures.map((f) => (
