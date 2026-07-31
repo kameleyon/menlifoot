@@ -182,7 +182,7 @@ const HeroSection = () => {
               >
                 <img
                   src={heroPodcast}
-                  alt="MVP Podcast - Soccer ball with headphones"
+                  alt="Podcast - Soccer ball with headphones"
                   className="w-full max-w-lg mx-auto drop-shadow-2xl"
                 />
               </motion.div>

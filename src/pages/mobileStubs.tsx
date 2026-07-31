@@ -16,7 +16,7 @@ const Stub = ({ kicker, title, note }: { kicker: string; title: string; note: st
   </AppShell>
 );
 
-export const Listen = () => <Stub kicker="Menlifoot original" title="MVP Podcast" note="Podcast player + episode list — building in this rebrand phase, wired to the podcasts table." />;
+export const Listen = () => <Stub kicker="Menlifoot original" title="Podcast" note="Podcast player + episode list — building in this rebrand phase, wired to the podcasts table." />;
 export const Shop = () => <Stub kicker="Now open" title="Store" note="Launch-drop store, product grid and cart — building in this rebrand phase (visual placeholder products)." />;
 export const Me = () => <Stub kicker="Account" title="Me" note="Profile, saved articles, Menlifoot+ — building in this rebrand phase." />;
 export const Ask = () => <Stub kicker="Trained on our archive" title="Ask Menli" note="The AI assistant (already live) gets its dedicated screen in this rebrand phase." />;

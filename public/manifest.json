@@ -1,7 +1,7 @@
 {
   "name": "Menlifoot",
   "short_name": "Menlifoot",
-  "description": "Le football autrement — analyses, interviews, MVP Podcast.",
+  "description": "Le football autrement — analyses, interviews, Podcast.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",
