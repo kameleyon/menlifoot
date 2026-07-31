@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { RichTextContent } from '@/components/RichTextContent';
 import AppShell from '@/components/mobile/AppShell';
 import { useStoreCart, type Product, type Variant } from '@/contexts/StoreCartContext';
+import { COUNTRIES } from '@/lib/countries';
 
 const stripe = 'repeating-linear-gradient(135deg,#1b1b1f 0 7px,#131316 7px 14px)';
 const money = (cents: number | null) => (cents == null ? '' : `$${(cents / 100).toFixed(2)}`);
@@ -31,6 +32,16 @@ const Field = ({ label, value, onChange, className = '' }: { label: string; valu
   <div className={`flex flex-col gap-1 ${className}`}>
     <label className="font-sans text-[10px] uppercase tracking-wide text-foreground/40">{label}</label>
     <input value={value} onChange={(e) => onChange(e.target.value)} className="rounded-xl border border-white/[0.12] bg-[#101012] px-3.5 py-2.5 font-sans text-[14px] text-foreground focus:border-primary/50 focus:outline-none" />
+  </div>
+);
+
+const CountryField = ({ label, value, onChange, className = '' }: { label: string; value: string; onChange: (v: string) => void; className?: string }) => (
+  <div className={`flex flex-col gap-1 ${className}`}>
+    <label className="font-sans text-[10px] uppercase tracking-wide text-foreground/40">{label}</label>
+    <select value={value} onChange={(e) => onChange(e.target.value)} className="rounded-xl border border-white/[0.12] bg-[#101012] px-3.5 py-2.5 font-sans text-[14px] text-foreground focus:border-primary/50 focus:outline-none">
+      <option value="">—</option>
+      {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+    </select>
   </div>
 );
 
@@ -465,7 +476,7 @@ const Shop = () => {
             <Field label={t('shop.city')} value={address.city} onChange={(v) => setAddress((a) => ({ ...a, city: v }))} />
             <Field label={t('shop.zip')} value={address.zip} onChange={(v) => setAddress((a) => ({ ...a, zip: v }))} />
             <Field label={t('shop.region')} value={address.region} onChange={(v) => setAddress((a) => ({ ...a, region: v }))} />
-            <Field label={t('shop.country')} value={address.country} onChange={(v) => setAddress((a) => ({ ...a, country: v }))} />
+            <CountryField label={t('shop.country')} value={address.country} onChange={(v) => setAddress((a) => ({ ...a, country: v }))} />
           </div>
           <button onClick={placeOrder} disabled={!addrValid || placing}
             className="mx-5 flex h-[52px] w-[calc(100%-40px)] items-center justify-center rounded-full font-sans text-[13.5px] font-bold tracking-[0.04em] text-[#070708] disabled:opacity-40"
