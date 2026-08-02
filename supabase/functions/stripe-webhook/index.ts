@@ -6,24 +6,26 @@ const PRINTIFY_API = "https://api.printify.com/v1";
 const SHOP_ID = "28370366";
 const SITE_URL = "https://menlifoot-mvp.vercel.app";
 const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+// Escape buyer-supplied strings before interpolating into email HTML (Stripe passes them through unchanged).
+const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
 // deno-lint-ignore no-explicit-any
 function confirmationHtml(o: { ref: string; date: string; items: any[]; subtotal: number; shipping: number; total: number; addr: any }) {
   const rows = o.items.map((it) => `
     <tr>
       <td style="padding:12px 0;border-bottom:1px solid #eceae6;font-family:Arial,sans-serif;font-size:14px;color:#111;">
-        ${it.title}${it.personalization ? `<br><span style="color:#a07d2c;font-size:12px;">Personalized: ${it.personalization}</span>` : ""}
-        <br><span style="color:#888;font-size:12px;">Qty ${it.quantity}</span>
+        ${esc(it.title)}${it.personalization ? `<br><span style="color:#a07d2c;font-size:12px;">Personalized: ${esc(it.personalization)}</span>` : ""}
+        <br><span style="color:#888;font-size:12px;">Qty ${esc(it.quantity)}</span>
       </td>
       <td align="right" style="padding:12px 0;border-bottom:1px solid #eceae6;font-family:Arial,sans-serif;font-size:14px;color:#111;white-space:nowrap;">${money(it.price * it.quantity)}</td>
     </tr>`).join("");
   const a = o.addr ?? {};
   const addressLines = [
-    `${a.first_name ?? ""} ${a.last_name ?? ""}`.trim(),
-    a.address1, a.address2,
-    [a.city, a.region, a.zip].filter(Boolean).join(", "),
-    a.country,
-  ].filter(Boolean).join("<br>");
+    `${esc(a.first_name)} ${esc(a.last_name)}`.trim(),
+    esc(a.address1), esc(a.address2),
+    [a.city, a.region, a.zip].filter(Boolean).map(esc).join(", "),
+    esc(a.country),
+  ].filter((l) => l && l !== " ").join("<br>");
   return `<!doctype html><html><body style="margin:0;background:#0a0a0b;padding:24px 0;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
     <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;">
@@ -33,7 +35,7 @@ function confirmationHtml(o: { ref: string; date: string; items: any[]; subtotal
       <tr><td style="padding:34px 32px 8px;">
         <div style="display:inline-block;background:linear-gradient(135deg,#e9c877,#c08a2a);color:#070708;font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:.08em;text-transform:uppercase;padding:7px 14px;border-radius:999px;">Order confirmed</div>
         <h1 style="margin:16px 0 4px;font-family:Arial,sans-serif;font-size:22px;color:#111;">Thank you for your order!</h1>
-        <p style="margin:0;font-family:Arial,sans-serif;font-size:14px;color:#555;">Order <strong>${o.ref}</strong> · ${o.date}</p>
+        <p style="margin:0;font-family:Arial,sans-serif;font-size:14px;color:#555;">Order <strong>${esc(o.ref)}</strong> · ${esc(o.date)}</p>
       </td></tr>
       <tr><td style="padding:20px 32px 0;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>
