@@ -4,6 +4,85 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const PRINTIFY_API = "https://api.printify.com/v1";
 const SHOP_ID = "28370366";
+const SITE_URL = "https://menlifoot-mvp.vercel.app";
+const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+
+// deno-lint-ignore no-explicit-any
+function confirmationHtml(o: { ref: string; date: string; items: any[]; subtotal: number; shipping: number; total: number; addr: any }) {
+  const rows = o.items.map((it) => `
+    <tr>
+      <td style="padding:12px 0;border-bottom:1px solid #eceae6;font-family:Arial,sans-serif;font-size:14px;color:#111;">
+        ${it.title}${it.personalization ? `<br><span style="color:#a07d2c;font-size:12px;">Personalized: ${it.personalization}</span>` : ""}
+        <br><span style="color:#888;font-size:12px;">Qty ${it.quantity}</span>
+      </td>
+      <td align="right" style="padding:12px 0;border-bottom:1px solid #eceae6;font-family:Arial,sans-serif;font-size:14px;color:#111;white-space:nowrap;">${money(it.price * it.quantity)}</td>
+    </tr>`).join("");
+  const a = o.addr ?? {};
+  const addressLines = [
+    `${a.first_name ?? ""} ${a.last_name ?? ""}`.trim(),
+    a.address1, a.address2,
+    [a.city, a.region, a.zip].filter(Boolean).join(", "),
+    a.country,
+  ].filter(Boolean).join("<br>");
+  return `<!doctype html><html><body style="margin:0;background:#0a0a0b;padding:24px 0;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+    <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;">
+      <tr><td style="background:#070708;padding:28px 32px;text-align:center;">
+        <img src="${SITE_URL}/menlifootca.png" alt="Menlifoot" width="180" style="max-width:180px;height:auto;">
+      </td></tr>
+      <tr><td style="padding:34px 32px 8px;">
+        <div style="display:inline-block;background:linear-gradient(135deg,#e9c877,#c08a2a);color:#070708;font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:.08em;text-transform:uppercase;padding:7px 14px;border-radius:999px;">Order confirmed</div>
+        <h1 style="margin:16px 0 4px;font-family:Arial,sans-serif;font-size:22px;color:#111;">Thank you for your order!</h1>
+        <p style="margin:0;font-family:Arial,sans-serif;font-size:14px;color:#555;">Order <strong>${o.ref}</strong> · ${o.date}</p>
+      </td></tr>
+      <tr><td style="padding:20px 32px 0;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>
+      </td></tr>
+      <tr><td style="padding:8px 32px 0;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif;font-size:14px;color:#111;">
+          <tr><td style="padding:4px 0;color:#555;">Subtotal</td><td align="right" style="padding:4px 0;">${money(o.subtotal)}</td></tr>
+          <tr><td style="padding:4px 0;color:#555;">Shipping</td><td align="right" style="padding:4px 0;">${o.shipping > 0 ? money(o.shipping) : "—"}</td></tr>
+          <tr><td style="padding:10px 0 0;border-top:2px solid #111;font-weight:bold;">Total</td><td align="right" style="padding:10px 0 0;border-top:2px solid #111;font-weight:bold;">${money(o.total)}</td></tr>
+        </table>
+      </td></tr>
+      <tr><td style="padding:24px 32px 0;">
+        <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:.06em;text-transform:uppercase;color:#999;">Shipping to</p>
+        <p style="margin:0;font-family:Arial,sans-serif;font-size:14px;color:#333;line-height:1.5;">${addressLines}</p>
+      </td></tr>
+      <tr><td style="padding:24px 32px 32px;">
+        <a href="${SITE_URL}/shop" style="display:inline-block;background:linear-gradient(135deg,#e9c877,#c08a2a);color:#070708;font-family:Arial,sans-serif;font-size:13px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;text-decoration:none;padding:14px 28px;border-radius:999px;">Continue shopping</a>
+        <p style="margin:22px 0 0;font-family:Arial,sans-serif;font-size:12px;color:#999;line-height:1.6;">We'll email you again when your order ships. Questions? Reply to this email or contact orders@menlifoot.ca.</p>
+      </td></tr>
+      <tr><td style="background:#f4f2ee;padding:20px 32px;text-align:center;font-family:Arial,sans-serif;font-size:11px;color:#999;">© 2026 Menlifoot · menlifoot.ca</td></tr>
+    </table>
+  </td></tr></table>
+  </body></html>`;
+}
+
+async function sendConfirmationEmail(order: {
+  // deno-lint-ignore no-explicit-any
+  ref: string; email: string; line_items: any[]; total: number; addr: any; date: string;
+}) {
+  const KEY = Deno.env.get("RESEND_API_KEY");
+  const FROM = Deno.env.get("EMAIL_FROM") ?? "noreply@menlifoot.ca";
+  const STORE = Deno.env.get("ORDER_CONFIRMATION_EMAIL");
+  if (!KEY || !order.email) return;
+  const items = order.line_items.map((v) => ({ title: v.title, quantity: v.quantity, price: v.price, personalization: v.personalization }));
+  const subtotal = items.reduce((s, it) => s + it.price * it.quantity, 0);
+  const shipping = Math.max(0, order.total - subtotal);
+  const html = confirmationHtml({ ref: order.ref, date: order.date, items, subtotal, shipping, total: order.total, addr: order.addr });
+  await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      from: `Menlifoot <${FROM}>`,
+      to: [order.email],
+      ...(STORE ? { bcc: [STORE], reply_to: STORE } : {}),
+      subject: `Your Menlifoot order ${order.ref}`,
+      html,
+    }),
+  }).catch(() => {});
+}
 
 serve(async (req) => {
   const STRIPE_KEY = Deno.env.get("STRIPE_SECRET_KEY");
@@ -59,6 +138,16 @@ serve(async (req) => {
     await fetch(`${PRINTIFY_API}/shops/${SHOP_ID}/orders/${pf.id}/send_to_production.json`, { method: "POST", headers: pfHeaders });
 
     await db.from("store_orders").update({ status: "submitted", printify_order_id: pf.id, updated_at: new Date().toISOString() }).eq("id", order.id);
+
+    // Send the branded order-confirmation email (failure must not break the webhook).
+    await sendConfirmationEmail({
+      ref: `MF-${String(session.id).slice(-10).toUpperCase()}`,
+      email: order.email ?? addr.email ?? "",
+      line_items: order.line_items ?? [],
+      total: order.amount_total ?? session.amount_total ?? 0,
+      addr,
+      date: new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
+    });
   } catch (e) {
     await db.from("store_orders").update({ status: "failed", error: e instanceof Error ? e.message : "order error", updated_at: new Date().toISOString() }).eq("id", order.id);
   }
