@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, ReactNode, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -67,10 +68,16 @@ const AuthModal = ({ isOpen, setOpen, mode, setMode }: Props) => {
     setEmail(''); setPassword('');
     if (mode === 'signup') {
       toast({ title: t('auth.checkEmail') });
-    } else {
-      // Signed in — send them to the admin panel (it self-guards non-admins).
-      navigate('/admin');
+      return;
     }
+    // Signed in — send admins/editors to the panel, everyone else to their profile.
+    const { data: { user } } = await supabase.auth.getUser();
+    let isStaff = false;
+    if (user) {
+      const { data: roles } = await supabase.from('user_roles').select('role').eq('user_id', user.id);
+      isStaff = (roles ?? []).some((r) => r.role === 'admin' || r.role === 'editor');
+    }
+    navigate(isStaff ? '/admin' : '/me');
   };
 
   const tabCls = (active: boolean) =>
