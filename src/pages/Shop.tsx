@@ -46,7 +46,7 @@ const CountryField = ({ label, value, onChange, className = '' }: { label: strin
 );
 
 const Shop = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { user } = useAuth();
   const { open: openAuth } = useAuthModal();
   const { toast } = useToast();
@@ -217,7 +217,7 @@ const Shop = () => {
       product_id: l.product.id, variant_id: l.variant.id, quantity: l.qty,
       ...(l.personalization ? { personalization: l.personalization } : {}),
     }));
-    const { data, error } = await supabase.functions.invoke('checkout', { body: { items, address } });
+    const { data, error } = await supabase.functions.invoke('checkout', { body: { items, address, language } });
     setPlacing(false);
     const url = (data as { url?: string })?.url;
     if (url) window.location.href = url;

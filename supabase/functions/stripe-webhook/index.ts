@@ -9,13 +9,24 @@ const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 // Escape buyer-supplied strings before interpolating into email HTML (Stripe passes them through unchanged).
 const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
+// Order-confirmation email copy per language.
+type Tr = { badge: string; heading: string; order: string; subtotal: string; shipping: string; total: string; shipTo: string; delivery: string; standard: string; free: string; arrival: string; personalized: string; qty: string; cta: string; note: string; subject: (r: string) => string };
+const L: Record<string, Tr> = {
+  en: { badge: "Order confirmed", heading: "Thank you for your order!", order: "Order", subtotal: "Subtotal", shipping: "Shipping", total: "Total", shipTo: "Shipping to", delivery: "Delivery", standard: "Standard shipping", free: "Free shipping", arrival: "Est. arrival", personalized: "Personalized", qty: "Qty", cta: "Continue shopping", note: "We'll email you again when your order ships. Questions? Reply to this email or contact orders@menlifoot.ca.", subject: (r) => `Your Menlifoot order ${r}` },
+  fr: { badge: "Commande confirmée", heading: "Merci pour votre commande !", order: "Commande", subtotal: "Sous-total", shipping: "Livraison", total: "Total", shipTo: "Livraison à", delivery: "Livraison", standard: "Livraison standard", free: "Livraison gratuite", arrival: "Arrivée est.", personalized: "Personnalisé", qty: "Qté", cta: "Continuer les achats", note: "Nous vous écrirons à l'expédition. Questions ? Répondez à cet e-mail ou écrivez à orders@menlifoot.ca.", subject: (r) => `Votre commande Menlifoot ${r}` },
+  es: { badge: "Pedido confirmado", heading: "¡Gracias por tu pedido!", order: "Pedido", subtotal: "Subtotal", shipping: "Envío", total: "Total", shipTo: "Enviar a", delivery: "Entrega", standard: "Envío estándar", free: "Envío gratis", arrival: "Llegada est.", personalized: "Personalizado", qty: "Cant.", cta: "Seguir comprando", note: "Te escribiremos cuando tu pedido se envíe. ¿Dudas? Responde a este correo o escribe a orders@menlifoot.ca.", subject: (r) => `Tu pedido Menlifoot ${r}` },
+  ht: { badge: "Kòmand konfime", heading: "Mèsi pou kòmand ou!", order: "Kòmand", subtotal: "Soutotal", shipping: "Livrezon", total: "Total", shipTo: "Livre bay", delivery: "Livrezon", standard: "Livrezon estanda", free: "Livrezon gratis", arrival: "Rive apeprè", personalized: "Pèsonalize", qty: "Kantite", cta: "Kontinye achte", note: "N ap ekri w lè kòmand la ekspedye. Kesyon? Reponn imèl sa a oswa ekri orders@menlifoot.ca.", subject: (r) => `Kòmand Menlifoot ou ${r}` },
+};
+const tr = (lang?: string): Tr => L[String(lang ?? "en")] ?? L.en;
+
 // deno-lint-ignore no-explicit-any
-function confirmationHtml(o: { ref: string; date: string; items: any[]; subtotal: number; shipping: number; total: number; addr: any; shipMethod: string; delivery: string }) {
+function confirmationHtml(o: { ref: string; date: string; items: any[]; subtotal: number; shipping: number; total: number; addr: any; shipMethod: string; delivery: string; t: Tr }) {
+  const t = o.t;
   const rows = o.items.map((it) => `
     <tr>
       <td style="padding:12px 0;border-bottom:1px solid #eceae6;font-family:Arial,sans-serif;font-size:14px;color:#111;">
-        ${esc(it.title)}${it.personalization ? `<br><span style="color:#a07d2c;font-size:12px;">Personalized: ${esc(it.personalization)}</span>` : ""}
-        <br><span style="color:#888;font-size:12px;">Qty ${esc(it.quantity)}</span>
+        ${esc(it.title)}${it.personalization ? `<br><span style="color:#a07d2c;font-size:12px;">${t.personalized}: ${esc(it.personalization)}</span>` : ""}
+        <br><span style="color:#888;font-size:12px;">${t.qty} ${esc(it.quantity)}</span>
       </td>
       <td align="right" style="padding:12px 0;border-bottom:1px solid #eceae6;font-family:Arial,sans-serif;font-size:14px;color:#111;white-space:nowrap;">${money(it.price * it.quantity)}</td>
     </tr>`).join("");
@@ -33,35 +44,35 @@ function confirmationHtml(o: { ref: string; date: string; items: any[]; subtotal
         <img src="${SITE_URL}/menlifootca.png" alt="Menlifoot" width="180" style="max-width:180px;height:auto;">
       </td></tr>
       <tr><td style="padding:34px 32px 8px;">
-        <div style="display:inline-block;background:linear-gradient(135deg,#e9c877,#c08a2a);color:#070708;font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:.08em;text-transform:uppercase;padding:7px 14px;border-radius:999px;">Order confirmed</div>
-        <h1 style="margin:16px 0 4px;font-family:Arial,sans-serif;font-size:22px;color:#111;">Thank you for your order!</h1>
-        <p style="margin:0;font-family:Arial,sans-serif;font-size:14px;color:#555;">Order <strong>${esc(o.ref)}</strong> · ${esc(o.date)}</p>
+        <div style="display:inline-block;background:linear-gradient(135deg,#e9c877,#c08a2a);color:#070708;font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:.08em;text-transform:uppercase;padding:7px 14px;border-radius:999px;">${t.badge}</div>
+        <h1 style="margin:16px 0 4px;font-family:Arial,sans-serif;font-size:22px;color:#111;">${t.heading}</h1>
+        <p style="margin:0;font-family:Arial,sans-serif;font-size:14px;color:#555;">${t.order} <strong>${esc(o.ref)}</strong> · ${esc(o.date)}</p>
       </td></tr>
       <tr><td style="padding:20px 32px 0;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>
       </td></tr>
       <tr><td style="padding:8px 32px 0;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif;font-size:14px;color:#111;">
-          <tr><td style="padding:4px 0;color:#555;">Subtotal</td><td align="right" style="padding:4px 0;">${money(o.subtotal)}</td></tr>
-          <tr><td style="padding:4px 0;color:#555;">Shipping</td><td align="right" style="padding:4px 0;">${o.shipping > 0 ? money(o.shipping) : "—"}</td></tr>
-          <tr><td style="padding:10px 0 0;border-top:2px solid #111;font-weight:bold;">Total</td><td align="right" style="padding:10px 0 0;border-top:2px solid #111;font-weight:bold;">${money(o.total)}</td></tr>
+          <tr><td style="padding:4px 0;color:#555;">${t.subtotal}</td><td align="right" style="padding:4px 0;">${money(o.subtotal)}</td></tr>
+          <tr><td style="padding:4px 0;color:#555;">${t.shipping}</td><td align="right" style="padding:4px 0;">${o.shipping > 0 ? money(o.shipping) : "—"}</td></tr>
+          <tr><td style="padding:10px 0 0;border-top:2px solid #111;font-weight:bold;">${t.total}</td><td align="right" style="padding:10px 0 0;border-top:2px solid #111;font-weight:bold;">${money(o.total)}</td></tr>
         </table>
       </td></tr>
       <tr><td style="padding:24px 32px 0;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
           <td valign="top" style="width:50%;padding-right:12px;">
-            <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:.06em;text-transform:uppercase;color:#999;">Shipping to</p>
+            <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:.06em;text-transform:uppercase;color:#999;">${t.shipTo}</p>
             <p style="margin:0;font-family:Arial,sans-serif;font-size:14px;color:#333;line-height:1.5;">${addressLines}</p>
           </td>
           <td valign="top" style="width:50%;padding-left:12px;">
-            <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:.06em;text-transform:uppercase;color:#999;">Delivery</p>
-            <p style="margin:0;font-family:Arial,sans-serif;font-size:14px;color:#333;line-height:1.5;">${esc(o.shipMethod)}<br><span style="color:#a07d2c;">Est. arrival ${esc(o.delivery)}</span></p>
+            <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:.06em;text-transform:uppercase;color:#999;">${t.delivery}</p>
+            <p style="margin:0;font-family:Arial,sans-serif;font-size:14px;color:#333;line-height:1.5;">${esc(o.shipMethod)}<br><span style="color:#a07d2c;">${t.arrival} ${esc(o.delivery)}</span></p>
           </td>
         </tr></table>
       </td></tr>
       <tr><td style="padding:24px 32px 32px;">
-        <a href="${SITE_URL}/shop" style="display:inline-block;background:linear-gradient(135deg,#e9c877,#c08a2a);color:#070708;font-family:Arial,sans-serif;font-size:13px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;text-decoration:none;padding:14px 28px;border-radius:999px;">Continue shopping</a>
-        <p style="margin:22px 0 0;font-family:Arial,sans-serif;font-size:12px;color:#999;line-height:1.6;">We'll email you again when your order ships. Questions? Reply to this email or contact orders@menlifoot.ca.</p>
+        <a href="${SITE_URL}/shop" style="display:inline-block;background:linear-gradient(135deg,#e9c877,#c08a2a);color:#070708;font-family:Arial,sans-serif;font-size:13px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;text-decoration:none;padding:14px 28px;border-radius:999px;">${t.cta}</a>
+        <p style="margin:22px 0 0;font-family:Arial,sans-serif;font-size:12px;color:#999;line-height:1.6;">${t.note}</p>
       </td></tr>
       <tr><td style="background:#f4f2ee;padding:20px 32px;text-align:center;font-family:Arial,sans-serif;font-size:11px;color:#999;">© 2026 Menlifoot · menlifoot.ca</td></tr>
     </table>
@@ -71,8 +82,9 @@ function confirmationHtml(o: { ref: string; date: string; items: any[]; subtotal
 
 async function sendConfirmationEmail(order: {
   // deno-lint-ignore no-explicit-any
-  ref: string; email: string; line_items: any[]; total: number; addr: any; date: string;
+  ref: string; email: string; line_items: any[]; total: number; addr: any; date: string; language?: string;
 }) {
+  const t = tr(order.language);
   const KEY = Deno.env.get("RESEND_API_KEY");
   const FROM = Deno.env.get("EMAIL_FROM") ?? "noreply@menlifoot.ca";
   const STORE = Deno.env.get("ORDER_CONFIRMATION_EMAIL");
@@ -85,8 +97,8 @@ async function sendConfirmationEmail(order: {
   const isUS = String(order.addr?.country ?? "").toUpperCase() === "US";
   const addDays = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString("en-US", { month: "short", day: "numeric" }); };
   const delivery = `${addDays(isUS ? 4 : 14)} – ${addDays(isUS ? 10 : 28)}`;
-  const shipMethod = shipping > 0 ? "Standard shipping" : "Free shipping";
-  const html = confirmationHtml({ ref: order.ref, date: order.date, items, subtotal, shipping, total: order.total, addr: order.addr, shipMethod, delivery });
+  const shipMethod = shipping > 0 ? t.standard : t.free;
+  const html = confirmationHtml({ ref: order.ref, date: order.date, items, subtotal, shipping, total: order.total, addr: order.addr, shipMethod, delivery, t });
   await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
@@ -95,7 +107,7 @@ async function sendConfirmationEmail(order: {
       to: [order.email],
       reply_to: REPLY_TO,
       ...(STORE ? { bcc: [STORE] } : {}),
-      subject: `Your Menlifoot order ${order.ref}`,
+      subject: t.subject(order.ref),
       html,
     }),
   }).catch(() => {});
@@ -173,6 +185,7 @@ serve(async (req) => {
       total: order.amount_total ?? session.amount_total ?? 0,
       addr,
       date: new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
+      language: order.language,
     });
   } catch (e) {
     await db.from("store_orders").update({ status: "failed", error: e instanceof Error ? e.message : "order error", updated_at: new Date().toISOString() }).eq("id", order.id);

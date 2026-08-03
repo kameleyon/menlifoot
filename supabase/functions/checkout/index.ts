@@ -22,7 +22,8 @@ serve(async (req) => {
   if (!PRINTIFY_KEY) return json({ error: "PRINTIFY_API_KEY not configured" }, 500);
 
   try {
-    const { items, address } = (await req.json()) as { items: InItem[]; address: Record<string, string> };
+    const { items, address, language } = (await req.json()) as { items: InItem[]; address: Record<string, string>; language?: string };
+    const lang = ["en", "fr", "es", "ht"].includes(String(language)) ? String(language) : "en";
     if (!Array.isArray(items) || items.length === 0) return json({ error: "empty cart" }, 400);
     if (!address?.address1 || !address?.city || !address?.country || !address?.zip) return json({ error: "incomplete address" }, 400);
 
@@ -107,6 +108,7 @@ serve(async (req) => {
       amount_total: session.amount_total,
       line_items: validated,
       shipping_address: address,
+      language: lang,
     });
 
     return json({ url: session.url });
