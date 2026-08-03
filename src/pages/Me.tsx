@@ -44,6 +44,7 @@ const Me = () => {
   const email = user?.email ?? null;
   const [orders, setOrders] = useState<MyOrder[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
+  const [saved, setSaved] = useState<{ id: string; title: string; thumbnail_url: string | null; category: string | null }[]>([]);
 
   useEffect(() => {
     if (!user) { setLoadingOrders(false); return; }
@@ -51,6 +52,19 @@ const Me = () => {
       const { data } = await supabase.functions.invoke('my-orders');
       setOrders(((data as { orders?: MyOrder[] })?.orders) ?? []);
       setLoadingOrders(false);
+      // The user's bookmarked (saved) articles.
+      // deno-lint-ignore no-explicit-any
+      const db = supabase as any;
+      const bm = await db.from('article_bookmarks').select('article_id').eq('user_id', user.id).order('created_at', { ascending: false });
+      const ids = (bm.data ?? []).map((r: { article_id: string }) => r.article_id);
+      if (ids.length) {
+        const arts = await db.from('articles').select('id,title,thumbnail_url,category').in('id', ids).eq('is_published', true);
+        // Preserve bookmark order.
+        const byId = new Map((arts.data ?? []).map((a: any) => [a.id, a]));
+        setSaved(ids.map((id: string) => byId.get(id)).filter(Boolean));
+      } else {
+        setSaved([]);
+      }
     })();
   }, [user]);
 
@@ -70,10 +84,27 @@ const Me = () => {
         </div>
 
         {/* Saved articles */}
-        <button onClick={() => navigate('/articles')} className="flex w-full items-center justify-between border-t border-white/[0.06] px-5 py-4 text-left transition-colors hover:bg-white/[0.03]">
-          <span className="font-sans text-[13.5px] font-medium">{t('me.savedArticles')}</span>
-          <span className="font-sans text-[12px] text-foreground/40">→</span>
-        </button>
+        <div className="border-t border-white/[0.06] px-5 py-4">
+          <div className="flex items-center justify-between">
+            <span className="font-sans text-[13.5px] font-medium">{t('me.savedArticles')}</span>
+            <span className="font-sans text-[12px] text-foreground/40">{saved.length}</span>
+          </div>
+          {saved.length === 0 ? (
+            <p className="mt-3 font-sans text-[12px] text-foreground/40">{t('me.noSaved')}</p>
+          ) : (
+            <div className="mt-3 flex flex-col gap-2.5">
+              {saved.map((a) => (
+                <button key={a.id} onClick={() => navigate(`/articles/${a.id}`)} className="flex items-center gap-3 text-left transition-opacity hover:opacity-80">
+                  <div className="h-[46px] w-[62px] flex-none rounded-lg bg-cover bg-center" style={{ background: a.thumbnail_url ? `center/cover url(${a.thumbnail_url})` : 'repeating-linear-gradient(135deg,#1b1b1f 0 8px,#131316 8px 16px)' }} />
+                  <div className="flex flex-1 flex-col gap-0.5">
+                    <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.14em] text-primary/85">{a.category ?? 'Analysis'}</span>
+                    <span className="line-clamp-2 font-sans text-[12.5px] font-medium leading-[1.3]">{a.title}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Order history */}
         <div className="border-t border-white/[0.06] px-5 py-4">
@@ -133,7 +164,7 @@ const Me = () => {
         </div>
 
         {/* Sign in / out */}
-        <button onClick={() => (email ? signOut().then(() => navigate('/')) : navigate('/auth'))} className="flex w-full items-center justify-between border-t border-b border-white/[0.06] px-5 py-4 text-left transition-colors hover:bg-white/[0.03]">
+        <button onClick={async () => { if (!email) { navigate('/auth'); return; } await signOut(); window.location.href = '/'; }} className="flex w-full items-center justify-between border-t border-b border-white/[0.06] px-5 py-4 text-left transition-colors hover:bg-white/[0.03]">
           <span className="font-sans text-[13.5px] font-medium">{email ? t('me.signOut') : t('me.signIn')}</span>
           <span className="font-sans text-[12px] text-foreground/40">→</span>
         </button>
