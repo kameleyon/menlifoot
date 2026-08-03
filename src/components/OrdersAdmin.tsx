@@ -166,6 +166,8 @@ export function OrdersAdmin() {
   const visible = useMemo(() => {
     const list = orders.filter((o) => {
       if (!showTest && o.isTest) return false;
+      // Hide canceled orders from the default view (still reachable via the Canceled status filter).
+      if (o.fulfillmentStatus === "canceled" && filterStatus !== "canceled") return false;
       if (filterCountry !== "all" && o.address?.country !== filterCountry) return false;
       if (filterState !== "all" && o.address?.state !== filterState) return false;
       if (filterStatus !== "all" && o.fulfillmentStatus !== filterStatus) return false;
