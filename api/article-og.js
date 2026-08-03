@@ -13,7 +13,7 @@ const esc = (s) =>
 
 export default async function handler(req, res) {
   const id = String((req.query && req.query.id) || '').trim();
-  const host = req.headers.host || 'menlifoot-mvp.vercel.app';
+  const host = req.headers.host || 'menlifoot.ca';
   const articleUrl = `https://${host}/articles/${id}`;
 
   let title = 'Menlifoot — Le football autrement';

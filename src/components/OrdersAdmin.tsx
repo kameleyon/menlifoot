@@ -33,8 +33,10 @@ interface Order {
     postal_code?: string;
     country?: string;
   } | null;
-  items: { name: string; quantity: number }[];
+  items: { name: string; quantity: number; personalization?: string | null }[];
   variants: string[];
+  carrierName?: string | null;
+  language?: string | null;
   amountSubtotal: number;
   amountShipping: number;
   amountTax: number;
@@ -64,8 +66,11 @@ const CARRIERS = [
   { value: "ups", label: "UPS" },
   { value: "fedex", label: "FedEx" },
   { value: "usps", label: "USPS" },
+  { value: "amazon", label: "Amazon" },
   { value: "other", label: "Other" },
 ];
+
+const LANG_LABEL: Record<string, string> = { en: "EN", fr: "FR", es: "ES", ht: "HT" };
 
 function formatAddress(addr: Order["address"]) {
   if (!addr) return "—";
@@ -114,10 +119,12 @@ export function OrdersAdmin() {
   const [filterState, setFilterState] = useState<string>("all");
   const [filterSize, setFilterSize] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [sortDir, setSortDir] = useState<"newest" | "oldest">("newest");
   // Per-row edit drafts
   const [drafts, setDrafts] = useState<Record<string, {
     status: string;
     carrier: string;
+    carrierName: string;
     trackingNumber: string;
   }>>({});
   const { toast } = useToast();
@@ -136,6 +143,7 @@ export function OrdersAdmin() {
         ds[o.id] = {
           status: o.fulfillmentStatus,
           carrier: o.carrier || "",
+          carrierName: o.carrierName || "",
           trackingNumber: o.trackingNumber || "",
         };
       }
@@ -156,7 +164,7 @@ export function OrdersAdmin() {
   }, []);
 
   const visible = useMemo(() => {
-    return orders.filter((o) => {
+    const list = orders.filter((o) => {
       if (!showTest && o.isTest) return false;
       if (filterCountry !== "all" && o.address?.country !== filterCountry) return false;
       if (filterState !== "all" && o.address?.state !== filterState) return false;
@@ -164,7 +172,9 @@ export function OrdersAdmin() {
       if (filterSize !== "all" && extractSize(o.variants) !== filterSize) return false;
       return true;
     });
-  }, [orders, showTest, filterCountry, filterState, filterStatus, filterSize]);
+    list.sort((a, b) => sortDir === "newest" ? (b.createdAt ?? 0) - (a.createdAt ?? 0) : (a.createdAt ?? 0) - (b.createdAt ?? 0));
+    return list;
+  }, [orders, showTest, filterCountry, filterState, filterStatus, filterSize, sortDir]);
 
   const totals = useMemo(() => {
     let revenue = 0;
@@ -237,6 +247,7 @@ export function OrdersAdmin() {
           status: draft.status,
           trackingNumber: draft.trackingNumber || null,
           carrier: draft.carrier || null,
+          carrierName: draft.carrier === "other" ? (draft.carrierName || null) : null,
           sendEmail,
         },
       });
@@ -259,7 +270,7 @@ export function OrdersAdmin() {
     }
   };
 
-  const updateDraft = (id: string, patch: Partial<{ status: string; carrier: string; trackingNumber: string }>) => {
+  const updateDraft = (id: string, patch: Partial<{ status: string; carrier: string; carrierName: string; trackingNumber: string }>) => {
     setDrafts((d) => ({ ...d, [id]: { ...d[id], ...patch } }));
   };
 
@@ -307,6 +318,13 @@ export function OrdersAdmin() {
             ))}
           </SelectContent>
         </Select>
+        <Select value={sortDir} onValueChange={(v) => setSortDir(v as "newest" | "oldest")}>
+          <SelectTrigger><SelectValue placeholder="Date" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="newest">Newest first</SelectItem>
+            <SelectItem value="oldest">Oldest first</SelectItem>
+          </SelectContent>
+        </Select>
         <Select value={filterCountry} onValueChange={setFilterCountry}>
           <SelectTrigger><SelectValue placeholder="Country" /></SelectTrigger>
           <SelectContent>
@@ -351,6 +369,7 @@ export function OrdersAdmin() {
             const draft = drafts[o.id] || {
               status: o.fulfillmentStatus,
               carrier: o.carrier || "",
+              carrierName: o.carrierName || "",
               trackingNumber: o.trackingNumber || "",
             };
             return (
@@ -369,6 +388,11 @@ export function OrdersAdmin() {
                       <Badge variant="outline" className={`text-[10px] ${statusColor(o.fulfillmentStatus)}`}>
                         {STATUSES.find((s) => s.value === o.fulfillmentStatus)?.label || o.fulfillmentStatus}
                       </Badge>
+                      {o.language && (
+                        <Badge variant="outline" className="text-[10px] border-primary/40 text-primary">
+                          {LANG_LABEL[o.language] || o.language.toUpperCase()}
+                        </Badge>
+                      )}
                     </div>
                     <div className="text-foreground font-medium mt-1">
                       {o.name || "—"}
@@ -391,9 +415,14 @@ export function OrdersAdmin() {
                     <div className="mt-2 text-muted-foreground text-xs uppercase tracking-wider mb-1">
                       Items
                     </div>
-                    <ul className="text-foreground">
+                    <ul className="text-foreground space-y-1">
                       {o.items.map((i, idx) => (
-                        <li key={idx}>{i.quantity}× {i.name}</li>
+                        <li key={idx}>
+                          {i.quantity}× {i.name}
+                          {i.personalization && (
+                            <span className="block text-xs text-primary">✎ Personalization: {i.personalization}</span>
+                          )}
+                        </li>
                       ))}
                     </ul>
                     {o.variants.length > 0 && (
@@ -472,6 +501,14 @@ export function OrdersAdmin() {
                     </Button>
                   </div>
                 </div>
+                {draft.carrier === "other" && draft.status === "shipped" && (
+                  <Input
+                    placeholder="Carrier name (shown to the customer)"
+                    value={draft.carrierName}
+                    onChange={(e) => updateDraft(o.id, { carrierName: e.target.value })}
+                    className="mt-2"
+                  />
+                )}
                 {o.isTest && (
                   <div className="text-[11px] text-orange-400/80">
                     Test order — status updates and emails are disabled.

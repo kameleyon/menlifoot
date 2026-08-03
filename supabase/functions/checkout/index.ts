@@ -68,7 +68,7 @@ serve(async (req) => {
     // If Printify's shipping calc is unavailable, charge a conservative flat rate — never free.
     if (shippingCents <= 0) shippingCents = isUS ? 599 : 1499;
 
-    const origin = req.headers.get("origin") ?? "https://menlifoot-mvp.vercel.app";
+    const origin = req.headers.get("origin") ?? "https://menlifoot.ca";
     const stripe = new Stripe(STRIPE_KEY, { apiVersion: "2024-06-20", httpClient: Stripe.createFetchHttpClient() });
 
     const session = await stripe.checkout.sessions.create({

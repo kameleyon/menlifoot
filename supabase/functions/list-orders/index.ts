@@ -67,17 +67,21 @@ Deno.serve(async (req) => {
 
     const paid = sessions.data.filter((s: any) => s.payment_status === "paid");
 
-    // Fetch saved statuses
+    // Fetch saved statuses + stored order data (language, personalization per item)
     const sessionIds = paid.map((s: any) => s.id);
     const statusMap = new Map<string, any>();
+    const storeMap = new Map<string, any>();
     if (sessionIds.length > 0) {
       const { data: statuses } = await service
         .from("order_status")
         .select("*")
         .in("stripe_session_id", sessionIds);
-      for (const row of statuses || []) {
-        statusMap.set(row.stripe_session_id, row);
-      }
+      for (const row of statuses || []) statusMap.set(row.stripe_session_id, row);
+      const { data: stored } = await service
+        .from("store_orders")
+        .select("stripe_session_id, language, line_items")
+        .in("stripe_session_id", sessionIds);
+      for (const row of stored || []) storeMap.set(row.stripe_session_id, row);
     }
 
     const orders = paid.map((s: any) => {
@@ -85,10 +89,11 @@ Deno.serve(async (req) => {
         s.shipping_details?.address || s.customer_details?.address || null;
       const name =
         s.shipping_details?.name || s.customer_details?.name || null;
-      const items = (s.line_items?.data || []).map((li: any) => ({
-        name: li.description,
-        quantity: li.quantity,
-      }));
+      const stored = storeMap.get(s.id);
+      // Prefer stored line items (they carry clean title + personalization); else Stripe line items.
+      const items = stored?.line_items
+        ? (stored.line_items as any[]).map((v) => ({ name: v.title, quantity: v.quantity, personalization: v.personalization || null }))
+        : (s.line_items?.data || []).map((li: any) => ({ name: li.description, quantity: li.quantity, personalization: null }));
       const variants = Object.entries(s.metadata || {})
         .filter(([k]) => k.startsWith("variant_"))
         .map(([, v]) => v as string);
@@ -131,6 +136,8 @@ Deno.serve(async (req) => {
         fulfillmentStatus: status?.status || "new",
         trackingNumber: status?.tracking_number || null,
         carrier: status?.carrier || null,
+        carrierName: status?.carrier_name || null,
+        language: stored?.language || null,
         notes: status?.notes || null,
         statusUpdatedAt: status?.updated_at || null,
       };

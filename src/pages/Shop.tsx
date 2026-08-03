@@ -6,6 +6,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthModal } from '@/components/AuthModal';
 import { useToast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 import { RichTextContent } from '@/components/RichTextContent';
 import AppShell from '@/components/mobile/AppShell';
 import { useStoreCart, type Product, type Variant } from '@/contexts/StoreCartContext';
@@ -194,7 +195,17 @@ const Shop = () => {
       return [...c, { product, variant, qty: q }];
     });
     setPersonalization('');
-    toast({ title: t('shop.addedToCart') });
+    toast({
+      title: t('shop.addedToCart'),
+      duration: 3500,
+      className: 'w-auto min-w-0 gap-2 border-0 bg-[#e9c877] p-3 text-[#070708] shadow-lg [&>div]:gap-0',
+      action: (
+        <ToastAction altText={t('shop.viewCart')} onClick={() => setView('cart')}
+          className="h-auto rounded-full border-0 bg-[#070708] px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-[#e9c877] hover:bg-[#070708]/90">
+          {t('shop.viewCart')}
+        </ToastAction>
+      ),
+    });
     setView('shop');
   };
   const cartProductIds = useMemo(() => new Set(cart.map((l) => l.product.id)), [cart]);

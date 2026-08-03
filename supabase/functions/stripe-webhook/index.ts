@@ -4,7 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const PRINTIFY_API = "https://api.printify.com/v1";
 const SHOP_ID = "28370366";
-const SITE_URL = "https://menlifoot-mvp.vercel.app";
+const SITE_URL = "https://menlifoot.ca";
 const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 // Escape buyer-supplied strings before interpolating into email HTML (Stripe passes them through unchanged).
 const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");

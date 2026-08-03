@@ -56,7 +56,7 @@ function carrierLabel(c: string | null | undefined, custom?: string | null): str
   }
 }
 
-const SITE_URL = "https://menlifoot-mvp.vercel.app";
+const SITE_URL = "https://menlifoot.ca";
 const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
 // Tracking / status email copy per language.

@@ -5,7 +5,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 // integration to confirm. This handler answers that immediately so products go "Published".
 const API = "https://api.printify.com/v1";
 const SHOP_ID = "28370366";
-const HANDLE = "https://menlifoot-mvp.vercel.app/shop";
+const HANDLE = "https://menlifoot.ca/shop";
 
 // Constant-time string compare (equal-length hex digests) to avoid timing side-channels.
 function safeEqual(a: string, b: string): boolean {
