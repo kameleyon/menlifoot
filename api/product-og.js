@@ -38,10 +38,10 @@ export default async function handler(req, res) {
     }
   }
 
-  // Product mockups are large; route through an image CDN for a compact JPEG (crawler-friendly). No crop.
-  const ogImage = image.includes(`${host}/og.png`)
-    ? image
-    : `https://images.weserv.nl/?url=${encodeURIComponent(image.replace(/^https?:\/\//, ''))}&w=1200&h=630&fit=contain&bg=101012&output=jpg&q=80`;
+  // Product mockups are large; serve via our own first-party, edge-cached JPEG endpoint.
+  const ogImage = image.includes('/og.png')
+    ? 'https://www.menlifoot.ca/og.png?v=4'
+    : `https://www.menlifoot.ca/api/og-image?url=${encodeURIComponent(image.replace(/^https?:\/\//, ''))}`;
 
   const desc = 'Menlifoot Store — shop the collection.';
 
