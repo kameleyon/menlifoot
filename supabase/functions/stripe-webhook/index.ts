@@ -68,6 +68,7 @@ async function sendConfirmationEmail(order: {
   const KEY = Deno.env.get("RESEND_API_KEY");
   const FROM = Deno.env.get("EMAIL_FROM") ?? "noreply@menlifoot.ca";
   const STORE = Deno.env.get("ORDER_CONFIRMATION_EMAIL");
+  const REPLY_TO = Deno.env.get("REPLY_TO_EMAIL") ?? "info@menlifoot.ca";
   if (!KEY || !order.email) return;
   const items = order.line_items.map((v) => ({ title: v.title, quantity: v.quantity, price: v.price, personalization: v.personalization }));
   const subtotal = items.reduce((s, it) => s + it.price * it.quantity, 0);
@@ -79,7 +80,8 @@ async function sendConfirmationEmail(order: {
     body: JSON.stringify({
       from: `Menlifoot <${FROM}>`,
       to: [order.email],
-      ...(STORE ? { bcc: [STORE], reply_to: STORE } : {}),
+      reply_to: REPLY_TO,
+      ...(STORE ? { bcc: [STORE] } : {}),
       subject: `Your Menlifoot order ${order.ref}`,
       html,
     }),
