@@ -91,6 +91,7 @@ async function sendConfirmationEmail(order: {
 serve(async (req) => {
   const STRIPE_KEY = Deno.env.get("STRIPE_SECRET_KEY");
   const WH_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET");
+  const WH_SECRET_TEST = Deno.env.get("STRIPE_WEBHOOK_SECRET_TEST");
   const PRINTIFY_KEY = Deno.env.get("PRINTIFY_API_KEY");
   if (!STRIPE_KEY || !WH_SECRET || !PRINTIFY_KEY) return new Response("not configured", { status: 500 });
 
@@ -98,12 +99,12 @@ serve(async (req) => {
   const sig = req.headers.get("stripe-signature") ?? "";
   const body = await req.text();
 
-  let event: Stripe.Event;
-  try {
-    event = await stripe.webhooks.constructEventAsync(body, sig, WH_SECRET);
-  } catch (e) {
-    return new Response(`signature error: ${e instanceof Error ? e.message : ""}`, { status: 400 });
+  // Verify against the live secret; if a test secret is configured, accept those too (for test-mode checkouts).
+  let event: Stripe.Event | null = null;
+  for (const secret of [WH_SECRET, WH_SECRET_TEST].filter(Boolean) as string[]) {
+    try { event = await stripe.webhooks.constructEventAsync(body, sig, secret); break; } catch { /* try next */ }
   }
+  if (!event) return new Response("signature error", { status: 400 });
 
   if (event.type !== "checkout.session.completed") return new Response("ignored", { status: 200 });
 
