@@ -10,7 +10,7 @@ const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
 // deno-lint-ignore no-explicit-any
-function confirmationHtml(o: { ref: string; date: string; items: any[]; subtotal: number; shipping: number; total: number; addr: any }) {
+function confirmationHtml(o: { ref: string; date: string; items: any[]; subtotal: number; shipping: number; total: number; addr: any; shipMethod: string; delivery: string }) {
   const rows = o.items.map((it) => `
     <tr>
       <td style="padding:12px 0;border-bottom:1px solid #eceae6;font-family:Arial,sans-serif;font-size:14px;color:#111;">
@@ -48,8 +48,16 @@ function confirmationHtml(o: { ref: string; date: string; items: any[]; subtotal
         </table>
       </td></tr>
       <tr><td style="padding:24px 32px 0;">
-        <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:.06em;text-transform:uppercase;color:#999;">Shipping to</p>
-        <p style="margin:0;font-family:Arial,sans-serif;font-size:14px;color:#333;line-height:1.5;">${addressLines}</p>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+          <td valign="top" style="width:50%;padding-right:12px;">
+            <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:.06em;text-transform:uppercase;color:#999;">Shipping to</p>
+            <p style="margin:0;font-family:Arial,sans-serif;font-size:14px;color:#333;line-height:1.5;">${addressLines}</p>
+          </td>
+          <td valign="top" style="width:50%;padding-left:12px;">
+            <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:.06em;text-transform:uppercase;color:#999;">Delivery</p>
+            <p style="margin:0;font-family:Arial,sans-serif;font-size:14px;color:#333;line-height:1.5;">${esc(o.shipMethod)}<br><span style="color:#a07d2c;">Est. arrival ${esc(o.delivery)}</span></p>
+          </td>
+        </tr></table>
       </td></tr>
       <tr><td style="padding:24px 32px 32px;">
         <a href="${SITE_URL}/shop" style="display:inline-block;background:linear-gradient(135deg,#e9c877,#c08a2a);color:#070708;font-family:Arial,sans-serif;font-size:13px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;text-decoration:none;padding:14px 28px;border-radius:999px;">Continue shopping</a>
@@ -73,7 +81,12 @@ async function sendConfirmationEmail(order: {
   const items = order.line_items.map((v) => ({ title: v.title, quantity: v.quantity, price: v.price, personalization: v.personalization }));
   const subtotal = items.reduce((s, it) => s + it.price * it.quantity, 0);
   const shipping = Math.max(0, order.total - subtotal);
-  const html = confirmationHtml({ ref: order.ref, date: order.date, items, subtotal, shipping, total: order.total, addr: order.addr });
+  // Estimated delivery window (US vs international) — matches the checkout estimate.
+  const isUS = String(order.addr?.country ?? "").toUpperCase() === "US";
+  const addDays = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString("en-US", { month: "short", day: "numeric" }); };
+  const delivery = `${addDays(isUS ? 4 : 14)} – ${addDays(isUS ? 10 : 28)}`;
+  const shipMethod = shipping > 0 ? "Standard shipping" : "Free shipping";
+  const html = confirmationHtml({ ref: order.ref, date: order.date, items, subtotal, shipping, total: order.total, addr: order.addr, shipMethod, delivery });
   await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
