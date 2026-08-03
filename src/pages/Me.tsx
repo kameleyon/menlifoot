@@ -44,7 +44,10 @@ const Me = () => {
   const email = user?.email ?? null;
   const [orders, setOrders] = useState<MyOrder[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
-  const [saved, setSaved] = useState<{ id: string; title: string; thumbnail_url: string | null; category: string | null }[]>([]);
+  type Art = { id: string; title: string; thumbnail_url: string | null; category: string | null };
+  const [saved, setSaved] = useState<Art[]>([]);
+  const [liked, setLiked] = useState<Art[]>([]);
+  const [commented, setCommented] = useState<(Art & { body: string })[]>([]);
 
   useEffect(() => {
     if (!user) { setLoadingOrders(false); return; }
@@ -52,21 +55,34 @@ const Me = () => {
       const { data } = await supabase.functions.invoke('my-orders');
       setOrders(((data as { orders?: MyOrder[] })?.orders) ?? []);
       setLoadingOrders(false);
-      // The user's bookmarked (saved) articles.
+
       // deno-lint-ignore no-explicit-any
       const db = supabase as any;
-      const bm = await db.from('article_bookmarks').select('article_id').eq('user_id', user.id).order('created_at', { ascending: false });
-      const ids = (bm.data ?? []).map((r: { article_id: string }) => r.article_id);
-      if (ids.length) {
-        const arts = await db.from('articles').select('id,title,thumbnail_url,category').in('id', ids).eq('is_published', true);
-        // Preserve bookmark order.
-        const byId = new Map((arts.data ?? []).map((a: any) => [a.id, a]));
-        setSaved(ids.map((id: string) => byId.get(id)).filter(Boolean));
-      } else {
-        setSaved([]);
-      }
+      // Fetch article details for a set of ids, preserving the given order.
+      const fetchArts = async (ids: string[]): Promise<Art[]> => {
+        if (!ids.length) return [];
+        const uniq = [...new Set(ids)];
+        const a = await db.from('articles').select('id,title,thumbnail_url,category').in('id', uniq).eq('is_published', true);
+        const byId = new Map((a.data ?? []).map((x: any) => [x.id, x]));
+        return ids.map((id) => byId.get(id) as Art).filter(Boolean);
+      };
+
+      const [bm, lk, cm] = await Promise.all([
+        db.from('article_bookmarks').select('article_id').eq('user_id', user.id).order('created_at', { ascending: false }),
+        db.from('article_likes').select('article_id').eq('user_id', user.id).order('created_at', { ascending: false }),
+        db.from('article_comments').select('article_id, body, created_at').eq('user_id', user.id).order('created_at', { ascending: false }),
+      ]);
+
+      setSaved(await fetchArts((bm.data ?? []).map((r: any) => r.article_id)));
+      setLiked(await fetchArts((lk.data ?? []).map((r: any) => r.article_id)));
+      const cmRows = (cm.data ?? []) as { article_id: string; body: string }[];
+      const cmArts = await fetchArts(cmRows.map((r) => r.article_id));
+      const artById = new Map(cmArts.map((a) => [a.id, a]));
+      setCommented(cmRows.map((r) => { const a = artById.get(r.article_id); return a ? { ...a, body: r.body } : null; }).filter(Boolean) as (Art & { body: string })[]);
     })();
   }, [user]);
+
+  const memberSince = user?.created_at ? new Date(user.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) : null;
 
   const name = email ? email.split('@')[0] : 'Guest';
   const statusMap = STATUS(t);
@@ -77,9 +93,10 @@ const Me = () => {
         {/* Profile */}
         <div className="flex items-center gap-4 px-5 pb-[22px]">
           <div className="h-16 w-16 rounded-full border border-white/10" style={{ background: 'repeating-linear-gradient(135deg,#1c1c20 0 6px,#141417 6px 12px)' }} />
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1">
             <span className="font-display text-[22px] uppercase">{name}</span>
             <span className="font-sans text-[11.5px] text-foreground/45">{email ? `${t('me.member')} · ${email}` : t('me.notSignedIn')}</span>
+            {memberSince && <span className="font-sans text-[11px] text-foreground/35">{t('me.memberSince')} {memberSince}</span>}
           </div>
         </div>
 
@@ -100,6 +117,49 @@ const Me = () => {
                     <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.14em] text-primary/85">{a.category ?? 'Analysis'}</span>
                     <span className="line-clamp-2 font-sans text-[12.5px] font-medium leading-[1.3]">{a.title}</span>
                   </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Liked articles */}
+        <div className="border-t border-white/[0.06] px-5 py-4">
+          <div className="flex items-center justify-between">
+            <span className="font-sans text-[13.5px] font-medium">{t('me.liked')}</span>
+            <span className="font-sans text-[12px] text-foreground/40">{liked.length}</span>
+          </div>
+          {liked.length === 0 ? (
+            <p className="mt-3 font-sans text-[12px] text-foreground/40">{t('me.noLiked')}</p>
+          ) : (
+            <div className="mt-3 flex flex-col gap-2.5">
+              {liked.map((a) => (
+                <button key={a.id} onClick={() => navigate(`/articles/${a.id}`)} className="flex items-center gap-3 text-left transition-opacity hover:opacity-80">
+                  <div className="h-[46px] w-[62px] flex-none rounded-lg bg-cover bg-center" style={{ background: a.thumbnail_url ? `center/cover url(${a.thumbnail_url})` : 'repeating-linear-gradient(135deg,#1b1b1f 0 8px,#131316 8px 16px)' }} />
+                  <div className="flex flex-1 flex-col gap-0.5">
+                    <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.14em] text-primary/85">{a.category ?? 'Analysis'}</span>
+                    <span className="line-clamp-2 font-sans text-[12.5px] font-medium leading-[1.3]">{a.title}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Your comments */}
+        <div className="border-t border-white/[0.06] px-5 py-4">
+          <div className="flex items-center justify-between">
+            <span className="font-sans text-[13.5px] font-medium">{t('me.comments')}</span>
+            <span className="font-sans text-[12px] text-foreground/40">{commented.length}</span>
+          </div>
+          {commented.length === 0 ? (
+            <p className="mt-3 font-sans text-[12px] text-foreground/40">{t('me.noComments')}</p>
+          ) : (
+            <div className="mt-3 flex flex-col gap-2.5">
+              {commented.map((c, i) => (
+                <button key={i} onClick={() => navigate(`/articles/${c.id}`)} className="flex flex-col gap-1 rounded-xl border border-white/[0.06] bg-[#101012] p-3 text-left transition-opacity hover:opacity-80">
+                  <span className="line-clamp-1 font-sans text-[11px] font-semibold uppercase tracking-[0.06em] text-primary/85">{c.title}</span>
+                  <span className="line-clamp-2 font-sans text-[12.5px] text-foreground/70">“{c.body}”</span>
                 </button>
               ))}
             </div>
