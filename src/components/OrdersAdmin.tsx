@@ -310,7 +310,7 @@ export function OrdersAdmin() {
       </div>
 
       {/* Filters */}
-      <div className="grid gap-2 grid-cols-2 md:grid-cols-4 mb-6">
+      <div className="grid gap-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-5 mb-6 [&_button]:h-9 [&_button]:text-xs">
         <Select value={filterStatus} onValueChange={setFilterStatus}>
           <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>
