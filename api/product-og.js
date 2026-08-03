@@ -38,10 +38,10 @@ export default async function handler(req, res) {
     }
   }
 
-  // Product mockups are large; serve via our own first-party, edge-cached JPEG endpoint.
+  // Product mockups are large — compact JPEG via the weserv CDN (proven for WhatsApp/Facebook).
   const ogImage = image.includes('/og.png')
     ? 'https://www.menlifoot.ca/og.png?v=4'
-    : `https://www.menlifoot.ca/api/og-image?url=${encodeURIComponent(image.replace(/^https?:\/\//, ''))}`;
+    : `https://images.weserv.nl/?url=${encodeURIComponent(image.replace(/^https?:\/\//, ''))}&w=1200&h=630&fit=contain&bg=101012&output=jpg&q=80`;
 
   const desc = 'Menlifoot Store — shop the collection.';
 

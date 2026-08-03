@@ -44,11 +44,11 @@ export default async function handler(req, res) {
   }
 
   // Crawlers (esp. WhatsApp) drop preview images over a few hundred KB and prefer JPEG.
-  // Article thumbnails are large PNGs. Serve them through our own first-party, edge-cached
-  // JPEG endpoint (Twitter is unreliable with third-party image proxies / slow resizes).
+  // Article thumbnails are large PNGs — serve a compact 1200x630 JPEG via the weserv CDN
+  // (proven for WhatsApp/Facebook). og.png is already small.
   const ogImage = image.includes('/og.png')
     ? 'https://www.menlifoot.ca/og.png?v=4'
-    : `https://www.menlifoot.ca/api/og-image?url=${encodeURIComponent(image.replace(/^https?:\/\//, ''))}`;
+    : `https://images.weserv.nl/?url=${encodeURIComponent(image.replace(/^https?:\/\//, ''))}&w=1200&h=630&fit=cover&output=jpg&q=75`;
 
   const html = `<!doctype html><html lang="en"><head>
 <meta charset="utf-8">
