@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage, Language } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 import AppShell from '@/components/mobile/AppShell';
 
 const LANGS: { code: Language; label: string }[] = [
@@ -41,7 +42,30 @@ const Me = () => {
   const navigate = useNavigate();
   const { t, language, setLanguage } = useLanguage();
   const { user, signOut } = useAuth();
+  const { toast } = useToast();
   const email = user?.email ?? null;
+  const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [savingEmail, setSavingEmail] = useState(false);
+  const [savingPw, setSavingPw] = useState(false);
+
+  const updateEmail = async () => {
+    if (!newEmail.trim() || savingEmail) return;
+    setSavingEmail(true);
+    const { error } = await supabase.auth.updateUser({ email: newEmail.trim() });
+    setSavingEmail(false);
+    toast({ title: error ? error.message : t('me.emailUpdated'), variant: error ? 'destructive' : undefined });
+    if (!error) setNewEmail('');
+  };
+  const updatePassword = async () => {
+    if (savingPw) return;
+    if (newPassword.length < 6) { toast({ title: t('me.pwShort'), variant: 'destructive' }); return; }
+    setSavingPw(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setSavingPw(false);
+    toast({ title: error ? error.message : t('me.passwordUpdated'), variant: error ? 'destructive' : undefined });
+    if (!error) setNewPassword('');
+  };
   const [orders, setOrders] = useState<MyOrder[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
   type Art = { id: string; title: string; thumbnail_url: string | null; category: string | null };
@@ -213,15 +237,52 @@ const Me = () => {
           )}
         </div>
 
-        {/* Language switcher */}
-        <div className="flex w-full items-center justify-between border-t border-white/[0.06] px-5 py-4">
-          <span className="font-sans text-[13.5px] font-medium">{t('me.language')}</span>
-          <span className="flex gap-1.5">
-            {LANGS.map((l) => (
-              <button key={l.code} onClick={() => setLanguage(l.code)} className={`rounded px-1.5 py-0.5 font-sans text-[11px] font-semibold transition-colors ${l.code === language ? 'bg-primary text-[#070708]' : 'text-foreground/35 hover:text-foreground'}`}>{l.label}</button>
-            ))}
-          </span>
-        </div>
+        {/* Preferences */}
+        {email && (
+          <div className="border-t border-white/[0.06] px-5 py-4">
+            <span className="font-sans text-[13.5px] font-medium">{t('me.preferences')}</span>
+            <div className="mt-3.5 flex flex-col gap-4">
+              {/* Email */}
+              <div className="flex flex-col gap-1.5">
+                <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.1em] text-foreground/45">{t('me.email')}</span>
+                <div className="flex gap-2">
+                  <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder={email}
+                    className="flex-1 rounded-xl border border-white/[0.12] bg-[#101012] px-3.5 py-2.5 font-sans text-[13.5px] text-foreground placeholder:text-foreground/30 focus:border-primary/50 focus:outline-none" />
+                  <button onClick={updateEmail} disabled={savingEmail || !newEmail.trim()} className="rounded-xl px-4 font-sans text-[12px] font-bold uppercase tracking-wide text-[#070708] disabled:opacity-40" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>{t('me.update')}</button>
+                </div>
+              </div>
+              {/* Password */}
+              <div className="flex flex-col gap-1.5">
+                <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.1em] text-foreground/45">{t('me.newPassword')}</span>
+                <div className="flex gap-2">
+                  <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="••••••••" autoComplete="new-password"
+                    className="flex-1 rounded-xl border border-white/[0.12] bg-[#101012] px-3.5 py-2.5 font-sans text-[13.5px] text-foreground placeholder:text-foreground/30 focus:border-primary/50 focus:outline-none" />
+                  <button onClick={updatePassword} disabled={savingPw || !newPassword} className="rounded-xl px-4 font-sans text-[12px] font-bold uppercase tracking-wide text-[#070708] disabled:opacity-40" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>{t('me.update')}</button>
+                </div>
+              </div>
+              {/* Language */}
+              <div className="flex items-center justify-between">
+                <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.1em] text-foreground/45">{t('me.language')}</span>
+                <span className="flex gap-1.5">
+                  {LANGS.map((l) => (
+                    <button key={l.code} onClick={() => setLanguage(l.code)} className={`rounded px-1.5 py-0.5 font-sans text-[11px] font-semibold transition-colors ${l.code === language ? 'bg-primary text-[#070708]' : 'text-foreground/35 hover:text-foreground'}`}>{l.label}</button>
+                  ))}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Language (for signed-out visitors) */}
+        {!email && (
+          <div className="flex w-full items-center justify-between border-t border-white/[0.06] px-5 py-4">
+            <span className="font-sans text-[13.5px] font-medium">{t('me.language')}</span>
+            <span className="flex gap-1.5">
+              {LANGS.map((l) => (
+                <button key={l.code} onClick={() => setLanguage(l.code)} className={`rounded px-1.5 py-0.5 font-sans text-[11px] font-semibold transition-colors ${l.code === language ? 'bg-primary text-[#070708]' : 'text-foreground/35 hover:text-foreground'}`}>{l.label}</button>
+              ))}
+            </span>
+          </div>
+        )}
 
         {/* Sign in / out */}
         <button onClick={async () => { if (!email) { navigate('/auth'); return; } await signOut(); window.location.href = '/'; }} className="flex w-full items-center justify-between border-t border-b border-white/[0.06] px-5 py-4 text-left transition-colors hover:bg-white/[0.03]">
