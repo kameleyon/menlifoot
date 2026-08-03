@@ -20,7 +20,6 @@ const GrenadiersApp = () => {
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const { t } = useLanguage();
   const [tab, setTab] = useState<'calendar' | 'records' | 'squad'>('calendar');
-  const [following, setFollowing] = useState(false);
   const [selected, setSelected] = useState<HaitiPlayer | null>(null);
 
   useEffect(() => {
@@ -61,10 +60,6 @@ const GrenadiersApp = () => {
           <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.18em] text-primary">{t('gren.nationalTeam')} · {players.length} {t('gren.players')}</span>
           <span className="font-display text-[34px] uppercase leading-[0.95]">Les Grenadiers</span>
           <span className="font-sans text-[12.5px] leading-[1.5] text-foreground/55">{t('gren.desc')}</span>
-          <button onClick={() => setFollowing((f) => !f)} className="mt-[3px] self-start rounded-full px-[18px] py-[11px] font-sans text-[11px] font-bold uppercase tracking-[0.08em]"
-            style={following ? { border: '1px solid rgba(255,255,255,.16)', color: 'rgba(244,242,238,.7)' } : { border: '1px solid transparent', background: 'linear-gradient(135deg,#e9c877,#c08a2a)', color: '#070708' }}>
-            {following ? t('gren.following') : t('gren.followTeam')}
-          </button>
         </div>
 
         {/* Tabs */}
@@ -139,8 +134,6 @@ const GrenadiersApp = () => {
             <span className="font-display text-[52px] uppercase leading-[0.95]">Les Grenadiers</span>
             <p className="m-0 max-w-[48ch] font-sans text-[15px] leading-[1.7] text-foreground/60">{t('gren.desc')}</p>
           </div>
-          <button onClick={() => setFollowing((f) => !f)} className="self-start rounded-full px-5 py-3 font-sans text-[11px] font-bold uppercase tracking-[0.08em]"
-            style={following ? { border: '1px solid rgba(255,255,255,.16)', color: 'rgba(244,242,238,.7)' } : { border: '1px solid transparent', background: 'linear-gradient(135deg,#e9c877,#c08a2a)', color: '#070708' }}>{following ? t('gren.following') : t('gren.followTeam')}</button>
           <div className="flex flex-col gap-3.5">
             <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[0.18em] text-primary">{t('gren.rUpcoming')}</span>
             {fixtures.map((f) => (
