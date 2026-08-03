@@ -114,34 +114,42 @@ serve(async (req) => {
 
   try {
     const addr = order.shipping_address ?? {};
-    // deno-lint-ignore no-explicit-any
-    const lineItems = (order.line_items as any[]).map((v) => ({ product_id: v.product_id, variant_id: v.variant_id, quantity: v.quantity }));
-    const pfHeaders = { Authorization: `Bearer ${PRINTIFY_KEY}`, "Content-Type": "application/json", "User-Agent": "Menlifoot" };
+    // Test-mode Stripe purchases (livemode=false) must NOT create real Printify orders
+    // (no real product made/shipped) — but we still send the confirmation email to test it.
+    const isTest = session.livemode === false;
 
-    const orderRes = await fetch(`${PRINTIFY_API}/shops/${SHOP_ID}/orders.json`, {
-      method: "POST", headers: pfHeaders,
-      body: JSON.stringify({
-        external_id: order.id,
-        label: "Menlifoot web order",
-        line_items: lineItems,
-        shipping_method: 1,
-        send_shipping_notification: false,
-        address_to: {
-          first_name: addr.first_name ?? "", last_name: addr.last_name ?? "",
-          email: order.email ?? addr.email ?? "", phone: addr.phone ?? "",
-          country: addr.country ?? "", region: addr.region ?? "",
-          address1: addr.address1 ?? "", address2: addr.address2 ?? "",
-          city: addr.city ?? "", zip: addr.zip ?? "",
-        },
-      }),
-    });
-    const pf = await orderRes.json();
-    if (!orderRes.ok) throw new Error(`printify order: ${JSON.stringify(pf)}`);
+    if (!isTest) {
+      // deno-lint-ignore no-explicit-any
+      const lineItems = (order.line_items as any[]).map((v) => ({ product_id: v.product_id, variant_id: v.variant_id, quantity: v.quantity }));
+      const pfHeaders = { Authorization: `Bearer ${PRINTIFY_KEY}`, "Content-Type": "application/json", "User-Agent": "Menlifoot" };
 
-    // Send to production so it actually gets made & shipped.
-    await fetch(`${PRINTIFY_API}/shops/${SHOP_ID}/orders/${pf.id}/send_to_production.json`, { method: "POST", headers: pfHeaders });
+      const orderRes = await fetch(`${PRINTIFY_API}/shops/${SHOP_ID}/orders.json`, {
+        method: "POST", headers: pfHeaders,
+        body: JSON.stringify({
+          external_id: order.id,
+          label: "Menlifoot web order",
+          line_items: lineItems,
+          shipping_method: 1,
+          send_shipping_notification: false,
+          address_to: {
+            first_name: addr.first_name ?? "", last_name: addr.last_name ?? "",
+            email: order.email ?? addr.email ?? "", phone: addr.phone ?? "",
+            country: addr.country ?? "", region: addr.region ?? "",
+            address1: addr.address1 ?? "", address2: addr.address2 ?? "",
+            city: addr.city ?? "", zip: addr.zip ?? "",
+          },
+        }),
+      });
+      const pf = await orderRes.json();
+      if (!orderRes.ok) throw new Error(`printify order: ${JSON.stringify(pf)}`);
 
-    await db.from("store_orders").update({ status: "submitted", printify_order_id: pf.id, updated_at: new Date().toISOString() }).eq("id", order.id);
+      // Send to production so it actually gets made & shipped.
+      await fetch(`${PRINTIFY_API}/shops/${SHOP_ID}/orders/${pf.id}/send_to_production.json`, { method: "POST", headers: pfHeaders });
+
+      await db.from("store_orders").update({ status: "submitted", printify_order_id: pf.id, updated_at: new Date().toISOString() }).eq("id", order.id);
+    } else {
+      await db.from("store_orders").update({ status: "test", updated_at: new Date().toISOString() }).eq("id", order.id);
+    }
 
     // Send the branded order-confirmation email (failure must not break the webhook).
     await sendConfirmationEmail({
