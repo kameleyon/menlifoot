@@ -46,25 +46,37 @@ const Me = () => {
   const email = user?.email ?? null;
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
   const [savingEmail, setSavingEmail] = useState(false);
   const [savingPw, setSavingPw] = useState(false);
 
+  // Verify the current password before any sensitive account change (prevents session-hijack takeover).
+  const reauth = async (): Promise<boolean> => {
+    if (!email) return false;
+    if (!currentPassword) { toast({ title: t('me.needCurrentPw'), variant: 'destructive' }); return false; }
+    const { error } = await supabase.auth.signInWithPassword({ email, password: currentPassword });
+    if (error) { toast({ title: t('me.wrongPw'), variant: 'destructive' }); return false; }
+    return true;
+  };
+
   const updateEmail = async () => {
     if (!newEmail.trim() || savingEmail) return;
+    if (!(await reauth())) return;
     setSavingEmail(true);
     const { error } = await supabase.auth.updateUser({ email: newEmail.trim() });
     setSavingEmail(false);
     toast({ title: error ? error.message : t('me.emailUpdated'), variant: error ? 'destructive' : undefined });
-    if (!error) setNewEmail('');
+    if (!error) { setNewEmail(''); setCurrentPassword(''); }
   };
   const updatePassword = async () => {
     if (savingPw) return;
     if (newPassword.length < 6) { toast({ title: t('me.pwShort'), variant: 'destructive' }); return; }
+    if (!(await reauth())) return;
     setSavingPw(true);
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     setSavingPw(false);
     toast({ title: error ? error.message : t('me.passwordUpdated'), variant: error ? 'destructive' : undefined });
-    if (!error) setNewPassword('');
+    if (!error) { setNewPassword(''); setCurrentPassword(''); }
   };
   const [orders, setOrders] = useState<MyOrder[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
@@ -110,6 +122,12 @@ const Me = () => {
 
   const name = email ? email.split('@')[0] : 'Guest';
   const statusMap = STATUS(t);
+  const [tab, setTab] = useState<'activity' | 'orders' | 'preferences'>('activity');
+  const TABS: { id: typeof tab; label: string }[] = [
+    { id: 'activity', label: t('me.activity') },
+    { id: 'orders', label: t('me.orders') },
+    { id: 'preferences', label: t('me.preferences') },
+  ];
 
   return (
     <AppShell>
@@ -124,6 +142,18 @@ const Me = () => {
           </div>
         </div>
 
+        {/* Tabs */}
+        {email && (
+          <div className="flex gap-2 px-5 pb-1">
+            {TABS.map((tb) => (
+              <button key={tb.id} onClick={() => setTab(tb.id)} className="rounded-full px-3.5 py-2 font-sans text-[11px] font-semibold uppercase tracking-[0.06em] transition-colors"
+                style={tab === tb.id ? { background: '#f4f2ee', color: '#070708' } : { border: '1px solid rgba(255,255,255,.14)', color: 'rgba(244,242,238,.7)' }}>{tb.label}</button>
+            ))}
+          </div>
+        )}
+
+        {/* ── Activity tab ── */}
+        {email && tab === 'activity' && (<>
         {/* Saved articles */}
         <div className="border-t border-white/[0.06] px-5 py-4">
           <div className="flex items-center justify-between">
@@ -190,7 +220,10 @@ const Me = () => {
           )}
         </div>
 
-        {/* Order history */}
+        </>)}
+
+        {/* ── Orders tab ── */}
+        {email && tab === 'orders' && (
         <div className="border-t border-white/[0.06] px-5 py-4">
           <span className="font-sans text-[13.5px] font-medium">{t('me.orders')}</span>
           {loadingOrders ? (
@@ -236,12 +269,20 @@ const Me = () => {
             </div>
           )}
         </div>
+        )}
 
-        {/* Preferences */}
-        {email && (
+        {/* ── Preferences tab ── */}
+        {email && tab === 'preferences' && (
           <div className="border-t border-white/[0.06] px-5 py-4">
-            <span className="font-sans text-[13.5px] font-medium">{t('me.preferences')}</span>
+            <span className="font-sans text-[13.5px] font-medium sr-only">{t('me.preferences')}</span>
             <div className="mt-3.5 flex flex-col gap-4">
+              {/* Current password (required to change email/password) */}
+              <div className="flex flex-col gap-1.5">
+                <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.1em] text-foreground/45">{t('me.currentPassword')}</span>
+                <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password"
+                  className="rounded-xl border border-white/[0.12] bg-[#101012] px-3.5 py-2.5 font-sans text-[13.5px] text-foreground placeholder:text-foreground/30 focus:border-primary/50 focus:outline-none" />
+                <span className="font-sans text-[10.5px] text-foreground/35">{t('me.currentPasswordHint')}</span>
+              </div>
               {/* Email */}
               <div className="flex flex-col gap-1.5">
                 <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.1em] text-foreground/45">{t('me.email')}</span>
