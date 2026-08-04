@@ -44,18 +44,16 @@ interface ShopProduct { id: string; title: string; image: string | null; price_c
 
 const Home = () => {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { user, isAdmin, isEditor } = useAuth();
   const { open: openAuth } = useAuthModal();
   const [articles, setArticles] = useState<Article[]>([]);
   const [podcast, setPodcast] = useState<Podcast | null>(null);
   const [shop, setShop] = useState<ShopProduct[]>([]);
 
+  // Podcast + shop don't depend on language — fetch once.
   useEffect(() => {
     (async () => {
-      const a = await db.from('articles').select('id,title,summary,subtitle,category,thumbnail_url,author,published_at')
-        .eq('is_published', true).order('published_at', { ascending: false, nullsFirst: false }).limit(12);
-      if (a.data) setArticles(a.data as Article[]);
       const p = await db.from('podcasts').select('id,title,episode_number,duration,embed_url,original_url,thumbnail_url')
         .order('published_at', { ascending: false, nullsFirst: false }).limit(1);
       if (p.data && (p.data as Podcast[])[0]) setPodcast((p.data as Podcast[])[0]);
@@ -63,6 +61,27 @@ const Home = () => {
       setShop(((pr.data as { products?: ShopProduct[] })?.products ?? []).slice(0, 4));
     })();
   }, []);
+
+  // Articles: base rows are French; overlay the chosen language's translation when available.
+  useEffect(() => {
+    (async () => {
+      const a = await db.from('articles').select('id,title,summary,subtitle,category,thumbnail_url,author,published_at')
+        .eq('is_published', true).order('published_at', { ascending: false, nullsFirst: false }).limit(12);
+      let list = (a.data as Article[]) ?? [];
+      if (language !== 'fr' && list.length) {
+        const ids = list.map((x) => x.id);
+        // deno-lint-ignore no-explicit-any
+        const tr = await (supabase as any).from('article_translations').select('article_id,title,summary,subtitle').in('article_id', ids).eq('language', language);
+        // deno-lint-ignore no-explicit-any
+        const byId = new Map((tr.data ?? []).map((r: any) => [r.article_id, r]));
+        list = list.map((x) => {
+          const tx = byId.get(x.id) as { title?: string; summary?: string; subtitle?: string } | undefined;
+          return tx ? { ...x, title: tx.title || x.title, summary: tx.summary ?? x.summary, subtitle: tx.subtitle ?? x.subtitle } : x;
+        });
+      }
+      setArticles(list);
+    })();
+  }, [language]);
 
   const lead = articles[0];
   const latest = articles.slice(1, 5);

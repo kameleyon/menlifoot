@@ -9,19 +9,28 @@ const stripe = 'repeating-linear-gradient(135deg,#1b1b1f 0 8px,#131316 8px 16px)
 
 const Editorial = () => {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [articles, setArticles] = useState<Art[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Base article rows are French; overlay the chosen language's translation when available.
   useEffect(() => {
     (async () => {
+      setLoading(true);
       const { data } = await (supabase as any).from('articles')
         .select('id,title,summary,category,thumbnail_url,author,published_at')
         .eq('is_published', true).order('published_at', { ascending: false, nullsFirst: false }).limit(60);
-      setArticles((data as Art[]) ?? []);
+      let list = (data as Art[]) ?? [];
+      if (language !== 'fr' && list.length) {
+        const ids = list.map((x) => x.id);
+        const tr = await (supabase as any).from('article_translations').select('article_id,title,summary').in('article_id', ids).eq('language', language);
+        const byId = new Map(((tr.data ?? []) as { article_id: string; title?: string; summary?: string }[]).map((r) => [r.article_id, r]));
+        list = list.map((x) => { const tx = byId.get(x.id); return tx ? { ...x, title: tx.title || x.title, summary: tx.summary ?? x.summary } : x; });
+      }
+      setArticles(list);
       setLoading(false);
     })();
-  }, []);
+  }, [language]);
 
   const date = (s: string | null) => (s ? new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : '');
 
