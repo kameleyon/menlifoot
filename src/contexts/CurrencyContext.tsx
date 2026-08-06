@@ -29,7 +29,9 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
     if (geo.currency === 'USD' || geo.rate === 1) return base;
     let local: string;
     try {
-      local = new Intl.NumberFormat(undefined, { style: 'currency', currency: geo.currency }).format(usd * geo.rate);
+      // Force en-US so the currency SYMBOL is prefixed (e.g. "CA$54.99", "€54.99"),
+      // not the visitor's locale which can render CAD as "54,99 $".
+      local = new Intl.NumberFormat('en-US', { style: 'currency', currency: geo.currency }).format(usd * geo.rate);
     } catch {
       local = `${geo.symbol}${(usd * geo.rate).toFixed(2)}`;
     }
