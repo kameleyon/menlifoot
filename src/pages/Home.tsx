@@ -7,6 +7,7 @@ import { useAuthModal } from '@/components/AuthModal';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { MessageCircle, User } from 'lucide-react';
 import AppShell from '@/components/mobile/AppShell';
+import MobileLangMenu from '@/components/mobile/MobileLangMenu';
 import { podcastThumb } from '@/lib/podcast';
 
 interface Article {
@@ -99,6 +100,7 @@ const Home = () => {
             <button onClick={() => navigate('/ask')} aria-label={t('home.askTitle')} className="flex h-[38px] w-[38px] items-center justify-center rounded-full border border-white/[0.12] text-primary transition-colors hover:border-primary/60">
               <MessageCircle className="h-[19px] w-[19px]" strokeWidth={2} />
             </button>
+            <MobileLangMenu />
             <button onClick={() => (user ? navigate(isAdmin || isEditor ? '/admin' : '/me') : openAuth('signin'))} aria-label={t('auth.signin')} className="flex h-[38px] w-[38px] items-center justify-center rounded-full border border-white/[0.12] text-foreground/70 transition-colors hover:border-primary/60 hover:text-primary">
               <User className="h-[19px] w-[19px]" strokeWidth={2} />
             </button>
