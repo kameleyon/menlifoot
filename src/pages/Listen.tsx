@@ -29,8 +29,21 @@ const VIDEOS = [
 
 const embedSrc = (url: string | null) => (url ? `${url}${url.includes('?') ? '&' : '?'}autoplay=1` : '');
 
+// Only ONE layout's player should mount — a CSS-hidden YouTube iframe still plays audio (doubled sound).
+const useIsDesktop = () => {
+  const [d, setD] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width:1024px)').matches);
+  useEffect(() => {
+    const m = window.matchMedia('(min-width:1024px)');
+    const on = () => setD(m.matches);
+    m.addEventListener('change', on);
+    return () => m.removeEventListener('change', on);
+  }, []);
+  return d;
+};
+
 const Listen = () => {
   const { t } = useLanguage();
+  const isDesktop = useIsDesktop();
   const [pods, setPods] = useState<Podcast[]>([]);
   const [playing, setPlaying] = useState<Podcast | null>(null);
 
@@ -58,7 +71,7 @@ const Listen = () => {
         {/* Now playing */}
         <div className="mx-5 mb-6 overflow-hidden rounded-2xl border border-white/[0.07] bg-[#101012]">
           <div className="relative aspect-video w-full overflow-hidden" style={{ background: 'radial-gradient(120% 100% at 50% 0%,#1d1a14,#0a0a0b)' }}>
-            {playing && playing.embed_url ? (
+            {playing && playing.embed_url && !isDesktop ? (
               <iframe src={embedSrc(playing.embed_url)} title={playing.title} className="h-full w-full" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
             ) : (
               <button onClick={() => current && setPlaying(current)} className="flex h-full w-full items-center justify-center">
@@ -116,7 +129,7 @@ const Listen = () => {
         <div className="border-b border-white/[0.07]" style={{ background: 'radial-gradient(90% 140% at 12% 0%,#1a1811,#070708)' }}>
           <div className="mx-auto flex max-w-[1180px] gap-10 px-10 py-11">
             <div className="aspect-video w-[420px] flex-none overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0b0b0d]">
-              {playing && playing.embed_url ? (
+              {playing && playing.embed_url && isDesktop ? (
                 <iframe src={embedSrc(playing.embed_url)} title={playing.title} className="h-full w-full" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
               ) : (
                 <button onClick={() => current && setPlaying(current)} className="relative flex h-full w-full items-center justify-center">
