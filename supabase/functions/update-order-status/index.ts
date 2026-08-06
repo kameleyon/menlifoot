@@ -109,7 +109,7 @@ function statusEmailHtml(o: { shipped: boolean; name?: string; ref: string; carr
 
 async function sendStatusEmail(to: string, subject: string, html: string) {
   const KEY = Deno.env.get("RESEND_API_KEY");
-  const FROM = Deno.env.get("EMAIL_FROM") ?? "noreply@menlifoot.ca";
+  const FROM = Deno.env.get("EMAIL_FROM") ?? "Menlifoot <info@menlifoot.ca>";
   const REPLY_TO = Deno.env.get("REPLY_TO_EMAIL") ?? "info@menlifoot.ca";
   const STORE = Deno.env.get("ORDER_CONFIRMATION_EMAIL");
   if (!KEY || !to) return false;
