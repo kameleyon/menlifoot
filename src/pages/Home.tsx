@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthModal } from '@/components/AuthModal';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { MessageCircle, User } from 'lucide-react';
 import AppShell from '@/components/mobile/AppShell';
 import { podcastThumb } from '@/lib/podcast';
@@ -39,7 +40,6 @@ const db = supabase as unknown as {
 };
 
 const stripe = 'repeating-linear-gradient(135deg,#1b1b1f 0 8px,#131316 8px 16px)';
-const money = (c: number | null) => (c == null ? '' : `$${(c / 100).toFixed(2)}`);
 interface ShopProduct { id: string; title: string; image: string | null; price_cents: number | null; }
 
 const Home = () => {
@@ -47,6 +47,7 @@ const Home = () => {
   const { t, language } = useLanguage();
   const { user, isAdmin, isEditor } = useAuth();
   const { open: openAuth } = useAuthModal();
+  const { fmt } = useCurrency();
   const [articles, setArticles] = useState<Article[]>([]);
   const [podcast, setPodcast] = useState<Podcast | null>(null);
   const [shop, setShop] = useState<ShopProduct[]>([]);
@@ -180,7 +181,7 @@ const Home = () => {
                   {p.image && <img src={p.image} alt={p.title} className="h-full w-full object-cover" />}
                 </div>
                 <div className="mt-[9px] line-clamp-1 font-sans text-[12px] font-medium leading-[1.3]">{p.title}</div>
-                <div className="mt-1 font-sans text-[12px] text-primary">{money(p.price_cents)}</div>
+                <div className="mt-1 font-sans text-[12px] text-primary">{fmt(p.price_cents)}</div>
               </Link>
             ))}
           </div>
@@ -241,7 +242,7 @@ const Home = () => {
               <Link key={p.id} to="/shop">
                 <div className="h-[220px] overflow-hidden rounded-xl" style={{ background: p.image ? undefined : stripe }}>{p.image && <img src={p.image} alt={p.title} className="h-full w-full object-cover" />}</div>
                 <div className="mt-2.5 font-sans text-[13px] font-medium">{p.title}</div>
-                <div className="mt-1 font-sans text-[12.5px] text-primary">{money(p.price_cents)}</div>
+                <div className="mt-1 font-sans text-[12.5px] text-primary">{fmt(p.price_cents)}</div>
               </Link>
             ))}
           </div>

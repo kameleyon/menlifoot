@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthModal } from '@/components/AuthModal';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { useToast } from '@/hooks/use-toast';
 import { ToastAction } from '@/components/ui/toast';
 import { RichTextContent } from '@/components/RichTextContent';
@@ -48,6 +49,7 @@ const CountryField = ({ label, value, onChange, className = '' }: { label: strin
 
 const Shop = () => {
   const { t, language } = useLanguage();
+  const { fmt } = useCurrency();
   const { user } = useAuth();
   const { open: openAuth } = useAuthModal();
   const { toast } = useToast();
@@ -292,7 +294,7 @@ const Shop = () => {
                     {p.image && <img src={p.image} alt={p.title} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />}
                   </div>
                   <span className="font-sans text-[12.5px] font-medium leading-[1.3]">{p.title}</span>
-                  <span className="font-sans text-[12px] text-primary">{money(p.price_cents)}</span>
+                  <span className="font-sans text-[12px] text-primary">{fmt(p.price_cents)}</span>
                 </button>
               ))}
             </div>
@@ -325,7 +327,7 @@ const Shop = () => {
           <div className="flex flex-1 flex-col gap-[18px] px-5 pt-[22px] lg:px-0 lg:pt-0">
             <div className="flex flex-col gap-2">
               <span className="font-display text-[26px] uppercase leading-[1.05] lg:text-[34px]">{selected.title}</span>
-              <span className="font-sans text-[18px] font-medium">{money(variant?.price ?? selected.price_cents)}</span>
+              <span className="font-sans text-[18px] font-medium">{fmt(variant?.price ?? selected.price_cents)}</span>
             </div>
 
             {/* Like · Favorite · Share */}
@@ -428,7 +430,7 @@ const Shop = () => {
                         <span className="min-w-[22px] text-center font-sans text-[12.5px] font-medium">{l.qty}</span>
                         <button onClick={() => setQty(i, 1)} aria-label="+" className="flex h-7 w-7 items-center justify-center font-sans text-[16px] leading-none text-foreground/70 transition-colors hover:text-primary">+</button>
                       </div>
-                      <span className="font-sans text-[12.5px] text-primary">{money(l.variant.price * l.qty)}</span>
+                      <span className="font-sans text-[12.5px] text-primary">{fmt(l.variant.price * l.qty)}</span>
                     </div>
                   </div>
                   <button onClick={() => removeLine(i)} aria-label={t('shop.remove')} className="flex h-8 w-8 flex-none items-center justify-center self-start rounded-full text-foreground/40 transition-colors hover:bg-white/[0.06] hover:text-primary">
@@ -437,10 +439,10 @@ const Shop = () => {
                 </div>
               ))}
               <div className="m-5 flex flex-col gap-2.5 rounded-2xl border border-white/[0.07] bg-[#101012] p-4">
-                <div className="flex justify-between font-sans text-[12.5px] text-foreground/60"><span>{t('shop.subtotal')}</span><span>{money(subtotal)}</span></div>
+                <div className="flex justify-between font-sans text-[12.5px] text-foreground/60"><span>{t('shop.subtotal')}</span><span>{fmt(subtotal)}</span></div>
                 <div className="flex justify-between font-sans text-[12.5px] text-foreground/60"><span>{t('shop.shipping')}</span><span>—</span></div>
                 <div className="h-px bg-white/[0.07]" />
-                <div className="flex items-baseline justify-between"><span className="font-sans text-[13px] font-semibold">{t('shop.total')}</span><span className="font-display text-[20px] text-primary">{money(subtotal)}</span></div>
+                <div className="flex items-baseline justify-between"><span className="font-sans text-[13px] font-semibold">{t('shop.total')}</span><span className="font-display text-[20px] text-primary">{fmt(subtotal)}</span></div>
               </div>
               <button onClick={() => setView('address')} className="mx-5 flex h-[52px] w-[calc(100%-40px)] items-center justify-center rounded-full font-sans text-[13.5px] font-bold tracking-[0.04em] text-[#070708]" style={{ background: 'linear-gradient(135deg,#e9c877,#c08a2a)' }}>{t('shop.checkout')}</button>
               <div className="mt-3.5 text-center font-sans text-[11px] text-foreground/35">{t('shop.secure')}</div>
@@ -453,7 +455,7 @@ const Shop = () => {
                       <button key={p.id} onClick={() => openProduct(p)} className="w-[130px] flex-none text-left">
                         <div className="aspect-square w-full overflow-hidden rounded-xl bg-white" style={{ background: p.image ? undefined : stripe }}>{p.image && <img src={p.image} alt={p.title} className="h-full w-full object-cover" />}</div>
                         <div className="mt-2 line-clamp-1 font-sans text-[12px] font-medium">{p.title}</div>
-                        <div className="mt-0.5 font-sans text-[12px] text-primary">{money(p.price_cents)}</div>
+                        <div className="mt-0.5 font-sans text-[12px] text-primary">{fmt(p.price_cents)}</div>
                       </button>
                     ))}
                   </div>

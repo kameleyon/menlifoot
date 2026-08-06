@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CartProvider } from "./contexts/CartContext";
 import { StoreCartProvider } from "./contexts/StoreCartContext";
+import { CurrencyProvider } from "./contexts/CurrencyContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { AuthModalProvider } from "./components/AuthModal";
@@ -40,6 +41,7 @@ const App = () => (
       <AuthProvider>
         <CartProvider>
           <StoreCartProvider>
+          <CurrencyProvider>
           <TooltipProvider>
             <Toaster />
             <Sonner />
@@ -72,6 +74,7 @@ const App = () => (
               </AuthModalProvider>
             </BrowserRouter>
           </TooltipProvider>
+          </CurrencyProvider>
           </StoreCartProvider>
         </CartProvider>
       </AuthProvider>
