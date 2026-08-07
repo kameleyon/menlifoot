@@ -33,6 +33,7 @@ const trackUrl = (carrier: string | null, num: string | null) => {
     case 'ups': return `https://www.ups.com/track?tracknum=${t}`;
     case 'fedex': return `https://www.fedex.com/fedextrack/?trknbr=${t}`;
     case 'usps': return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${t}`;
+    case 'dhl': return `https://www.dhl.com/us-en/home/tracking/tracking-parcel.html?submit=1&tracking-id=${t}`;
     case 'amazon': return `https://track.amazon.com/tracking/${t}`;
     default: return null;
   }

@@ -66,6 +66,7 @@ const CARRIERS = [
   { value: "ups", label: "UPS" },
   { value: "fedex", label: "FedEx" },
   { value: "usps", label: "USPS" },
+  { value: "dhl", label: "DHL" },
   { value: "amazon", label: "Amazon" },
   { value: "other", label: "Other" },
 ];
