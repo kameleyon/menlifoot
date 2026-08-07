@@ -103,7 +103,7 @@ async function sendConfirmationEmail(order: {
     method: "POST",
     headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      from: `Menlifoot <${FROM}>`,
+      from: FROM,
       to: [order.email],
       reply_to: REPLY_TO,
       ...(STORE ? { bcc: [STORE] } : {}),

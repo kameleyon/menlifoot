@@ -20,6 +20,7 @@ const VALID_CARRIERS = new Set([
   "ups",
   "fedex",
   "usps",
+  "dhl",
   "amazon",
   "other",
 ]);
@@ -119,7 +120,7 @@ async function sendStatusEmail(to: string, subject: string, html: string) {
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: `Menlifoot <${FROM}>`, to: [to], reply_to: REPLY_TO, ...(STORE ? { bcc: [STORE] } : {}), subject, html }),
+    body: JSON.stringify({ from: FROM, to: [to], reply_to: REPLY_TO, ...(STORE ? { bcc: [STORE] } : {}), subject, html }),
   });
   return r.ok;
 }
