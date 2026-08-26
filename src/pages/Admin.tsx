@@ -37,6 +37,7 @@ import {
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { CATEGORY_VALUES } from '@/lib/articleCategories';
 
 interface Podcast {
   id: string;
@@ -114,25 +115,6 @@ const detectPlatform = (url: string): 'spotify' | 'youtube' | null => {
   if (url.includes('youtube.com') || url.includes('youtu.be') || url.includes('youtube.com/shorts')) return 'youtube';
   return null;
 };
-
-const ARTICLE_CATEGORIES = [
-  'Match Analysis',
-  'Transfer News',
-  'Player Spotlight',
-  'World Cup 2026',
-  'Champions League',
-  'Premier League',
-  'La Liga',
-  'Serie A',
-  'Bundesliga',
-  'MLS',
-  'Tactics',
-  'Opinion',
-  'Did You Know?',
-  'Flashback',
-  'Football Business',
-  'Haiti',
-];
 
 // Common keyword suggestions for football articles
 const KEYWORD_SUGGESTIONS = [
@@ -945,7 +927,7 @@ const Admin = () => {
                             <SelectValue placeholder="Select category" />
                           </SelectTrigger>
                           <SelectContent>
-                            {ARTICLE_CATEGORIES.map((cat) => (
+                            {CATEGORY_VALUES.map((cat) => (
                               <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                             ))}
                           </SelectContent>

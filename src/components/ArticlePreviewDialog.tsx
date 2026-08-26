@@ -5,6 +5,8 @@ import { RichTextContent } from '@/components/RichTextContent';
 import { format } from 'date-fns';
 import { Calendar, Tag, Eye, Edit2, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { getCategoryLabel } from '@/lib/articleCategories';
 
 interface ArticlePreviewData {
   title: string;
@@ -39,6 +41,8 @@ export const ArticlePreviewDialog = ({
   isLoading = false,
   isEditing = false,
 }: ArticlePreviewDialogProps) => {
+  const { t } = useLanguage();
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl max-h-[95vh] p-0 overflow-hidden">
@@ -84,7 +88,7 @@ export const ArticlePreviewDialog = ({
             {/* Meta Info */}
             <div className="flex flex-wrap gap-3 mb-4">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/20 text-primary rounded-full text-sm font-medium">
-                {article.category}
+                {getCategoryLabel(t, article.category)}
               </span>
               {article.published_at && (
                 <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">

@@ -6,6 +6,7 @@ import { User } from 'lucide-react';
 import { RichTextContent } from '@/components/RichTextContent';
 import AppShell from '@/components/mobile/AppShell';
 import { useArticleEngagement, EngagementBar, CommentsSection } from '@/components/ArticleEngagement';
+import { getCategoryLabel } from '@/lib/articleCategories';
 
 interface Art {
   title: string; content: string; summary: string | null; category: string | null;
@@ -17,7 +18,7 @@ const stripe = 'repeating-linear-gradient(135deg,#1b1b1f 0 8px,#131316 8px 16px)
 const Article = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { language } = useLanguage();
+  const { t, language } = useLanguage();
   const [art, setArt] = useState<Art | null>(null);
   const [loading, setLoading] = useState(true);
   const eng = useArticleEngagement(id ?? '', { title: art?.title ?? '', summary: art?.summary ?? null });
@@ -52,7 +53,7 @@ const Article = () => {
             <button onClick={() => navigate(-1)} className="absolute left-4 top-[52px] flex h-[34px] w-[34px] items-center justify-center rounded-full bg-[#070708]/65 font-display text-[15px] backdrop-blur-md">←</button>
           </div>
           <div className="flex flex-col gap-3.5 px-5 pt-[22px]">
-            <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-primary">{art.category ?? 'Analysis'}</span>
+            <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.16em] text-primary">{getCategoryLabel(t, art.category)}</span>
             <h2 className="m-0 font-display text-[28px] uppercase leading-[1.08]">{art.title}</h2>
             <div className="flex items-center gap-2.5 border-b border-white/[0.08] pb-1.5">
               <div className="flex h-7 w-7 items-center justify-center rounded-full border border-primary/40 text-primary"><User className="h-[15px] w-[15px]" /></div>

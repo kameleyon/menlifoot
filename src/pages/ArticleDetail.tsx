@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { RichTextContent } from "@/components/RichTextContent";
+import { getCategoryLabel } from "@/lib/articleCategories";
 
 interface Article {
   id: string;
@@ -518,7 +519,7 @@ const ArticleDetail = () => {
 
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <Badge variant="secondary" className="mb-4 bg-primary/90 text-primary-foreground">
-              {article.category}
+              {getCategoryLabel(t, article.category)}
             </Badge>
 
             {translating && (
@@ -664,7 +665,7 @@ const ArticleDetail = () => {
                     />
                     <div className="p-4">
                       <Badge variant="outline" className="mb-2 text-xs">
-                        {similar.category}
+                        {getCategoryLabel(t, similar.category)}
                       </Badge>
                       <h3 className="font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors">
                         {similar.title}

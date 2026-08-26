@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { CATEGORY_VALUES, getCategoryLabel } from "@/lib/articleCategories";
 
 interface Article {
   id: string;
@@ -34,51 +35,6 @@ interface ArticleLike {
   count: number;
   userLiked: boolean;
 }
-
-const CATEGORY_VALUES = [
-  "Match Analysis",
-  "Transfer News",
-  "Player Spotlight",
-  "World Cup 2026",
-  "Champions League",
-  "Premier League",
-  "La Liga",
-  "Serie A",
-  "Bundesliga",
-  "MLS",
-  "Tactics",
-  "Opinion",
-  "Did You Know?",
-  "Flashback",
-  "Football Business",
-  "Haiti",
-] as const;
-
-type CategoryValue = (typeof CATEGORY_VALUES)[number];
-
-const CATEGORY_LABEL_KEYS: Record<CategoryValue, string> = {
-  "Match Analysis": "articles.cat.matchAnalysis",
-  "Transfer News": "articles.cat.transferNews",
-  "Player Spotlight": "articles.cat.playerSpotlight",
-  "World Cup 2026": "articles.cat.worldCup2026",
-  "Champions League": "articles.cat.championsLeague",
-  "Premier League": "articles.cat.premierLeague",
-  "La Liga": "articles.cat.laLiga",
-  "Serie A": "articles.cat.serieA",
-  Bundesliga: "articles.cat.bundesliga",
-  MLS: "articles.cat.mls",
-  Tactics: "articles.cat.tactics",
-  Opinion: "articles.cat.opinion",
-  "Did You Know?": "articles.cat.didYouKnow",
-  Flashback: "articles.cat.flashback",
-  "Football Business": "articles.cat.footballBusiness",
-  Haiti: "articles.cat.haiti",
-};
-
-const getCategoryLabel = (t: (key: string) => string, category: string) => {
-  const key = (CATEGORY_LABEL_KEYS as Record<string, string>)[category];
-  return key ? t(key) : category;
-};
 
 const Articles = () => {
   const { t, language } = useLanguage();

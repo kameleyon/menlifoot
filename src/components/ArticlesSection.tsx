@@ -7,6 +7,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { getCategoryLabel } from "@/lib/articleCategories";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,7 +52,8 @@ const CATEGORIES = [
   'Analysis',
   'Did You Know?',
   'Flashback',
-  'Football Business'
+  'Football Business',
+  'Lifestyle'
 ];
 
 type SortOption = 'latest' | 'oldest' | 'popular';
@@ -614,7 +616,7 @@ const ArticlesSection = () => {
                   <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-primary font-medium uppercase tracking-wider px-2 py-1 bg-primary/10 rounded">
-                        {article.category}
+                        {getCategoryLabel(t, article.category)}
                       </span>
                       {article.author && (
                         <span className="text-xs text-muted-foreground flex items-center gap-1">

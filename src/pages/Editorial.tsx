@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
 import AppShell from '@/components/mobile/AppShell';
+import { getCategoryLabel } from '@/lib/articleCategories';
 
 interface Art { id: string; title: string; summary: string | null; category: string | null; thumbnail_url: string | null; author: string | null; published_at: string | null; }
 const stripe = 'repeating-linear-gradient(135deg,#1b1b1f 0 8px,#131316 8px 16px)';
@@ -54,7 +55,7 @@ const Editorial = () => {
                   {a.thumbnail_url && <img src={a.thumbnail_url} alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />}
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.14em] text-primary/85">{a.category ?? 'Analysis'}</span>
+                  <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.14em] text-primary/85">{getCategoryLabel(t, a.category)}</span>
                   <span className="font-display text-[19px] uppercase leading-[1.1]">{a.title}</span>
                   {a.summary && <span className="line-clamp-2 font-sans text-[12.5px] leading-[1.5] text-foreground/55">{a.summary}</span>}
                   <span className="mt-0.5 font-sans text-[11px] text-foreground/40">{[a.author, date(a.published_at)].filter(Boolean).join(' · ')}</span>
