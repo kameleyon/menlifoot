@@ -65,6 +65,32 @@ export interface Suggestion {
   priority: 'high' | 'medium' | 'low';
 }
 
+export interface CaptainOption {
+  player_id: string;
+  name: string;
+  team: string;
+  next_opponent: string | null;
+  next_difficulty: number | null;
+  form: number | null;
+  is_current: boolean;
+}
+
+export interface ChipAdvice {
+  /** UCL Fantasy has only Wildcard and Limitless. Null means hold them both. */
+  chip: 'Wildcard' | 'Limitless' | null;
+  urgency: 'high' | 'medium' | 'none';
+  reason: string;
+}
+
+export interface Optimisation {
+  formation: string;
+  starters: SquadSlot[];
+  bench: SquadSlot[];
+  captain: { player_id: string; name: string } | null;
+  improvement: number;
+  changes_needed: boolean;
+}
+
 export interface RatingResult {
   id: string | null;
   rating: number;
@@ -72,14 +98,76 @@ export interface RatingResult {
   breakdown: SubScore[];
   narrative: { verdict?: string; strengths?: string[]; weaknesses?: string[] } | null;
   suggestions: Suggestion[];
+  optimisation: Optimisation | null;
+  captain_ranking: CaptainOption[];
+  chip_advice: ChipAdvice | null;
 }
 
+export interface Fixture {
+  id: string;
+  matchday: number;
+  kickoff: string | null;
+  home_team: string;
+  away_team: string;
+  home_score: number | null;
+  away_score: number | null;
+  status: 'scheduled' | 'live' | 'finished' | 'postponed';
+}
+
+export interface Matchday {
+  matchday: number;
+  deadline: string | null;
+  starts_on: string | null;
+  ends_on: string | null;
+}
+
+/** Fixtures for one matchday, plus that matchday's deadline. */
+export const getFixtures = async (matchday: number) => {
+  const [fx, md] = await Promise.all([
+    (supabase as any)
+      .from('ucl_fixtures')
+      .select('id,matchday,kickoff,home_team,away_team,home_score,away_score,status')
+      .eq('matchday', matchday)
+      .order('kickoff', { ascending: true, nullsFirst: false }),
+    (supabase as any).from('ucl_matchdays').select('*').eq('matchday', matchday).maybeSingle(),
+  ]);
+  return {
+    fixtures: (fx.data ?? []) as Fixture[],
+    matchday: (md.data ?? null) as Matchday | null,
+  };
+};
+
+/** Which matchdays have any fixtures loaded, so the pager only offers real ones. */
+export const getLoadedMatchdays = async (): Promise<number[]> => {
+  const { data } = await (supabase as any).from('ucl_fixtures').select('matchday');
+  const set = new Set<number>(((data ?? []) as { matchday: number }[]).map((r) => r.matchday));
+  return [...set].sort((a, b) => a - b);
+};
+
 export const FORMATIONS = ['3-4-3', '3-5-2', '4-3-3', '4-4-2', '4-5-1', '5-3-2', '5-4-1'] as const;
+
+/**
+ * UCL Fantasy squad rules: 15 players for EUR 100m, split 2/5/5/3.
+ * (Confirmed against the 2026/27 rules — this is NOT the same as FPL.)
+ */
+export const SQUAD_COMPOSITION: Record<Position, number> = { GK: 2, DEF: 5, MID: 5, FWD: 3 };
 
 /** Slot counts per outfield line for a formation, plus the single keeper. */
 export const formationSlots = (formation: string): Record<Position, number> => {
   const [def, mid, fwd] = formation.split('-').map((n) => parseInt(n, 10) || 0);
   return { GK: 1, DEF: def, MID: mid, FWD: fwd };
+};
+
+/**
+ * The bench is whatever the formation leaves over from the 2/5/5/3 squad — not
+ * one player per position. A 4-3-3 benches 1 GK, 1 DEF and 2 MID; a 4-4-2
+ * benches one of each.
+ */
+export const benchShape = (formation: string): Position[] => {
+  const starting = formationSlots(formation);
+  return (['GK', 'DEF', 'MID', 'FWD'] as Position[]).flatMap((pos) =>
+    Array.from({ length: Math.max(0, SQUAD_COMPOSITION[pos] - starting[pos]) }, () => pos),
+  );
 };
 
 export const parseScreenshot = async (imageBase64: string): Promise<ParseResult> => {

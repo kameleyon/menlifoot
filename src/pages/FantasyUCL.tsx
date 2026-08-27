@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Upload, PenLine, ArrowLeft, AlertTriangle, ArrowRight } from 'lucide-react';
+import {
+  Upload, PenLine, ArrowLeft, AlertTriangle, ArrowRight,
+  Clipboard, Wand2, Star, Zap, CalendarDays, ChevronDown,
+} from 'lucide-react';
 import AppShell from '@/components/mobile/AppShell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import PitchView from '@/components/ucl/PitchView';
 import RatingRing from '@/components/ucl/RatingRing';
 import SquadBuilder from '@/components/ucl/SquadBuilder';
+import FixturesCalendar from '@/components/ucl/FixturesCalendar';
 import {
   fileToBase64,
   parseScreenshot,
@@ -16,7 +20,7 @@ import {
   type Squad,
 } from '@/lib/uclFantasy';
 
-type Step = 'start' | 'import' | 'build' | 'analyzing' | 'email' | 'result';
+type Step = 'start' | 'import' | 'build' | 'analyzing' | 'email' | 'result' | 'fixtures';
 
 const STAGE_KEYS = ['ucl.stage.reading', 'ucl.stage.measuring', 'ucl.stage.finding'];
 
@@ -33,6 +37,7 @@ const FantasyUCL = () => {
   const [result, setResult] = useState<RatingResult | null>(null);
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showAllTransfers, setShowAllTransfers] = useState(false);
 
   // Advance the progress copy while the request is in flight. Purely cosmetic —
   // the real work is one round trip, but a blank wait reads as a hang.
@@ -42,6 +47,22 @@ const FantasyUCL = () => {
     const id = setInterval(() => setStage((s) => Math.min(s + 1, STAGE_KEYS.length - 1)), 1400);
     return () => clearInterval(id);
   }, [step]);
+
+  // Ctrl+V anywhere on the import step. Managers screenshot on a phone and
+  // paste on a desktop far more often than they save and re-upload a file.
+  useEffect(() => {
+    if (step !== 'import') return;
+    const onPaste = (e: ClipboardEvent) => {
+      const item = [...(e.clipboardData?.items ?? [])].find((i) => i.type.startsWith('image/'));
+      const file = item?.getAsFile();
+      if (file) {
+        e.preventDefault();
+        void handleFile(file);
+      }
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  });
 
   const analyze = useCallback(
     async (next: Squad, src: 'screenshot' | 'manual', withEmail?: string) => {
@@ -113,12 +134,25 @@ const FantasyUCL = () => {
     }
   };
 
+  /** Apply the suggested XI/captain, then re-run the rating so the score moves. */
+  const applyOptimisation = async () => {
+    if (!result?.optimisation) return;
+    const next: Squad = {
+      formation: result.optimisation.formation,
+      starters: result.optimisation.starters,
+      bench: result.optimisation.bench,
+    };
+    setShowAllTransfers(false);
+    await analyze(next, source, email.trim() || undefined);
+  };
+
   const reset = () => {
     setStep('start');
     setSquad(null);
     setResult(null);
     setUnresolved([]);
     setEmail('');
+    setShowAllTransfers(false);
   };
 
   return (
@@ -162,6 +196,14 @@ const FantasyUCL = () => {
                 <PenLine className="h-4 w-4" />
                 {t('ucl.buildManually')}
               </Button>
+              <Button
+                variant="ghost"
+                className="h-12 w-full justify-start gap-3"
+                onClick={() => setStep('fixtures')}
+              >
+                <CalendarDays className="h-4 w-4" />
+                {t('ucl.viewFixtures')}
+              </Button>
             </div>
           </div>
         )}
@@ -186,6 +228,10 @@ const FantasyUCL = () => {
               <Upload className="mr-2 h-4 w-4" />
               {t('ucl.chooseImage')}
             </Button>
+            <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+              <Clipboard className="h-3.5 w-3.5" />
+              {t('ucl.orPaste')}
+            </div>
 
             {unresolved.length > 0 && (
               <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
@@ -214,6 +260,13 @@ const FantasyUCL = () => {
                 </Button>
               </>
             )}
+          </div>
+        )}
+
+        {step === 'fixtures' && (
+          <div className="space-y-4">
+            <h2 className="font-display text-2xl uppercase">{t('ucl.fixturesTitle')}</h2>
+            <FixturesCalendar />
           </div>
         )}
 
@@ -322,10 +375,70 @@ const FantasyUCL = () => {
                 ))}
             </div>
 
+            {result.optimisation?.changes_needed && (
+              <div className="rounded-xl border border-primary/40 bg-primary/5 p-4">
+                <div className="flex items-center gap-2">
+                  <Wand2 className="h-4 w-4 text-primary" />
+                  <h3 className="font-display text-sm uppercase tracking-wide">
+                    {t('ucl.optimizeTitle')}
+                  </h3>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t('ucl.optimizeBody')} {result.optimisation.formation}
+                </p>
+                <Button size="sm" className="mt-3 w-full" disabled={busy} onClick={applyOptimisation}>
+                  {t('ucl.optimizeApply')}
+                </Button>
+              </div>
+            )}
+
+            {result.captain_ranking?.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="flex items-center gap-2 font-display text-sm uppercase tracking-wide">
+                  <Star className="h-4 w-4 text-primary" />
+                  {t('ucl.captainTitle')}
+                </h3>
+                {result.captain_ranking.map((c) => (
+                  <div
+                    key={c.player_id}
+                    className={`flex items-center justify-between rounded-lg border p-2.5 ${
+                      c.is_current ? 'border-primary/50 bg-primary/5' : 'border-border bg-card/60'
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium">{c.name}</div>
+                      <div className="truncate text-xs text-muted-foreground">
+                        {c.next_opponent ? `${t('ucl.vs')} ${c.next_opponent}` : c.team}
+                        {c.next_difficulty != null && ` · ${t('ucl.difficulty')} ${c.next_difficulty}/5`}
+                      </div>
+                    </div>
+                    {c.is_current && (
+                      <span className="shrink-0 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
+                        C
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {result.chip_advice && (
+              <div className="rounded-lg border border-border bg-card/60 p-3">
+                <div className="flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-primary" />
+                  <h3 className="font-display text-sm uppercase tracking-wide">{t('ucl.chipTitle')}</h3>
+                </div>
+                <p className="mt-1 text-sm font-medium">
+                  {result.chip_advice.chip ?? t('ucl.chipHold')}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{result.chip_advice.reason}</p>
+              </div>
+            )}
+
             {result.suggestions.length > 0 && (
               <div className="space-y-2">
                 <h3 className="font-display text-sm uppercase tracking-wide">{t('ucl.transfers')}</h3>
-                {result.suggestions.map((s, i) => (
+                {(showAllTransfers ? result.suggestions : result.suggestions.slice(0, 3)).map((s, i) => (
                   <div key={i} className="rounded-lg border border-border bg-card/60 p-3">
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <span className="text-muted-foreground line-through">{s.out}</span>
@@ -335,8 +448,26 @@ const FantasyUCL = () => {
                     <p className="mt-1 text-xs text-muted-foreground">{s.reason}</p>
                   </div>
                 ))}
+                {result.suggestions.length > 3 && !showAllTransfers && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllTransfers(true)}
+                    className="flex w-full items-center justify-center gap-1 py-1 text-xs text-muted-foreground underline"
+                  >
+                    {t('ucl.showMore')} ({result.suggestions.length - 3})
+                    <ChevronDown className="h-3 w-3" />
+                  </button>
+                )}
               </div>
             )}
+
+            <div className="space-y-2">
+              <h3 className="flex items-center gap-2 font-display text-sm uppercase tracking-wide">
+                <CalendarDays className="h-4 w-4 text-primary" />
+                {t('ucl.fixturesTitle')}
+              </h3>
+              <FixturesCalendar />
+            </div>
 
             <Button variant="outline" className="w-full" onClick={reset}>
               {t('ucl.rateAnother')}

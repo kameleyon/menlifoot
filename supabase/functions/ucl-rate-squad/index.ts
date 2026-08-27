@@ -36,6 +36,15 @@ const WEIGHTS = {
 // matchday 1 when form, price and fixtures are all still empty.
 const MAX_COMFORTABLE_PER_CLUB = 3;
 
+// UCL Fantasy squad rules (verified against the 2026/27 rules): 15 players for
+// EUR 100m, split 2 GK / 5 DEF / 5 MID / 3 FWD. The bench is therefore whatever
+// the formation leaves over — it is NOT one player per position.
+const SQUAD_COMPOSITION: Record<string, number> = { GK: 2, DEF: 5, MID: 5, FWD: 3 };
+
+// UCL Fantasy has exactly two chips. Bench Boost and Triple Captain are Fantasy
+// Premier League chips and do not exist here.
+const CHIPS = ["Wildcard", "Limitless"] as const;
+
 const VALID_FORMATIONS = new Set([
   "3-4-3", "3-5-2", "4-3-3", "4-4-2", "4-5-1", "5-3-2", "5-4-1", "3-6-1", "5-2-3",
 ]);
@@ -201,11 +210,24 @@ serve(async (req) => {
     const benchedBetter = bench.filter(
       (b) => starters.some((s) => s.position === b.position && availabilityScore(s) === 0 && availabilityScore(b) === 1),
     ).length;
+    // Squad-wide composition must be 2/5/5/3 across all 15, not just a legal XI.
+    const squadCounts = [...starters, ...bench].reduce<Record<string, number>>((acc, p) => {
+      acc[p.position] = (acc[p.position] ?? 0) + 1;
+      return acc;
+    }, {});
+    const compositionOk =
+      starters.length + bench.length !== 15
+        ? false
+        : Object.entries(SQUAD_COMPOSITION).every(([pos, n]) => (squadCounts[pos] ?? 0) === n);
+
     let structure = 1;
-    if (starters.length !== 11) structure -= 0.35;
+    if (starters.length !== 11) structure -= 0.3;
     if ((counts.GK ?? 0) !== 1) structure -= 0.2;
     if (!VALID_FORMATIONS.has(shape)) structure -= 0.2;
     if (!captain) structure -= 0.25;
+    // Only penalise composition when a full 15 was submitted; a screenshot that
+    // only captured the XI should not be marked down for a bench we never saw.
+    if (bench.length > 0 && !compositionOk) structure -= 0.15;
     structure -= Math.min(0.3, benchedBetter * 0.15);
     sub.structure = clamp01(structure);
 
@@ -238,6 +260,128 @@ serve(async (req) => {
       applicable: applicable[k],
     }));
 
+    // ---------------------------------------------------- optimise the XI ---
+    // Pure re-arrangement of the 15 players already owned: no transfers, no
+    // budget, so it works today even with zero price data. Deterministic — the
+    // same squad always yields the same optimal XI.
+    const expectedValue = (p: Player): number => {
+      const parts: [number, number][] = [[0.4, availabilityScore(p)]];
+      if (p.form != null) parts.push([0.4, formScore(p)]);
+      if (p.next_difficulty != null) parts.push([0.2, fixtureScore(p)]);
+      const w = parts.reduce((t, [x]) => t + x, 0);
+      return w ? parts.reduce((t, [x, sc]) => t + x * sc, 0) / w : 0.5;
+    };
+
+    // Attacking returns dominate fantasy captaincy: a keeper's ceiling is a
+    // clean sheet and some saves, a forward's is a hat-trick. Without this the
+    // optimiser captains whoever sorts first when everyone ties on availability
+    // pre-season — which was a goalkeeper.
+    const CAPTAIN_POSITION_PRIOR: Record<string, number> = { FWD: 1, MID: 0.95, DEF: 0.7, GK: 0.45 };
+    const captaincyValue = (p: Player): number =>
+      expectedValue(p) * (CAPTAIN_POSITION_PRIOR[p.position] ?? 0.8);
+
+    const optimiseXi = (squadPlayers: Player[]) => {
+      const byPos = (pos: string) =>
+        squadPlayers.filter((p) => p.position === pos).sort((a, c) => expectedValue(c) - expectedValue(a));
+      const pools = { GK: byPos("GK"), DEF: byPos("DEF"), MID: byPos("MID"), FWD: byPos("FWD") };
+
+      let best: { xi: Player[]; benchOut: Player[]; shape: string; total: number } | null = null;
+      for (const f of VALID_FORMATIONS) {
+        const [d, m, fw] = f.split("-").map(Number);
+        if (pools.GK.length < 1 || pools.DEF.length < d || pools.MID.length < m || pools.FWD.length < fw) {
+          continue;
+        }
+        const xi = [
+          ...pools.GK.slice(0, 1),
+          ...pools.DEF.slice(0, d),
+          ...pools.MID.slice(0, m),
+          ...pools.FWD.slice(0, fw),
+        ];
+        const total = xi.reduce((t, p) => t + expectedValue(p), 0);
+        if (!best || total > best.total) {
+          const picked = new Set(xi.map((p) => p.id));
+          best = { xi, benchOut: squadPlayers.filter((p) => !picked.has(p.id)), shape: f, total };
+        }
+      }
+      if (!best) return null;
+      // Captain the highest captaincy value in the chosen XI.
+      const cap = [...best.xi].sort((a, c) => captaincyValue(c) - captaincyValue(a))[0] ?? null;
+      return { ...best, captain: cap };
+    };
+
+    const optimised = optimiseXi([...starters, ...bench]);
+    const currentXiValue = starters.reduce((t, p) => t + expectedValue(p), 0);
+    const optimisation = optimised
+      ? {
+          formation: optimised.shape,
+          starters: optimised.xi.map((p) => ({
+            player_id: p.id,
+            name: p.name,
+            display_name: p.display_name,
+            team: p.team,
+            position: p.position,
+            price: p.price,
+            is_captain: p.id === optimised.captain?.id,
+          })),
+          bench: optimised.benchOut.map((p) => ({
+            player_id: p.id,
+            name: p.name,
+            display_name: p.display_name,
+            team: p.team,
+            position: p.position,
+            price: p.price,
+          })),
+          captain: optimised.captain
+            ? { player_id: optimised.captain.id, name: optimised.captain.name }
+            : null,
+          // Positive means the suggested XI is stronger than the current one.
+          improvement: Number((optimised.total - currentXiValue).toFixed(3)),
+          // A reshuffle that gains nothing is noise, so require a real delta in
+          // XI strength or a genuinely better captain before flagging it.
+          changes_needed:
+            optimised.total - currentXiValue > 0.01 ||
+            (optimised.captain != null &&
+              captain != null &&
+              captaincyValue(optimised.captain) - captaincyValue(captain) > 0.01) ||
+            (optimised.captain != null && captain == null),
+        }
+      : null;
+
+    // --------------------------------------------------- captain suggestion ---
+    const captainRanking = [...starters]
+      .sort((a, c) => captaincyValue(c) - captaincyValue(a))
+      .slice(0, 3)
+      .map((p) => ({
+        player_id: p.id,
+        name: p.name,
+        team: p.team,
+        next_opponent: p.next_opponent,
+        next_difficulty: p.next_difficulty,
+        form: p.form,
+        is_current: p.id === captain?.id,
+      }));
+
+    // ---------------------------------------------------------- chip advice ---
+    // UCL Fantasy only has Wildcard and Limitless, so the advice is a simple
+    // read of how much of the squad is actually broken this matchday.
+    const unavailableStarters = starters.filter((p) => availabilityScore(p) === 0).length;
+    const hardFixtures = starters.filter((p) => (p.next_difficulty ?? 0) >= 4).length;
+    const chipAdvice = (() => {
+      if (unavailableStarters >= 4) {
+        return { chip: CHIPS[0], urgency: "high",
+          reason: `${unavailableStarters} of your XI cannot play — too many to fix with normal transfers.` };
+      }
+      if (hardFixtures >= 7) {
+        return { chip: CHIPS[1], urgency: "medium",
+          reason: `${hardFixtures} of your XI face a top-tier opponent; a one-matchday reshape may pay.` };
+      }
+      if (unavailableStarters >= 2) {
+        return { chip: CHIPS[0], urgency: "medium",
+          reason: `${unavailableStarters} unavailable starters is more than a free transfer can cover.` };
+      }
+      return { chip: null, urgency: "none", reason: "Hold both chips — nothing this matchday justifies one." };
+    })();
+
     // -------------------------------------------------- transfer shortlist ---
     // Rank starters worst-first, then pull same-position replacements the user
     // could plausibly afford. The model picks from THIS list; it never invents.
@@ -247,21 +391,27 @@ serve(async (req) => {
         s: 0.4 * formScore(p) + 0.3 * availabilityScore(p) + 0.3 * fixtureScore(p),
       }))
       .sort((a, b) => a.s - b.s)
-      .slice(0, 3);
+      .slice(0, 5);
 
     const candidates: Record<string, Player[]> = {};
     for (const { p } of weakest) {
-      const budget = (p.price ?? 0) + 2.0;
-      const { data: alts } = await supabase
+      let q = supabase
         .from("ucl_players")
         .select(
           "id,name,display_name,team,position,price,total_points,form,minutes,availability,availability_note,next_opponent,next_difficulty",
         )
         .eq("position", p.position)
         .eq("availability", "available")
-        .lte("price", budget)
-        .not("id", "in", `(${[...starterIds, ...benchIds].join(",")})`)
+        .not("id", "in", `(${[...starterIds, ...benchIds].join(",")})`);
+
+      // Only constrain by budget when we actually know what the outgoing player
+      // costs. `lte` against a null column matches nothing, so applying this
+      // pre-season silently returned zero candidates for every slot.
+      if (p.price != null) q = q.lte("price", p.price + 2.0);
+
+      const { data: alts } = await q
         .order("form", { ascending: false, nullsFirst: false })
+        .order("next_difficulty", { ascending: true, nullsFirst: false })
         .limit(6);
       candidates[p.id] = (alts ?? []) as Player[];
     }
@@ -279,6 +429,8 @@ serve(async (req) => {
           .filter((k) => !applicable[k]),
         formation: shape,
         club_concentration: { max_from_one_club: maxPerClub, by_club: perClub },
+        chip_advice: chipAdvice,
+        best_captain_options: captainRanking,
         captain: captain ? { name: captain.name, team: captain.team, form: captain.form } : null,
         starters: starters.map((p) => ({
           name: p.name, team: p.team, position: p.position, price: p.price,
@@ -355,7 +507,7 @@ serve(async (req) => {
         email_captured_at: email ? new Date().toISOString() : null,
         squad,
         rating,
-        breakdown: { sub_scores: breakdown, formation: shape, narrative },
+        breakdown: { sub_scores: breakdown, formation: shape, narrative, chip_advice: chipAdvice },
         suggestions,
         source,
         language,
@@ -371,6 +523,9 @@ serve(async (req) => {
         breakdown,
         narrative,
         suggestions,
+        optimisation,
+        captain_ranking: captainRanking,
+        chip_advice: chipAdvice,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

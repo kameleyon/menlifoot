@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import PitchView from './PitchView';
 import {
+  benchShape,
   FORMATIONS,
   formationSlots,
   searchPlayers,
@@ -19,8 +20,6 @@ interface Props {
   submitting?: boolean;
 }
 
-const BENCH_SHAPE: Position[] = ['GK', 'DEF', 'MID', 'FWD'];
-
 const emptySlot = (position: Position): SquadSlot => ({ player_id: null, position });
 
 const buildStarters = (formation: string): SquadSlot[] => {
@@ -34,7 +33,9 @@ const SquadBuilder = ({ onSubmit, submitting = false }: Props) => {
   const { t } = useLanguage();
   const [formation, setFormation] = useState<string>('4-3-3');
   const [starters, setStarters] = useState<SquadSlot[]>(() => buildStarters('4-3-3'));
-  const [bench, setBench] = useState<SquadSlot[]>(() => BENCH_SHAPE.map(emptySlot));
+  // Bench composition is derived from the formation against the 2/5/5/3 squad
+  // rule, so a 4-3-3 benches 1 GK / 1 DEF / 2 MID rather than one per position.
+  const [bench, setBench] = useState<SquadSlot[]>(() => benchShape('4-3-3').map(emptySlot));
   const [picking, setPicking] = useState<{ index: number; onBench: boolean; position: Position } | null>(
     null,
   );
@@ -45,15 +46,16 @@ const SquadBuilder = ({ onSubmit, submitting = false }: Props) => {
   // Changing formation rebuilds the pitch. Players already picked are carried
   // over per position so a manager doesn't lose their whole XI to a reshape.
   const changeFormation = (next: string) => {
-    const carried = [...starters];
-    const rebuilt = buildStarters(next).map((slot) => {
-      const idx = carried.findIndex((c) => c.position === slot.position && c.player_id);
-      if (idx === -1) return slot;
-      const [taken] = carried.splice(idx, 1);
-      return taken;
-    });
+    // Pool every player currently held, then refill the new XI and the new
+    // bench from it, so a reshape never silently drops someone.
+    const pool = [...starters, ...bench].filter((s) => s.player_id);
+    const take = (pos: Position) => {
+      const i = pool.findIndex((c) => c.position === pos);
+      return i === -1 ? emptySlot(pos) : pool.splice(i, 1)[0];
+    };
     setFormation(next);
-    setStarters(rebuilt);
+    setStarters(buildStarters(next).map((slot) => take(slot.position as Position)));
+    setBench(benchShape(next).map((pos) => take(pos)));
   };
 
   useEffect(() => {

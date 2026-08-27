@@ -1,0 +1,302 @@
+// Fixtures, club strength and post-matchday player stats.
+//
+// Three modes, each on its own schedule because they change at different rates:
+//   fixtures  — the league-phase schedule. Set at the draw, rarely changes.
+//   teams     — club strength tiers. Refresh occasionally.
+//   stats     — player points/form. Only moves after a matchday is played, so
+//               this runs weekly rather than nightly.
+//
+// After fixtures or teams change, refresh_player_fixtures() recomputes every
+// player's next opponent and difficulty in SQL.
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-api-version",
+};
+
+const POOL_SIZE = 6;
+
+async function runPool<T, R>(items: T[], size: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = [];
+  for (let i = 0; i < items.length; i += size) {
+    out.push(...(await Promise.all(items.slice(i, i + size).map(fn))));
+  }
+  return out;
+}
+
+async function askPerplexity(prompt: string, apiKey: string): Promise<unknown> {
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "perplexity/sonar",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You return ONLY raw JSON matching the requested shape. No prose, no markdown fences. " +
+            "Use null for anything you cannot confirm rather than guessing.",
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.1,
+    }),
+  });
+  if (!res.ok) throw new Error(`openrouter ${res.status}: ${await res.text()}`);
+  const body = await res.json();
+  const text = String(body?.choices?.[0]?.message?.content ?? "");
+  const match = text.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
+  if (!match) throw new Error(`no JSON in response: ${text.slice(0, 200)}`);
+  return JSON.parse(match[0]);
+}
+
+const num = (v: unknown, fallback = 0): number => {
+  const n = typeof v === "string" ? parseFloat(v) : typeof v === "number" ? v : NaN;
+  return Number.isFinite(n) ? n : fallback;
+};
+
+const normalize = (s: string): string =>
+  s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+  );
+  const apiKey = Deno.env.get("OPENROUTER_API_KEY");
+
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
+  try {
+    if (!apiKey) return json({ error: "OPENROUTER_API_KEY is not configured" }, 500);
+    const body = await req.json().catch(() => ({}));
+    const mode: string = body?.mode ?? "fixtures";
+
+    // Club names already in the pool are the canonical spellings; everything
+    // written here must match them or the joins silently produce nothing.
+    const { data: teamRows } = await supabase.from("ucl_players").select("team");
+    const teams: string[] = [...new Set(((teamRows ?? []) as { team: string }[]).map((r) => r.team))];
+
+    // ------------------------------------------------------------- teams ---
+    if (mode === "teams") {
+      // Ask for a RANKING, not absolute tiers. Asked for 1-5 directly the model
+      // rated 22 of 36 clubs a 4 or 5, which compressed every fixture toward
+      // "hard" and made the sub-score useless. An ordinal list bucketed into
+      // fifths here guarantees a real spread whatever the model thinks.
+      const rows = (await askPerplexity(
+        `Rank these ${teams.length} football clubs from strongest to weakest for the 2026/27 ` +
+          `UEFA Champions League, considering squad quality, recent European form and UEFA ` +
+          `coefficient. Clubs: ${teams.join(", ")}. ` +
+          `Return a JSON array ordered strongest first, one object per club with keys: ` +
+          `team (exactly as given), code (3-letter uppercase abbreviation). ` +
+          `Include every club exactly once.`,
+        apiKey,
+      )) as Record<string, unknown>[];
+      if (!Array.isArray(rows)) return json({ error: "teams: not an array" }, 502);
+
+      const known = new Map(teams.map((t) => [normalize(t), t]));
+      const ranked: { name: string; code: string | null }[] = [];
+      const seenTeams = new Set<string>();
+      for (const r of rows) {
+        const canonical = known.get(normalize(String(r.team ?? "")));
+        if (!canonical || seenTeams.has(canonical)) continue;
+        seenTeams.add(canonical);
+        ranked.push({ name: canonical, code: r.code ? String(r.code).toUpperCase().slice(0, 4) : null });
+      }
+      // Anything the model dropped lands in the middle rather than vanishing.
+      for (const t of teams) {
+        if (!seenTeams.has(t)) ranked.splice(Math.floor(ranked.length / 2), 0, { name: t, code: null });
+      }
+
+      const total = ranked.length || 1;
+      const payload = ranked.map((r, i) => ({
+        name: r.name,
+        code: r.code,
+        // Fifths: top 20% -> 5, bottom 20% -> 1.
+        strength: Math.max(1, 5 - Math.floor((i * 5) / total)),
+        updated_at: new Date().toISOString(),
+      }));
+
+      const { error } = await supabase.from("ucl_teams").upsert(payload, { onConflict: "name" });
+      if (error) throw new Error(`teams upsert: ${error.message}`);
+
+      const { data: touched } = await supabase.rpc("refresh_player_fixtures");
+      return json({ mode, teams: payload.length, players_touched: touched ?? 0 });
+    }
+
+    // ---------------------------------------------------------- fixtures ---
+    if (mode === "fixtures") {
+      const matchdays: number[] = Array.isArray(body?.matchdays) && body.matchdays.length
+        ? body.matchdays.map((n: unknown) => num(n, 0)).filter((n: number) => n >= 1 && n <= 8)
+        : [1, 2, 3, 4, 5, 6, 7, 8];
+
+      // One matchday per call: 18 fixtures is a comfortable response, all eight
+      // at once is not, and a truncated schedule is worse than a missing one.
+      const perDay = await runPool(matchdays, POOL_SIZE, async (md: number) => {
+        try {
+          const res = (await askPerplexity(
+            `Matchday ${md} of the league phase of the 2026/27 UEFA Champions League. ` +
+              `Return a JSON object with keys: ` +
+              `deadline (ISO 8601 datetime of the fantasy deadline, or null), ` +
+              `fixtures (array of objects with home_team, away_team, ` +
+              `kickoff (ISO 8601 datetime with timezone, or null), ` +
+              `home_score (integer or null if not played), away_score (integer or null)). ` +
+              `Use these exact club names where they appear: ${teams.join(", ")}.`,
+            apiKey,
+          )) as Record<string, unknown>;
+          return { md, res };
+        } catch (err) {
+          console.log(`matchday ${md}: ${err instanceof Error ? err.message : String(err)}`);
+          return { md, res: null };
+        }
+      });
+
+      const known = new Map(teams.map((t) => [normalize(t), t]));
+      const fixtures: Record<string, unknown>[] = [];
+      const days: Record<string, unknown>[] = [];
+
+      for (const { md, res } of perDay) {
+        if (!res) continue;
+        const list = Array.isArray(res.fixtures) ? (res.fixtures as Record<string, unknown>[]) : [];
+        const kickoffs: string[] = [];
+        for (const f of list) {
+          const home = known.get(normalize(String(f.home_team ?? "")));
+          const away = known.get(normalize(String(f.away_team ?? "")));
+          if (!home || !away || home === away) continue;
+          const kickoff = f.kickoff ? String(f.kickoff) : null;
+          if (kickoff) kickoffs.push(kickoff);
+          const played = f.home_score != null && f.away_score != null;
+          fixtures.push({
+            matchday: md,
+            kickoff,
+            home_team: home,
+            away_team: away,
+            home_score: played ? Math.round(num(f.home_score)) : null,
+            away_score: played ? Math.round(num(f.away_score)) : null,
+            status: played ? "finished" : "scheduled",
+            updated_at: new Date().toISOString(),
+          });
+        }
+        const sorted = kickoffs.sort();
+        days.push({
+          matchday: md,
+          deadline: res.deadline ? String(res.deadline) : null,
+          starts_on: sorted[0]?.slice(0, 10) ?? null,
+          ends_on: sorted[sorted.length - 1]?.slice(0, 10) ?? null,
+          updated_at: new Date().toISOString(),
+        });
+      }
+
+      // Collapse duplicates before upserting — same reason as the player pool.
+      const seen = new Map<string, Record<string, unknown>>();
+      for (const f of fixtures) seen.set(`${f.matchday}|${f.home_team}|${f.away_team}`, f);
+      const deduped = [...seen.values()];
+
+      if (deduped.length) {
+        const { error } = await supabase
+          .from("ucl_fixtures")
+          .upsert(deduped, { onConflict: "matchday,home_team,away_team" });
+        if (error) throw new Error(`fixtures upsert: ${error.message}`);
+      }
+      if (days.length) {
+        await supabase.from("ucl_matchdays").upsert(days, { onConflict: "matchday" });
+      }
+
+      const { data: touched } = await supabase.rpc("refresh_player_fixtures");
+      return json({ mode, fixtures: deduped.length, matchdays: days.length, players_touched: touched ?? 0 });
+    }
+
+    // ------------------------------------------------------------- stats ---
+    if (mode === "stats") {
+      const { data: run } = await supabase
+        .from("ucl_stats_runs")
+        .insert({ status: "running", matchday: body?.matchday ?? null })
+        .select("id")
+        .single();
+      const runId = run?.id as string | undefined;
+
+      const perTeam = await runPool(teams, POOL_SIZE, async (team: string) => {
+        try {
+          const rows = (await askPerplexity(
+            `UEFA Champions League Fantasy player statistics for ${team} in the 2026/27 season so far. ` +
+              `Return a JSON array; one object per player with keys: ` +
+              `name (full name), total_points (fantasy points this season, integer), ` +
+              `form (average fantasy points per match so far, number or null), ` +
+              `minutes (total minutes played, integer), goals (integer), assists (integer), ` +
+              `clean_sheets (integer), price (current fantasy price in millions, number or null). ` +
+              `Return [] if the competition has not started and no player has any points yet.`,
+            apiKey,
+          )) as Record<string, unknown>[];
+          return Array.isArray(rows) ? rows.map((r) => ({ team, r })) : [];
+        } catch (err) {
+          console.log(`stats ${team}: ${err instanceof Error ? err.message : String(err)}`);
+          return [];
+        }
+      });
+
+      let updated = 0;
+      for (const { team, r } of perTeam.flat()) {
+        const name = String(r.name ?? "").trim();
+        if (!name) continue;
+        const { data: matches } = await supabase.rpc("match_ucl_player", {
+          q: normalize(name),
+          lim: 1,
+        });
+        const hit = Array.isArray(matches) ? matches[0] : null;
+        if (!hit?.id) continue;
+
+        // Only write fields the sweep actually returned. A null here means "not
+        // reported", not "reset this player's season to zero".
+        const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+        if (r.total_points != null) patch.total_points = Math.round(num(r.total_points));
+        if (r.form != null) patch.form = num(r.form);
+        if (r.minutes != null) patch.minutes = Math.round(num(r.minutes));
+        if (r.goals != null) patch.goals = Math.round(num(r.goals));
+        if (r.assists != null) patch.assists = Math.round(num(r.assists));
+        if (r.clean_sheets != null) patch.clean_sheets = Math.round(num(r.clean_sheets));
+        if (r.price != null) patch.price = num(r.price);
+        if (Object.keys(patch).length === 1) continue;
+
+        const { error } = await supabase.from("ucl_players").update(patch).eq("id", hit.id);
+        if (!error) updated += 1;
+        void team;
+      }
+
+      if (runId) {
+        await supabase
+          .from("ucl_stats_runs")
+          .update({
+            status: updated > 0 ? "success" : "partial",
+            players_updated: updated,
+            finished_at: new Date().toISOString(),
+            error: updated > 0 ? null : "no player stats reported yet",
+          })
+          .eq("id", runId);
+      }
+      return json({ mode, players_updated: updated });
+    }
+
+    return json({ error: `unknown mode "${mode}"` }, 400);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("ucl-sync-fixtures failed:", message);
+    return json({ error: message }, 500);
+  }
+});
