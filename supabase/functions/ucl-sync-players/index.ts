@@ -164,6 +164,71 @@ function mapUefaPlayer(raw: unknown): Player | null {
   };
 }
 
+// ------------------------------------------------------------- Big Balls ---
+// Real squad data, which a search model cannot reliably recall. Free tier
+// covers /v1/players (filter by ?team=) and /v1/teams. It does NOT carry
+// fantasy prices or fantasy points — those exist only inside UEFA's own game,
+// so no sports API can supply them.
+
+const BBS_BASE = "https://api.bigballsdata.com/v1";
+const BBS_POSITION: Record<string, string> = {
+  Goalkeeper: "GK",
+  Defender: "DEF",
+  Midfielder: "MID",
+  Attacker: "FWD",
+  Forward: "FWD",
+};
+
+// Upstream stores a few clubs under a different string. Only verified 1:1
+// mappings belong here. Notably absent: PSG, whose squad upstream files under
+// "Paris FC" — a different, real Ligue 1 club — so that roster is contaminated
+// and is deliberately left on the fallback source instead.
+const BBS_TEAM_ALIASES: Record<string, string> = {
+  Como: "Como 1907",
+};
+
+async function fetchSquadFromBigBalls(team: string, apiKey: string): Promise<Player[]> {
+  const lookup = BBS_TEAM_ALIASES[team] ?? team;
+  const url = `${BBS_BASE}/players?sport=football&team=${encodeURIComponent(lookup)}&limit=200`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
+  if (!res.ok) throw new Error(`bigballs ${res.status}: ${(await res.text()).slice(0, 120)}`);
+  const body = await res.json();
+  const rows: Record<string, unknown>[] = Array.isArray(body?.data) ? body.data : [];
+
+  return rows
+    .map((r): Player | null => {
+      const name = String(r.name ?? "").trim();
+      const position = BBS_POSITION[String(r.position ?? "")];
+      // Skip anyone whose position we cannot map — the pool is position-driven.
+      if (!name || !position) return null;
+      return {
+        uefa_id: null,
+        name,
+        normalized_name: normalize(name),
+        display_name: name,
+        team,
+        team_code: null,
+        position,
+        price: null,
+        total_points: 0,
+        form: null,
+        minutes: 0,
+        goals: 0,
+        assists: 0,
+        clean_sheets: 0,
+        saves: 0,
+        yellow_cards: 0,
+        red_cards: 0,
+        availability: "available",
+        availability_note: null,
+        selected_by_pct: null,
+        source: "bigballs",
+        updated_at: new Date().toISOString(),
+      };
+    })
+    .filter((p): p is Player => p !== null);
+}
+
 // -------------------------------------------------------------- Perplexity ---
 
 async function askPerplexity(prompt: string, apiKey: string): Promise<unknown> {
@@ -415,7 +480,60 @@ serve(async (req) => {
       }
     }
 
-    // 2/3. Perplexity paths.
+    // 2. Real squads from Big Balls, when we have a key for it. Preferred over
+    // the Perplexity backfill: a search model recalling 25-man squads for 36
+    // clubs is exactly the kind of thing it gets subtly wrong.
+    const bbsKey = Deno.env.get("BIGBALLS_API_KEY");
+    if (bbsKey && (mode === "auto" || mode === "roster")) {
+      const seedTeams: string[] = Array.isArray(body?.teams) && body.teams.length
+        ? body.teams.map(String)
+        : ((await supabase.from("ucl_players").select("team")).data ?? [])
+            .map((r: { team: string }) => r.team)
+            .filter((t: string, i: number, a: string[]) => a.indexOf(t) === i);
+
+      if (seedTeams.length > 0) {
+        const rosterLog: string[] = [];
+        const covered: string[] = [];
+        const perTeam = await runPool(seedTeams, POOL_SIZE, async (team: string) => {
+          try {
+            const squad = await fetchSquadFromBigBalls(team, bbsKey);
+            rosterLog.push(`${team}:${squad.length}`);
+            if (squad.length > 0) covered.push(team);
+            return squad;
+          } catch (err) {
+            const m = err instanceof Error ? err.message : String(err);
+            rosterLog.push(`${team}:ERR ${m.slice(0, 60)}`);
+            return [] as Player[];
+          }
+        });
+        const players = dedupe(perTeam.flat());
+        if (players.length > 0) {
+          const { error } = await supabase
+            .from("ucl_players")
+            .upsert(players, { onConflict: "normalized_name,team" });
+          if (error) throw new Error(`upsert failed: ${error.message}`);
+
+          // Real squad data wins outright for the clubs it covers. Without this
+          // the model-recalled rows survive alongside it under slightly
+          // different spellings — "Antonio Rudiger" and "A. Rudiger" become two
+          // separate players in the same squad.
+          if (covered.length > 0) {
+            await supabase
+              .from("ucl_players")
+              .delete()
+              .eq("source", "perplexity")
+              .in("team", covered);
+          }
+          console.log(`roster: ${rosterLog.join(" | ")}`);
+          return await finish("success", "bigballs:roster", players.length, null);
+        }
+        if (mode === "roster") {
+          return await finish("failed", "bigballs", 0, `no squads returned — ${rosterLog.join(" | ")}`);
+        }
+      }
+    }
+
+    // 3/4. Perplexity paths.
     const apiKey = Deno.env.get("OPENROUTER_API_KEY");
     if (!apiKey) return await finish("failed", null, 0, "OPENROUTER_API_KEY is not configured");
 
