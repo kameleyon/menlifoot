@@ -55,6 +55,18 @@ async function askPerplexity(prompt: string, apiKey: string): Promise<unknown> {
   return JSON.parse(match[0]);
 }
 
+// UCL Fantasy prices run roughly EUR 4.0m to 12.0m. Anything outside this band
+// is a recalled or invented figure, not a real price, so it is dropped rather
+// than stored — a wrong price is worse than no price, because it makes the
+// value sub-score look applicable when it is not.
+const PRICE_MIN = 3.5;
+const PRICE_MAX = 13.0;
+const sanePrice = (v: unknown): number | null => {
+  if (v == null) return null;
+  const n = typeof v === "string" ? parseFloat(v) : typeof v === "number" ? v : NaN;
+  return Number.isFinite(n) && n >= PRICE_MIN && n <= PRICE_MAX ? n : null;
+};
+
 const num = (v: unknown, fallback = 0): number => {
   const n = typeof v === "string" ? parseFloat(v) : typeof v === "number" ? v : NaN;
   return Number.isFinite(n) ? n : fallback;
@@ -271,7 +283,8 @@ serve(async (req) => {
         if (r.goals != null) patch.goals = Math.round(num(r.goals));
         if (r.assists != null) patch.assists = Math.round(num(r.assists));
         if (r.clean_sheets != null) patch.clean_sheets = Math.round(num(r.clean_sheets));
-        if (r.price != null) patch.price = num(r.price);
+        const p = sanePrice(r.price);
+        if (p != null) patch.price = p;
         if (Object.keys(patch).length === 1) continue;
 
         const { error } = await supabase.from("ucl_players").update(patch).eq("id", hit.id);

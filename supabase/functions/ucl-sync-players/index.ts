@@ -70,6 +70,18 @@ const normalize = (s: string): string =>
     .replace(/\s+/g, " ")
     .trim();
 
+// UCL Fantasy prices run roughly EUR 4.0m to 12.0m. Anything outside this band
+// is a recalled or invented figure, not a real price, so it is dropped rather
+// than stored — a wrong price is worse than no price, because it makes the
+// value sub-score look applicable when it is not.
+const PRICE_MIN = 3.5;
+const PRICE_MAX = 13.0;
+const sanePrice = (v: unknown): number | null => {
+  if (v == null) return null;
+  const n = typeof v === "string" ? parseFloat(v) : typeof v === "number" ? v : NaN;
+  return Number.isFinite(n) && n >= PRICE_MIN && n <= PRICE_MAX ? n : null;
+};
+
 const num = (v: unknown, fallback = 0): number => {
   const n = typeof v === "string" ? parseFloat(v) : typeof v === "number" ? v : NaN;
   return Number.isFinite(n) ? n : fallback;
@@ -270,7 +282,7 @@ async function backfillViaPerplexity(apiKey: string, teams: string[]): Promise<P
           team,
           team_code: null,
           position,
-          price: r.price != null ? num(r.price, 0) : null,
+          price: sanePrice(r.price),
           total_points: Math.round(num(r.total_points)),
           form: null,
           minutes: 0,
