@@ -33,3 +33,7 @@ project_id = "tjotexujwnfltszqqovk"
     verify_jwt = false
   [functions.update-order-status]
     verify_jwt = false
+  [functions.ucl-parse-screenshot]
+    verify_jwt = false
+  [functions.ucl-rate-squad]
+    verify_jwt = false

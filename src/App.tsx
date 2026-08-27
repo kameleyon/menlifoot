@@ -28,6 +28,7 @@ import ShareArticleRedirect from "./pages/ShareArticleRedirect";
 import Quizzes from "./pages/Quizzes";
 import QuizPlay from "./pages/QuizPlay";
 import GrenadiersApp from "./pages/GrenadiersApp";
+import FantasyUCL from "./pages/FantasyUCL";
 import NotFound from "./pages/NotFound";
 import CheckoutReturn from "./pages/CheckoutReturn";
 import Unsubscribe from "./pages/Unsubscribe";
@@ -68,6 +69,7 @@ const App = () => (
                 <Route path="/quizzes" element={<QuizList />} />
                 <Route path="/quizzes/:id" element={<QuizPlay />} />
                 <Route path="/grenadiers" element={<GrenadiersApp />} />
+                <Route path="/fantasy" element={<FantasyUCL />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
