@@ -154,22 +154,29 @@ const SquadBuilder = ({ onSubmit, submitting = false }: Props) => {
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium text-muted-foreground">{t('ucl.formation')}</span>
-        {FORMATIONS.map((f) => (
-          <button
-            key={f}
-            type="button"
-            onClick={() => changeFormation(f)}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              formation === f
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/70'
-            }`}
-          >
-            {f}
-          </button>
-        ))}
+      {/* One line, scrolled horizontally rather than wrapped: seven chips plus a
+          label will not fit a phone width, and a second row pushed the pitch
+          down the screen. */}
+      <div className="flex items-center gap-2">
+        <span className="shrink-0 text-xs font-medium text-muted-foreground">
+          {t('ucl.formation')}
+        </span>
+        <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 py-0.5">
+          {FORMATIONS.map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => changeFormation(f)}
+              className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium tabular-nums transition-colors ${
+                formation === f
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/70'
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
       </div>
 
       <PitchView

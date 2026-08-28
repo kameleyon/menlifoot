@@ -179,3 +179,15 @@
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--primary));
 }
+
+/* Horizontal chip rows (formation picker) scroll instead of wrapping, so the
+   options stay on one line on a phone. The bar itself is hidden because the
+   row is short and a visible scrollbar reads as a layout bug at this size. */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
