@@ -48,7 +48,7 @@ ${description ? `Description: ${description}` : 'Description: null'}`;
       'X-Title': 'Menlifoot Quiz Translation',
     },
     body: JSON.stringify({
-      model: 'anthropic/claude-sonnet-4',
+      model: 'openai/gpt-5.6-luna',
       messages: [
         { role: 'system', content: 'You are a professional sports translator. Always respond with valid JSON only.' },
         { role: 'user', content: prompt },

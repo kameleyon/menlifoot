@@ -78,7 +78,7 @@ serve(async (req) => {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "openai/gpt-5.6-sol",
+        model: "openai/gpt-5.6-luna",
         messages: [
           { role: "system", content: "You return only raw JSON. No prose, no markdown fences." },
           { role: "user", content: [{ type: "text", text: VISION_PROMPT }, imageContent] },

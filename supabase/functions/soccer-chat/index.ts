@@ -75,7 +75,7 @@ serve(async (req) => {
         "X-Title": "Menlifoot Soccer AI",
       },
       body: JSON.stringify({
-        model: "openai/gpt-5.1",
+        model: "openai/gpt-5.6-luna",
         messages: [
           {
             role: "system",
