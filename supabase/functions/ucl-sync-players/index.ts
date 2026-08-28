@@ -171,12 +171,23 @@ function mapUefaPlayer(raw: unknown): Player | null {
 // so no sports API can supply them.
 
 const BBS_BASE = "https://api.bigballsdata.com/v1";
+// Upstream mixes BOTH spellings inside a single response — one Arsenal call
+// returned 8 "Defender" and 3 "DEF". Mapping only the long form silently
+// dropped 17 of 37 players, Calafiori among them.
 const BBS_POSITION: Record<string, string> = {
-  Goalkeeper: "GK",
-  Defender: "DEF",
-  Midfielder: "MID",
-  Attacker: "FWD",
-  Forward: "FWD",
+  goalkeeper: "GK",
+  gk: "GK",
+  keeper: "GK",
+  defender: "DEF",
+  def: "DEF",
+  defence: "DEF",
+  midfielder: "MID",
+  mid: "MID",
+  midfield: "MID",
+  attacker: "FWD",
+  forward: "FWD",
+  fwd: "FWD",
+  striker: "FWD",
 };
 
 // Upstream stores a few clubs under a different string. Only verified 1:1
@@ -195,10 +206,10 @@ async function fetchSquadFromBigBalls(team: string, apiKey: string): Promise<Pla
   const body = await res.json();
   const rows: Record<string, unknown>[] = Array.isArray(body?.data) ? body.data : [];
 
-  return rows
+  const mapped = rows
     .map((r): Player | null => {
       const name = String(r.name ?? "").trim();
-      const position = BBS_POSITION[String(r.position ?? "")];
+      const position = BBS_POSITION[String(r.position ?? "").trim().toLowerCase()];
       // Skip anyone whose position we cannot map — the pool is position-driven.
       if (!name || !position) return null;
       return {
@@ -227,6 +238,18 @@ async function fetchSquadFromBigBalls(team: string, apiKey: string): Promise<Pla
       };
     })
     .filter((p): p is Player => p !== null);
+
+  if (mapped.length < rows.length) {
+    const unmapped = [
+      ...new Set(
+        rows
+          .filter((r) => !BBS_POSITION[String(r.position ?? "").trim().toLowerCase()])
+          .map((r) => String(r.position ?? "null")),
+      ),
+    ];
+    console.log(`${team}: dropped ${rows.length - mapped.length} of ${rows.length} — unmapped positions: ${unmapped.join(", ")}`);
+  }
+  return mapped;
 }
 
 // -------------------------------------------------------------- Perplexity ---
