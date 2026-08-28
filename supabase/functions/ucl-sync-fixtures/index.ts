@@ -67,6 +67,82 @@ const sanePrice = (v: unknown): number | null => {
   return Number.isFinite(n) && n >= PRICE_MIN && n <= PRICE_MAX ? n : null;
 };
 
+// --------------------------------------------------------- Big Ball Sports ---
+const BBS_BASE = "https://api.bigballsdata.com/v1";
+// The league phase opens in September; anything earlier belongs to last season.
+const SEASON_START = "2026-08-01";
+// A new matchday starts when the gap to the previous kick-off exceeds this.
+// League-phase rounds run Tue-Thu, then weeks pass before the next round.
+const MATCHDAY_GAP_DAYS = 6;
+
+type RawFixture = {
+  id: string;
+  kickoff: string;
+  home: string;
+  away: string;
+  hs: number | null;
+  as: number | null;
+  status: string;
+};
+
+/**
+ * Real fixtures from the archive. Returns null when the archive holds nothing
+ * for this season yet, so the caller falls back instead of wiping good data.
+ */
+async function fetchFixturesFromBigBalls(apiKey: string): Promise<RawFixture[] | null> {
+  const rows: Record<string, unknown>[] = [];
+  for (let offset = 0; offset < 1200; offset += 200) {
+    const url =
+      `${BBS_BASE}/stored/matches?sport=football&league=${encodeURIComponent("UEFA Champions League")}` +
+      `&limit=200&offset=${offset}`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
+    if (!res.ok) throw new Error(`bigballs fixtures ${res.status}`);
+    const body = await res.json();
+    const page: Record<string, unknown>[] = Array.isArray(body?.data) ? body.data : [];
+    rows.push(...page);
+    const total = Number((body?.pagination as Record<string, unknown>)?.total ?? 0);
+    if (page.length === 0 || rows.length >= total) break;
+  }
+
+  const sumHalves = (xs?: number[]) =>
+    Array.isArray(xs) && xs.length ? xs.reduce((a, c) => a + c, 0) : null;
+
+  const current = rows
+    .filter((r) => String(r.kickoff_utc ?? "") >= SEASON_START)
+    .map((r): RawFixture => {
+      const home = r.home as Record<string, unknown> | undefined;
+      const away = r.away as Record<string, unknown> | undefined;
+      const ls = r.linescore as { home?: number[]; away?: number[] } | undefined;
+      return {
+        id: String(r.id ?? ""),
+        kickoff: String(r.kickoff_utc ?? ""),
+        home: String(home?.name ?? ""),
+        away: String(away?.name ?? ""),
+        hs: sumHalves(ls?.home),
+        as: sumHalves(ls?.away),
+        status: String(r.status ?? "scheduled"),
+      };
+    })
+    .filter((f) => f.home && f.away && f.kickoff);
+
+  return current.length > 0 ? current : null;
+}
+
+/** Cluster kick-offs into matchdays - the archive carries no matchday field. */
+function assignMatchdays(fixtures: RawFixture[]): (RawFixture & { matchday: number })[] {
+  const sorted = [...fixtures].sort((a, b) => a.kickoff.localeCompare(b.kickoff));
+  const out: (RawFixture & { matchday: number })[] = [];
+  let matchday = 1;
+  let anchor: number | null = null;
+  for (const f of sorted) {
+    const t = Date.parse(f.kickoff);
+    if (anchor !== null && (t - anchor) / 86400000 > MATCHDAY_GAP_DAYS) matchday += 1;
+    anchor = t;
+    out.push({ ...f, matchday: Math.min(matchday, 8) });
+  }
+  return out;
+}
+
 const num = (v: unknown, fallback = 0): number => {
   const n = typeof v === "string" ? parseFloat(v) : typeof v === "number" ? v : NaN;
   return Number.isFinite(n) ? n : fallback;
@@ -155,6 +231,67 @@ serve(async (req) => {
 
     // ---------------------------------------------------------- fixtures ---
     if (mode === "fixtures") {
+      // Real fixtures beat model-recalled ones outright. The archive refreshes
+      // daily, so the genuine calendar lands here on its own once UEFA
+      // publishes it after the draw.
+      const bbsKey = Deno.env.get("BIGBALLS_API_KEY");
+      if (bbsKey) {
+        try {
+          const real = await fetchFixturesFromBigBalls(bbsKey);
+          if (real) {
+            const known = new Map(teams.map((t) => [normalize(t), t]));
+            const payload = assignMatchdays(real)
+              .map((f) => {
+                const home = known.get(normalize(f.home)) ?? f.home;
+                const away = known.get(normalize(f.away)) ?? f.away;
+                if (home === away) return null;
+                const played = f.status === "finished" && f.hs !== null && f.as !== null;
+                return {
+                  matchday: f.matchday,
+                  kickoff: f.kickoff,
+                  home_team: home,
+                  away_team: away,
+                  home_score: played ? f.hs : null,
+                  away_score: played ? f.as : null,
+                  status: f.status === "finished" ? "finished" : f.status === "live" ? "live" : "scheduled",
+                  external_id: f.id,
+                  updated_at: new Date().toISOString(),
+                };
+              })
+              .filter(Boolean) as Record<string, unknown>[];
+
+            const seen = new Map<string, Record<string, unknown>>();
+            for (const f of payload) seen.set(`${f.matchday}|${f.home_team}|${f.away_team}`, f);
+            const deduped = [...seen.values()];
+
+            if (deduped.length > 0) {
+              const { error } = await supabase
+                .from("ucl_fixtures")
+                .upsert(deduped, { onConflict: "matchday,home_team,away_team" });
+              if (error) throw new Error(`fixtures upsert: ${error.message}`);
+              const { data: touched } = await supabase.rpc("refresh_player_fixtures");
+              return json({ mode, source: "bigballs", fixtures: deduped.length, players_touched: touched ?? 0 });
+            }
+          }
+          console.log("bigballs archive has no fixtures for this season yet");
+        } catch (err) {
+          console.log(`bigballs fixtures failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+
+      // Model-recalled fixtures are opt-in, never automatic. A guessed calendar
+      // sets next_difficulty for hundreds of players and drives captain advice,
+      // so it fails loud and specific rather than quietly wrong. The daily cron
+      // simply waits until the real calendar is published.
+      if (body?.allow_llm !== true) {
+        return json({
+          mode,
+          source: "bigballs",
+          fixtures: 0,
+          note: "no real fixtures published for this season yet; pass {\"allow_llm\":true} to fall back to search-derived fixtures",
+        });
+      }
+
       const matchdays: number[] = Array.isArray(body?.matchdays) && body.matchdays.length
         ? body.matchdays.map((n: unknown) => num(n, 0)).filter((n: number) => n >= 1 && n <= 8)
         : [1, 2, 3, 4, 5, 6, 7, 8];
@@ -304,6 +441,50 @@ serve(async (req) => {
           .eq("id", runId);
       }
       return json({ mode, players_updated: updated });
+    }
+
+    // ----------------------------------------------------------- lineups ---
+    // The route is live but the upstream ingest has not shipped, so this
+    // reports availability honestly rather than pretending. Written against the
+    // documented shape so it returns real XIs the day the ingest switches on.
+    if (mode === "lineups") {
+      const bbsKey = Deno.env.get("BIGBALLS_API_KEY");
+      if (!bbsKey) return json({ error: "BIGBALLS_API_KEY is not configured" }, 500);
+
+      const { data: recent } = await supabase
+        .from("ucl_fixtures")
+        .select("id,home_team,away_team,external_id")
+        .not("external_id", "is", null)
+        .order("kickoff", { ascending: false })
+        .limit(Number(body?.limit ?? 5));
+
+      const fixtures = (recent ?? []) as Record<string, unknown>[];
+      if (fixtures.length === 0) {
+        return json({ mode, checked: [], any_available: false, note: "no fixtures with an upstream id yet" });
+      }
+
+      const checked = await runPool(fixtures, POOL_SIZE, async (f) => {
+        const label = `${f.home_team} v ${f.away_team}`;
+        try {
+          const res = await fetch(`${BBS_BASE}/stored/matches/${String(f.external_id)}/lineups`, {
+            headers: { Authorization: `Bearer ${bbsKey}` },
+          });
+          const bd = await res.json();
+          const home = Array.isArray(bd?.data?.home) ? bd.data.home : [];
+          const away = Array.isArray(bd?.data?.away) ? bd.data.away : [];
+          return {
+            fixture: label,
+            available: Boolean(bd?.meta?.available) || home.length + away.length > 0,
+            home_rows: home.length,
+            away_rows: away.length,
+            note: bd?.meta?.coverage_note ?? null,
+          };
+        } catch (err) {
+          return { fixture: label, available: false, home_rows: 0, away_rows: 0, note: String(err) };
+        }
+      });
+
+      return json({ mode, checked, any_available: checked.some((c) => c.available) });
     }
 
     return json({ error: `unknown mode "${mode}"` }, 400);
