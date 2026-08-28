@@ -6,9 +6,12 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import PitchView from './PitchView';
 import {
   benchShape,
+  formatPrice,
   FORMATIONS,
   formationSlots,
   searchPlayers,
+  squadCost,
+  SQUAD_BUDGET,
   type Position,
   type Squad,
   type SquadSlot,
@@ -101,10 +104,56 @@ const SquadBuilder = ({ onSubmit, submitting = false }: Props) => {
 
   const filled = starters.filter((s) => s.player_id).length;
   const hasCaptain = starters.some((s) => s.is_captain);
-  const ready = filled === starters.length && hasCaptain;
+  const budget = useMemo(() => squadCost([...starters, ...bench]), [starters, bench]);
+  // Over-budget blocks submission, but only once prices actually exist.
+  const ready = filled === starters.length && hasCaptain && !budget.overBudget;
 
   return (
     <div className="space-y-4">
+      {/* Budget. Prices only exist once UEFA opens the game, so before then this
+          says so rather than implying a full EUR 100m is still available. */}
+      <div className="rounded-lg border border-border bg-card/60 p-3">
+        <div className="flex items-baseline justify-between">
+          <span className="text-xs font-medium text-muted-foreground">{t('ucl.budget')}</span>
+          {budget.priced === 0 ? (
+            <span className="text-xs text-muted-foreground">{t('ucl.pricesPending')}</span>
+          ) : (
+            <span
+              className={`font-display text-sm tabular-nums ${
+                budget.overBudget ? 'text-destructive' : 'text-foreground'
+              }`}
+            >
+              {formatPrice(budget.spent)} / {formatPrice(SQUAD_BUDGET)}
+            </span>
+          )}
+        </div>
+
+        {budget.priced > 0 && (
+          <>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  budget.overBudget ? 'bg-destructive' : 'bg-primary'
+                }`}
+                style={{ width: `${Math.min(100, (budget.spent / SQUAD_BUDGET) * 100)}%` }}
+              />
+            </div>
+            <div className="mt-1.5 flex items-center justify-between text-[11px]">
+              <span className={budget.overBudget ? 'text-destructive' : 'text-muted-foreground'}>
+                {budget.overBudget
+                  ? `${t('ucl.overBudget')} ${formatPrice(Math.abs(budget.remaining))}`
+                  : `${t('ucl.remaining')} ${formatPrice(budget.remaining)}`}
+              </span>
+              {budget.priced < budget.picked && (
+                <span className="text-muted-foreground">
+                  {t('ucl.partialPrices')} ({budget.priced}/{budget.picked})
+                </span>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs font-medium text-muted-foreground">{t('ucl.formation')}</span>
         {FORMATIONS.map((f) => (
@@ -162,6 +211,8 @@ const SquadBuilder = ({ onSubmit, submitting = false }: Props) => {
       <Button className="w-full" disabled={!ready || submitting} onClick={() => onSubmit({ formation, starters, bench })}>
         {submitting
           ? t('ucl.analyzing')
+          : budget.overBudget
+          ? `${t('ucl.overBudget')} ${formatPrice(Math.abs(budget.remaining))}`
           : ready
           ? t('ucl.rateMyTeam')
           : !hasCaptain && filled === starters.length
@@ -208,7 +259,7 @@ const SquadBuilder = ({ onSubmit, submitting = false }: Props) => {
                       </div>
                     </div>
                     {p.price != null && (
-                      <span className="shrink-0 text-xs text-muted-foreground">£{p.price.toFixed(1)}m</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">{formatPrice(p.price)}</span>
                     )}
                   </button>
                 );

@@ -168,6 +168,34 @@ export const FORMATIONS = ['3-4-3', '3-5-2', '4-3-3', '4-4-2', '4-5-1', '5-3-2',
  */
 export const SQUAD_COMPOSITION: Record<Position, number> = { GK: 2, DEF: 5, MID: 5, FWD: 3 };
 
+/** UCL Fantasy gives EUR 100m for the 15-man squad. Note euros, not pounds. */
+export const SQUAD_BUDGET = 100;
+
+/** Money formatter. Returns null when there is no price to show. */
+export const formatPrice = (price: number | null | undefined): string | null =>
+  price == null ? null : `€${price.toFixed(1)}m`;
+
+/**
+ * Squad cost against the budget.
+ *
+ * `priced` counts how many of the picked players actually carry a price. UEFA
+ * only publishes prices when the game opens, so before then the total is
+ * meaningless and the UI must say so rather than imply a full budget remains.
+ */
+export const squadCost = (slots: SquadSlot[]) => {
+  const picked = slots.filter((s) => s.player_id);
+  const priced = picked.filter((s) => s.price != null);
+  const spent = priced.reduce((t, s) => t + (s.price ?? 0), 0);
+  return {
+    spent: Number(spent.toFixed(1)),
+    remaining: Number((SQUAD_BUDGET - spent).toFixed(1)),
+    priced: priced.length,
+    picked: picked.length,
+    complete: priced.length === picked.length && picked.length > 0,
+    overBudget: spent > SQUAD_BUDGET,
+  };
+};
+
 /** Slot counts per outfield line for a formation, plus the single keeper. */
 export const formationSlots = (formation: string): Record<Position, number> => {
   const [def, mid, fwd] = formation.split('-').map((n) => parseInt(n, 10) || 0);

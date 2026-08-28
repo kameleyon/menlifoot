@@ -1,5 +1,5 @@
 import { AlertTriangle } from 'lucide-react';
-import type { Position, SquadSlot } from '@/lib/uclFantasy';
+import { formatPrice, type Position, type SquadSlot } from '@/lib/uclFantasy';
 
 interface Props {
   starters: SquadSlot[];
@@ -59,7 +59,7 @@ const PlayerCard = ({
       </span>
       {/* Price is null until the UEFA game opens; show the club instead. */}
       <span className="text-[10px] text-muted-foreground">
-        {slot.price != null ? `£${slot.price.toFixed(1)}m` : slot.team ?? ''}
+        {formatPrice(slot.price) ?? slot.team ?? ''}
       </span>
     </button>
   );
