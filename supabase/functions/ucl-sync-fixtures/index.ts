@@ -143,6 +143,65 @@ function assignMatchdays(fixtures: RawFixture[]): (RawFixture & { matchday: numb
   return out;
 }
 
+// Club-name variants used for BOTH crest and Elo lookups. Every entry is
+// hand-verified: token-overlap matching mapped Inter Milan to AC Milan,
+// Atletico to Real Madrid and Manchester United to Leeds, because rival clubs
+// share the distinctive words in their names.
+const CLUB_ALIASES: Record<string, string> = {
+  "Sporting CP": "Sporting Clube de Portugal",
+  "Club Brugge": "Club Brugge KV",
+  "PSV Eindhoven": "PSV",
+  "Bodo/Glimt": "FK Bod\u00f8/Glimt",
+  Galatasaray: "Galatasaray SK",
+  "Slavia Prague": "SK Slavia Praha",
+  Como: "Como 1907",
+  Roma: "AS Roma",
+};
+
+/** Upstream team directory keyed by normalised name -> {id, logo}. */
+async function fetchTeamDirectory(apiKey: string): Promise<Map<string, { id: string; logo: string | null }>> {
+  const dir = new Map<string, { id: string; logo: string | null }>();
+  for (let offset = 0; offset < 600; offset += 200) {
+    const res = await fetch(`${BBS_BASE}/teams?sport=football&limit=200&offset=${offset}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!res.ok) break;
+    const body = await res.json();
+    const page: Record<string, unknown>[] = Array.isArray(body?.data) ? body.data : [];
+    for (const t of page) {
+      const name = String(t.name ?? "");
+      if (name) dir.set(normalize(name), { id: String(t.id ?? ""), logo: t.logo_url ? String(t.logo_url) : null });
+    }
+    if (page.length === 0) break;
+  }
+  return dir;
+}
+
+/** Current Elo per club, where the provider has one. */
+async function fetchElo(
+  apiKey: string,
+  teams: string[],
+  dir: Map<string, { id: string; logo: string | null }>,
+): Promise<Record<string, number>> {
+  const out: Record<string, number> = {};
+  await runPool(teams, POOL_SIZE, async (team: string) => {
+    const entry = dir.get(normalize(CLUB_ALIASES[team] ?? team));
+    if (!entry?.id) return;
+    try {
+      const res = await fetch(`${BBS_BASE}/teams/${entry.id}/elo?sport=football`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (!res.ok) return;
+      const body = await res.json();
+      const rating = Number((body?.data as Record<string, unknown>)?.elo_rating);
+      if (Number.isFinite(rating)) out[team] = rating;
+    } catch {
+      // A club without Elo keeps its fallback strength; nothing to do here.
+    }
+  });
+  return out;
+}
+
 const num = (v: unknown, fallback = 0): number => {
   const n = typeof v === "string" ? parseFloat(v) : typeof v === "number" ? v : NaN;
   return Number.isFinite(n) ? n : fallback;
@@ -222,11 +281,50 @@ serve(async (req) => {
         updated_at: new Date().toISOString(),
       }));
 
+      // Attach crests where we have a verified match; null elsewhere so the UI
+      // shows an initials chip instead of a broken image.
+      // Real Elo beats a model's opinion of who is strong. Clubs the provider
+      // has no Elo for keep the ranked fallback above, so each club uses the
+      // best signal available rather than the whole field dropping to one.
+      const bbsKey = Deno.env.get("BIGBALLS_API_KEY");
+      let elo: Record<string, number> = {};
+      let dir = new Map<string, { id: string; logo: string | null }>();
+      if (bbsKey) {
+        try {
+          dir = await fetchTeamDirectory(bbsKey);
+          elo = await fetchElo(bbsKey, teams, dir);
+        } catch (err) {
+          console.log(`elo failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+
+      // Rank the Elo-covered clubs among themselves and bucket into fifths, so
+      // the 1-5 scale keeps a real spread instead of clustering on raw ratings.
+      const eloRanked = Object.entries(elo).sort((a, b) => b[1] - a[1]);
+      const eloStrength = new Map<string, number>();
+      eloRanked.forEach(([club], i) => {
+        eloStrength.set(club, Math.max(1, 5 - Math.floor((i * 5) / (eloRanked.length || 1))));
+      });
+
+      for (const row of payload) {
+        const r = row as Record<string, unknown>;
+        const club = String(r.name);
+        if (eloStrength.has(club)) r.strength = eloStrength.get(club);
+        r.elo_rating = elo[club] ?? null;
+        r.logo_url = dir.get(normalize(CLUB_ALIASES[club] ?? club))?.logo ?? null;
+      }
+
       const { error } = await supabase.from("ucl_teams").upsert(payload, { onConflict: "name" });
       if (error) throw new Error(`teams upsert: ${error.message}`);
 
       const { data: touched } = await supabase.rpc("refresh_player_fixtures");
-      return json({ mode, teams: payload.length, players_touched: touched ?? 0 });
+      return json({
+        mode,
+        teams: payload.length,
+        with_elo: Object.keys(elo).length,
+        with_crest: payload.filter((p) => (p as Record<string, unknown>).logo_url).length,
+        players_touched: touched ?? 0,
+      });
     }
 
     // ---------------------------------------------------------- fixtures ---

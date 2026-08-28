@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { getFixtures, getLoadedMatchdays, type Fixture, type Matchday } from '@/lib/uclFantasy';
+import {
+  getFixtures,
+  getLoadedMatchdays,
+  getTeamCrests,
+  type Fixture,
+  type Matchday,
+} from '@/lib/uclFantasy';
 
 /**
  * League-phase fixtures, grouped by day.
@@ -10,6 +16,19 @@ import { getFixtures, getLoadedMatchdays, type Fixture, type Matchday } from '@/
  * matchdays played Tue/Wed/Thu across the season, so the pager steps matchdays
  * rather than weeks. Kick-offs render in the viewer's local timezone.
  */
+/**
+ * Club badge, falling back to initials. The provider has crests for about two
+ * thirds of the field, so a missing one must look deliberate rather than broken.
+ */
+const Crest = ({ team, src }: { team: string; src?: string }) =>
+  src ? (
+    <img src={src} alt="" loading="lazy" className="h-5 w-5 shrink-0 object-contain" />
+  ) : (
+    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[8px] font-bold text-muted-foreground">
+      {team.replace(/[^A-Za-z ]/g, '').split(' ').map((w) => w[0]).join('').slice(0, 3).toUpperCase()}
+    </span>
+  );
+
 const FixturesCalendar = () => {
   const { t, language } = useLanguage();
   const [available, setAvailable] = useState<number[]>([]);
@@ -17,6 +36,11 @@ const FixturesCalendar = () => {
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [meta, setMeta] = useState<Matchday | null>(null);
   const [loading, setLoading] = useState(true);
+  const [crests, setCrests] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    getTeamCrests().then(setCrests).catch(() => setCrests({}));
+  }, []);
 
   useEffect(() => {
     getLoadedMatchdays()
@@ -134,7 +158,10 @@ const FixturesCalendar = () => {
                     key={f.id}
                     className="flex items-center gap-2 border-b border-border/50 px-3 py-2.5 last:border-b-0"
                   >
-                    <span className="flex-1 truncate text-right text-sm">{f.home_team}</span>
+                    <span className="flex flex-1 items-center justify-end gap-1.5 truncate text-sm">
+                      <span className="truncate">{f.home_team}</span>
+                      <Crest team={f.home_team} src={crests[f.home_team]} />
+                    </span>
                     <span
                       className={`shrink-0 rounded px-2 py-0.5 text-xs font-semibold tabular-nums ${
                         played ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
@@ -142,7 +169,10 @@ const FixturesCalendar = () => {
                     >
                       {played ? `${f.home_score}–${f.away_score}` : time(f.kickoff)}
                     </span>
-                    <span className="flex-1 truncate text-sm">{f.away_team}</span>
+                    <span className="flex flex-1 items-center gap-1.5 truncate text-sm">
+                      <Crest team={f.away_team} src={crests[f.away_team]} />
+                      <span className="truncate">{f.away_team}</span>
+                    </span>
                   </div>
                 );
               })}

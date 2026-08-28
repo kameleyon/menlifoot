@@ -121,6 +121,22 @@ export interface Matchday {
   ends_on: string | null;
 }
 
+export interface UclTeam {
+  name: string;
+  code: string | null;
+  strength: number;
+  logo_url: string | null;
+  elo_rating: number | null;
+}
+
+/** Club crests, keyed by club name. The provider covers ~2/3 of the field. */
+export const getTeamCrests = async (): Promise<Record<string, string>> => {
+  const { data } = await (supabase as any).from('ucl_teams').select('name,logo_url');
+  const out: Record<string, string> = {};
+  for (const t of (data ?? []) as UclTeam[]) if (t.logo_url) out[t.name] = t.logo_url;
+  return out;
+};
+
 /** Fixtures for one matchday, plus that matchday's deadline. */
 export const getFixtures = async (matchday: number) => {
   const [fx, md] = await Promise.all([
