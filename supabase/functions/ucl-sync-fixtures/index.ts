@@ -177,6 +177,42 @@ async function fetchTeamDirectory(apiKey: string): Promise<Map<string, { id: str
   return dir;
 }
 
+/**
+ * Attacking / defensive profile per club. Free, and more useful than Elo alone:
+ * a hard fixture means something different to a striker than to a keeper.
+ */
+async function fetchTeamStats(
+  apiKey: string,
+  teams: string[],
+  dir: Map<string, { id: string; logo: string | null }>,
+): Promise<Record<string, Record<string, number | string | null>>> {
+  const out: Record<string, Record<string, number | string | null>> = {};
+  await runPool(teams, POOL_SIZE, async (team: string) => {
+    const entry = dir.get(normalize(CLUB_ALIASES[team] ?? team));
+    if (!entry?.id) return;
+    try {
+      const res = await fetch(`${BBS_BASE}/teams/${entry.id}/stats?sport=football`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (!res.ok) return;
+      const d = (await res.json())?.data as Record<string, unknown> | undefined;
+      if (!d) return;
+      const played = Number(d.matches_played);
+      const cs = Number(d.clean_sheets);
+      out[team] = {
+        avg_goals_scored: Number.isFinite(Number(d.avg_goals_scored)) ? Number(d.avg_goals_scored) : null,
+        avg_goals_conceded: Number.isFinite(Number(d.avg_goals_conceded)) ? Number(d.avg_goals_conceded) : null,
+        clean_sheet_rate: Number.isFinite(cs) && played > 0 ? Number((cs / played).toFixed(3)) : null,
+        form_string: typeof d.form_string === "string" ? d.form_string : null,
+        matches_played: Number.isFinite(played) ? played : null,
+      };
+    } catch {
+      // No stats for this club; it keeps its strength-based difficulty.
+    }
+  });
+  return out;
+}
+
 /** Current Elo per club, where the provider has one. */
 async function fetchElo(
   apiKey: string,
@@ -288,11 +324,13 @@ serve(async (req) => {
       // best signal available rather than the whole field dropping to one.
       const bbsKey = Deno.env.get("BIGBALLS_API_KEY");
       let elo: Record<string, number> = {};
+      let stats: Record<string, Record<string, number | string | null>> = {};
       let dir = new Map<string, { id: string; logo: string | null }>();
       if (bbsKey) {
         try {
           dir = await fetchTeamDirectory(bbsKey);
           elo = await fetchElo(bbsKey, teams, dir);
+          stats = await fetchTeamStats(bbsKey, teams, dir);
         } catch (err) {
           console.log(`elo failed: ${err instanceof Error ? err.message : String(err)}`);
         }
@@ -311,6 +349,7 @@ serve(async (req) => {
         const club = String(r.name);
         if (eloStrength.has(club)) r.strength = eloStrength.get(club);
         r.elo_rating = elo[club] ?? null;
+        Object.assign(r, stats[club] ?? {});
         r.logo_url = dir.get(normalize(CLUB_ALIASES[club] ?? club))?.logo ?? null;
       }
 
@@ -323,6 +362,7 @@ serve(async (req) => {
         teams: payload.length,
         with_elo: Object.keys(elo).length,
         with_crest: payload.filter((p) => (p as Record<string, unknown>).logo_url).length,
+        with_stats: Object.keys(stats).length,
         players_touched: touched ?? 0,
       });
     }
