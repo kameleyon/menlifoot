@@ -375,19 +375,41 @@ const FantasyUCL = () => {
                 ))}
             </div>
 
-            {result.optimisation?.changes_needed && (
-              <div className="rounded-xl border border-primary/40 bg-primary/5 p-4">
+            {/* Always rendered. Hiding it when nothing improves reads as a
+                missing feature rather than "your XI is already right". */}
+            {result.optimisation && (
+              <div
+                className={`rounded-xl border p-4 ${
+                  result.optimisation.changes_needed
+                    ? 'border-primary/40 bg-primary/5'
+                    : 'border-border bg-card/60'
+                }`}
+              >
                 <div className="flex items-center gap-2">
-                  <Wand2 className="h-4 w-4 text-primary" />
+                  <Wand2
+                    className={`h-4 w-4 ${
+                      result.optimisation.changes_needed ? 'text-primary' : 'text-muted-foreground'
+                    }`}
+                  />
                   <h3 className="font-display text-sm uppercase tracking-wide">
                     {t('ucl.optimizeTitle')}
                   </h3>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {t('ucl.optimizeBody')} {result.optimisation.formation}
+                  {result.optimisation.changes_needed
+                    ? `${t('ucl.optimizeBody')} ${result.optimisation.formation}`
+                    : t('ucl.optimizeAlready')}
                 </p>
-                <Button size="sm" className="mt-3 w-full" disabled={busy} onClick={applyOptimisation}>
-                  {t('ucl.optimizeApply')}
+                <Button
+                  size="sm"
+                  variant={result.optimisation.changes_needed ? 'default' : 'outline'}
+                  className="mt-3 w-full"
+                  disabled={busy}
+                  onClick={applyOptimisation}
+                >
+                  {result.optimisation.changes_needed
+                    ? t('ucl.optimizeApply')
+                    : t('ucl.optimizeAnyway')}
                 </Button>
               </div>
             )}
