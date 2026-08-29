@@ -45,6 +45,23 @@ const SQUAD_COMPOSITION: Record<string, number> = { GK: 2, DEF: 5, MID: 5, FWD: 
 // Premier League chips and do not exist here.
 const CHIPS = ["Wildcard", "Limitless"] as const;
 
+// ---------------------------------------------------------------- credits ---
+// Advice costs credits; the rating, its breakdown and the narrative stay free,
+// because the score is the hook that makes the product worth signing up for.
+//
+// Gating happens HERE, not in the UI. A blurred panel over a full response is
+// not a paywall - the data sits in the network tab. Unpaid fields are omitted
+// from the payload entirely.
+const UNLOCK_PRICES = {
+  optimisation: 1,
+  captains: 1,
+  chips: 1,
+  // Charged per suggestion actually requested, capped at MAX_TRANSFERS.
+  transfers: 1,
+} as const;
+
+const MAX_TRANSFERS = 3;
+
 const VALID_FORMATIONS = new Set([
   "3-4-3", "3-5-2", "4-3-3", "4-4-2", "4-5-1", "5-3-2", "5-4-1", "3-6-1", "5-2-3",
 ]);
@@ -113,8 +130,30 @@ serve(async (req) => {
     // userId is deliberately NOT read from the body — this endpoint is public,
     // so a client-supplied id would let anyone write rows attributed to another
     // user. It is derived from a verified JWT below, or left null.
-    const { squad, source = "manual", language = "en", email: rawEmail = null } =
-      await req.json();
+    const {
+      squad,
+      source = "manual",
+      language = "en",
+      email: rawEmail = null,
+      unlock: rawUnlock = [],
+      transferCount: rawTransferCount = 0,
+    } = await req.json();
+
+    // What the caller is asking to pay for, normalised and bounded.
+    const requested = new Set(
+      (Array.isArray(rawUnlock) ? rawUnlock : []).map(String).filter((u) =>
+        ["optimisation", "captains", "chips"].includes(u)
+      ),
+    );
+    const transferCount = Math.max(
+      0,
+      Math.min(MAX_TRANSFERS, Math.floor(Number(rawTransferCount) || 0)),
+    );
+    const cost =
+      (requested.has("optimisation") ? UNLOCK_PRICES.optimisation : 0) +
+      (requested.has("captains") ? UNLOCK_PRICES.captains : 0) +
+      (requested.has("chips") ? UNLOCK_PRICES.chips : 0) +
+      transferCount * UNLOCK_PRICES.transfers;
 
     const rawStarterIds: unknown[] = (squad?.starters ?? []).map(
       (s: { player_id?: unknown }) => s?.player_id,
@@ -498,6 +537,50 @@ serve(async (req) => {
       }
     }
 
+    // ------------------------------------------------------------ charge ---
+    // Spend as the signed-in user rather than with the service role, so the
+    // balance check and decrement run under spend_credits' own auth.uid()
+    // guard and cannot be aimed at somebody else's wallet.
+    let creditsRemaining: number | null = null;
+    let paid = new Set<string>();
+    let paidTransfers = 0;
+
+    if (cost > 0) {
+      if (!userId || !token) {
+        return new Response(
+          JSON.stringify({ error: "sign_in_required", cost }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      const asUser = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+        { global: { headers: { Authorization: `Bearer ${token}` } } },
+      );
+      const { data: newBalance, error: spendError } = await asUser.rpc("spend_credits", {
+        p_amount: cost,
+        p_reason: "ucl_rate_squad",
+        p_metadata: { unlock: [...requested], transfers: transferCount },
+      });
+      if (spendError) throw new Error(`credit spend failed: ${spendError.message}`);
+      if (typeof newBalance !== "number" || newBalance < 0) {
+        return new Response(
+          JSON.stringify({ error: "insufficient_credits", cost }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      creditsRemaining = newBalance;
+      paid = requested;
+      paidTransfers = transferCount;
+    } else if (userId) {
+      const { data: wallet } = await supabase
+        .from("user_credits")
+        .select("balance")
+        .eq("user_id", userId)
+        .maybeSingle();
+      creditsRemaining = (wallet as { balance?: number } | null)?.balance ?? 0;
+    }
+
     // The rating is still valid without the narrative, so persist either way.
     const { data: saved } = await supabase
       .from("ucl_squad_ratings")
@@ -522,10 +605,20 @@ serve(async (req) => {
         formation: shape,
         breakdown,
         narrative,
-        suggestions,
-        optimisation,
-        captain_ranking: captainRanking,
-        chip_advice: chipAdvice,
+        // Everything below is omitted unless it was paid for. `locked` tells the
+        // client what exists and what it would cost, without leaking any of it.
+        suggestions: paidTransfers > 0 ? suggestions.slice(0, paidTransfers) : [],
+        optimisation: paid.has("optimisation") ? optimisation : null,
+        captain_ranking: paid.has("captains") ? captainRanking : [],
+        chip_advice: paid.has("chips") ? chipAdvice : null,
+        locked: {
+          optimisation: !paid.has("optimisation") && optimisation != null,
+          captains: !paid.has("captains") && captainRanking.length > 0,
+          chips: !paid.has("chips") && chipAdvice != null,
+          transfers: Math.max(0, Math.min(MAX_TRANSFERS, suggestions.length) - paidTransfers),
+        },
+        prices: { ...UNLOCK_PRICES, max_transfers: MAX_TRANSFERS },
+        credits_remaining: creditsRemaining,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

@@ -37,3 +37,7 @@ project_id = "tjotexujwnfltszqqovk"
     verify_jwt = false
   [functions.ucl-rate-squad]
     verify_jwt = false
+  [functions.ucl-best-picks]
+    verify_jwt = false
+  [functions.ucl-credits-checkout]
+    verify_jwt = false

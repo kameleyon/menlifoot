@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Upload, PenLine, ArrowLeft, AlertTriangle, ArrowRight,
-  Clipboard, Wand2, Star, Zap, CalendarDays, ChevronDown,
+  Clipboard, Wand2, Star, Zap, CalendarDays, ChevronDown, Coins,
 } from 'lucide-react';
 import AppShell from '@/components/mobile/AppShell';
 import { Button } from '@/components/ui/button';
@@ -12,12 +13,18 @@ import RatingRing from '@/components/ucl/RatingRing';
 import SquadBuilder from '@/components/ucl/SquadBuilder';
 import FixturesCalendar from '@/components/ucl/FixturesCalendar';
 import BestPicks from '@/components/ucl/BestPicks';
+import LockedPanel, { PlaceholderRows } from '@/components/ucl/LockedPanel';
+import { useAuth } from '@/contexts/AuthContext';
 import {
+  CreditError,
   fileToBase64,
+  getCreditBalance,
   parseScreenshot,
   rateSquad,
+  startTopUp,
   type RatingResult,
   type Squad,
+  type Unlockable,
 } from '@/lib/uclFantasy';
 
 type Step = 'start' | 'import' | 'build' | 'analyzing' | 'result' | 'fixtures';
@@ -37,6 +44,34 @@ const FantasyUCL = () => {
   const [result, setResult] = useState<RatingResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [showAllTransfers, setShowAllTransfers] = useState(false);
+  const [balance, setBalance] = useState<number | null>(null);
+  const [unlocking, setUnlocking] = useState(false);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const signedIn = Boolean(user);
+
+  // Everything already paid for on this squad, so re-rating after an optimise
+  // does not silently charge again for the same panels.
+  const [paidUnlocks, setPaidUnlocks] = useState<Unlockable[]>([]);
+  const [paidTransfers, setPaidTransfers] = useState(0);
+
+  useEffect(() => {
+    getCreditBalance().then(setBalance).catch(() => setBalance(null));
+  }, [user]);
+
+  const goSignIn = () => navigate('/auth');
+
+  const topUp = async () => {
+    try {
+      window.location.href = await startTopUp('starter');
+    } catch (err) {
+      toast({
+        title: t('ucl.error'),
+        description: err instanceof Error ? err.message : String(err),
+        variant: 'destructive',
+      });
+    }
+  };
 
   // Advance the progress copy while the request is in flight. Purely cosmetic —
   // the real work is one round trip, but a blank wait reads as a hang.
@@ -64,15 +99,30 @@ const FantasyUCL = () => {
   });
 
   const analyze = useCallback(
-    async (next: Squad, src: 'screenshot' | 'manual') => {
+    async (
+      next: Squad,
+      src: 'screenshot' | 'manual',
+      unlock: Unlockable[] = [],
+      transferCount = 0,
+    ) => {
       setSquad(next);
       setSource(src);
       setStep('analyzing');
       try {
-        const r = await rateSquad(next, { source: src, language });
+        const r = await rateSquad(next, { source: src, language, unlock, transferCount });
         setResult(r);
+        if (r.credits_remaining != null) setBalance(r.credits_remaining);
         setStep('result');
       } catch (err) {
+        if (err instanceof CreditError) {
+          toast({
+            title: err.kind === 'sign_in_required' ? t('ucl.signIn') : t('ucl.notEnoughCredits'),
+            description: err.kind === 'sign_in_required' ? t('ucl.signInToUnlock') : t('ucl.topUpPrompt'),
+          });
+          if (err.kind === 'sign_in_required') goSignIn();
+          setStep('result');
+          return;
+        }
         toast({
           title: t('ucl.error'),
           description: err instanceof Error ? err.message : String(err),
@@ -118,6 +168,47 @@ const FantasyUCL = () => {
     }
   };
 
+  /**
+   * Buy one more panel for the squad already on screen. The rating is
+   * recomputed server-side with the wider unlock set, so previously paid
+   * panels survive without being charged again.
+   */
+  const unlockMore = async (add: Unlockable | 'transfer') => {
+    if (!squad) return;
+    const nextUnlocks: Unlockable[] =
+      add === 'transfer' ? paidUnlocks : [...new Set([...paidUnlocks, add])];
+    const nextTransfers = add === 'transfer' ? paidTransfers + 1 : paidTransfers;
+    setUnlocking(true);
+    try {
+      const r = await rateSquad(squad, {
+        source,
+        language,
+        unlock: nextUnlocks,
+        transferCount: nextTransfers,
+      });
+      setResult(r);
+      setPaidUnlocks(nextUnlocks);
+      setPaidTransfers(nextTransfers);
+      if (r.credits_remaining != null) setBalance(r.credits_remaining);
+    } catch (err) {
+      if (err instanceof CreditError) {
+        toast({
+          title: err.kind === 'sign_in_required' ? t('ucl.signIn') : t('ucl.notEnoughCredits'),
+          description: err.kind === 'sign_in_required' ? t('ucl.signInToUnlock') : t('ucl.topUpPrompt'),
+        });
+        if (err.kind === 'sign_in_required') goSignIn();
+      } else {
+        toast({
+          title: t('ucl.error'),
+          description: err instanceof Error ? err.message : String(err),
+          variant: 'destructive',
+        });
+      }
+    } finally {
+      setUnlocking(false);
+    }
+  };
+
   /** Apply the suggested XI/captain, then re-run the rating so the score moves. */
   const applyOptimisation = async () => {
     if (!result?.optimisation) return;
@@ -127,7 +218,7 @@ const FantasyUCL = () => {
       bench: result.optimisation.bench,
     };
     setShowAllTransfers(false);
-    await analyze(next, source);
+    await analyze(next, source, paidUnlocks, paidTransfers);
   };
 
   const reset = () => {
@@ -136,21 +227,45 @@ const FantasyUCL = () => {
     setResult(null);
     setUnresolved([]);
     setShowAllTransfers(false);
+    setPaidUnlocks([]);
+    setPaidTransfers(0);
   };
 
   return (
     <AppShell>
       <div className="mx-auto w-full max-w-lg px-4 pb-24 pt-6">
-        {step !== 'start' && (
-          <button
-            type="button"
-            onClick={reset}
-            className="mb-4 flex items-center gap-1 text-xs text-muted-foreground"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            {t('ucl.startOver')}
-          </button>
-        )}
+        <div className="mb-4 flex items-center justify-between">
+          {step !== 'start' ? (
+            <button
+              type="button"
+              onClick={reset}
+              className="flex items-center gap-1 text-xs text-muted-foreground"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              {t('ucl.startOver')}
+            </button>
+          ) : (
+            <span />
+          )}
+
+          {/* Balance is always visible once signed in: a paywall the user cannot
+              see their side of feels arbitrary. */}
+          {signedIn ? (
+            <button
+              type="button"
+              onClick={topUp}
+              className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs"
+            >
+              <Coins className="h-3.5 w-3.5 text-primary" />
+              <span className="tabular-nums font-medium">{balance ?? '—'}</span>
+              <span className="text-muted-foreground">{t('ucl.credits')}</span>
+            </button>
+          ) : (
+            <button type="button" onClick={goSignIn} className="text-xs text-primary underline">
+              {t('ucl.signIn')}
+            </button>
+          )}
+        </div>
 
         {step === 'start' && (
           <div className="space-y-6 text-center">
@@ -331,6 +446,28 @@ const FantasyUCL = () => {
 
             {/* Always rendered. Hiding it when nothing improves reads as a
                 missing feature rather than "your XI is already right". */}
+            {result.locked.optimisation && (
+              <LockedPanel
+                cost={result.prices.optimisation}
+                balance={balance}
+                signedIn={signedIn}
+                busy={unlocking}
+                onUnlock={() => unlockMore('optimisation')}
+                onSignIn={goSignIn}
+                onTopUp={topUp}
+              >
+                <div className="p-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <Wand2 className="h-4 w-4 text-primary" />
+                    <span className="font-display text-sm uppercase tracking-wide">
+                      {t('ucl.optimizeTitle')}
+                    </span>
+                  </div>
+                  <PlaceholderRows rows={1} />
+                </div>
+              </LockedPanel>
+            )}
+
             {result.optimisation && (
               <div
                 className={`rounded-xl border p-4 ${
@@ -368,6 +505,28 @@ const FantasyUCL = () => {
               </div>
             )}
 
+            {result.locked.captains && (
+              <LockedPanel
+                cost={result.prices.captains}
+                balance={balance}
+                signedIn={signedIn}
+                busy={unlocking}
+                onUnlock={() => unlockMore('captains')}
+                onSignIn={goSignIn}
+                onTopUp={topUp}
+              >
+                <div className="p-3">
+                  <div className="mb-2 flex items-center gap-2">
+                    <Star className="h-4 w-4 text-primary" />
+                    <span className="font-display text-sm uppercase tracking-wide">
+                      {t('ucl.captainTitle')}
+                    </span>
+                  </div>
+                  <PlaceholderRows rows={3} />
+                </div>
+              </LockedPanel>
+            )}
+
             {result.captain_ranking?.length > 0 && (
               <div className="space-y-2">
                 <h3 className="flex items-center gap-2 font-display text-sm uppercase tracking-wide">
@@ -396,6 +555,28 @@ const FantasyUCL = () => {
                   </div>
                 ))}
               </div>
+            )}
+
+            {result.locked.chips && (
+              <LockedPanel
+                cost={result.prices.chips}
+                balance={balance}
+                signedIn={signedIn}
+                busy={unlocking}
+                onUnlock={() => unlockMore('chips')}
+                onSignIn={goSignIn}
+                onTopUp={topUp}
+              >
+                <div className="p-3">
+                  <div className="mb-2 flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-primary" />
+                    <span className="font-display text-sm uppercase tracking-wide">
+                      {t('ucl.chipTitle')}
+                    </span>
+                  </div>
+                  <PlaceholderRows rows={1} />
+                </div>
+              </LockedPanel>
             )}
 
             {result.chip_advice && (
@@ -437,7 +618,39 @@ const FantasyUCL = () => {
               </div>
             )}
 
-            <BestPicks />
+            {/* Transfers are bought one at a time, so a manager only pays for
+                the depth of advice they actually want. */}
+            {result.locked.transfers > 0 && (
+              <div className="space-y-2">
+                {result.suggestions.length === 0 && (
+                  <h3 className="font-display text-sm uppercase tracking-wide">
+                    {t('ucl.transfers')}
+                  </h3>
+                )}
+                <LockedPanel
+                  cost={result.prices.transfers}
+                  balance={balance}
+                  signedIn={signedIn}
+                  busy={unlocking}
+                  onUnlock={() => unlockMore('transfer')}
+                  onSignIn={goSignIn}
+                  onTopUp={topUp}
+                >
+                  <PlaceholderRows rows={1} />
+                </LockedPanel>
+                <p className="text-center text-[11px] text-muted-foreground">
+                  {result.locked.transfers} {t('ucl.moreTransfersAvailable')}
+                </p>
+              </div>
+            )}
+
+            <BestPicks
+              signedIn={signedIn}
+              balance={balance}
+              onBalance={setBalance}
+              onSignIn={goSignIn}
+              onTopUp={topUp}
+            />
 
             <Button variant="outline" className="w-full" onClick={reset}>
               {t('ucl.rateAnother')}

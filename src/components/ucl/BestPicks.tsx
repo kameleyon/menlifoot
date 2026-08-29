@@ -2,32 +2,58 @@ import { useState } from 'react';
 import { Telescope, ChevronDown, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { formatPrice, getBestPicks, type BestPick, type Position } from '@/lib/uclFantasy';
+import LockedPanel, { PlaceholderRows } from './LockedPanel';
+import {
+  BEST_PICKS_PRICE,
+  CreditError,
+  formatPrice,
+  getBestPicks,
+  type BestPick,
+  type BestPicksResult,
+  type Position,
+} from '@/lib/uclFantasy';
 
 const ORDER: Position[] = ['GK', 'DEF', 'MID', 'FWD'];
 
+interface Props {
+  signedIn: boolean;
+  balance: number | null;
+  onBalance: (n: number | null) => void;
+  onSignIn: () => void;
+  onTopUp: () => void;
+}
+
 /**
- * "Who should I own this matchday" — loaded on demand rather than rendered
- * eagerly, because it is a question the manager asks after seeing their rating,
- * not something they need occupying the screen before they ask it.
+ * "Who should I own this matchday" — a paid, on-demand panel.
+ *
+ * Nothing is fetched until it is paid for: the underlying RPC has EXECUTE
+ * revoked from the browser roles, so the list simply does not exist client-side
+ * until the edge function has taken the credits.
  */
-const BestPicks = () => {
+const BestPicks = ({ signedIn, balance, onBalance, onSignIn, onTopUp }: Props) => {
   const { t } = useLanguage();
-  const [picks, setPicks] = useState<Record<Position, BestPick[]> | null>(null);
+  const [result, setResult] = useState<BestPicksResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
-    if (picks) {
-      setPicks(null);
+    if (result) {
+      setResult(null);
       return;
     }
     setLoading(true);
-    setError(false);
+    setError(null);
     try {
-      setPicks(await getBestPicks(3));
-    } catch {
-      setError(true);
+      const r = await getBestPicks(3);
+      setResult(r);
+      onBalance(r.credits_remaining);
+    } catch (err) {
+      if (err instanceof CreditError) {
+        setError(err.kind === 'sign_in_required' ? t('ucl.signInToUnlock') : t('ucl.notEnoughCredits'));
+        if (err.kind === 'sign_in_required') onSignIn();
+      } else {
+        setError(t('ucl.error'));
+      }
     } finally {
       setLoading(false);
     }
@@ -48,6 +74,35 @@ const BestPicks = () => {
       : p.team;
   };
 
+  // Before purchase, show a locked teaser rather than a bare button, so the
+  // shape of what is on offer is visible without giving any of it away.
+  if (!result) {
+    return (
+      <div className="space-y-2">
+        <LockedPanel
+          cost={BEST_PICKS_PRICE}
+          balance={balance}
+          signedIn={signedIn}
+          busy={loading}
+          onUnlock={load}
+          onSignIn={onSignIn}
+          onTopUp={onTopUp}
+        >
+          <div className="p-3">
+            <div className="mb-2 flex items-center gap-2">
+              <Telescope className="h-4 w-4 text-primary" />
+              <span className="font-display text-sm uppercase tracking-wide">
+                {t('ucl.bestPicksTitle')}
+              </span>
+            </div>
+            <PlaceholderRows rows={4} />
+          </div>
+        </LockedPanel>
+        {error && <p className="text-xs text-destructive">{error}</p>}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
       <Button variant="outline" className="w-full justify-between" onClick={load} disabled={loading}>
@@ -59,46 +114,43 @@ const BestPicks = () => {
           )}
           {t('ucl.bestPicksTitle')}
         </span>
-        <ChevronDown className={`h-4 w-4 transition-transform ${picks ? 'rotate-180' : ''}`} />
+        <ChevronDown className="h-4 w-4 rotate-180 transition-transform" />
       </Button>
 
-      {error && <p className="text-xs text-destructive">{t('ucl.error')}</p>}
+      <p className="text-xs text-muted-foreground">
+        {result.fixtures_known ? t('ucl.bestPicksBody') : t('ucl.bestPicksNoFixtures')}
+      </p>
 
-      {picks && (
-        <div className="space-y-3">
-          <p className="text-xs text-muted-foreground">{t('ucl.bestPicksBody')}</p>
-          {ORDER.filter((pos) => picks[pos]?.length).map((pos) => (
-            <div key={pos} className="space-y-1">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {t(`ucl.score.${pos === 'GK' ? 'gk' : pos.toLowerCase()}`)}
-              </div>
-              <div className="overflow-hidden rounded-lg border border-border">
-                {picks[pos].map((p, i) => (
-                  <div
-                    key={p.id}
-                    className="flex items-center gap-2 border-b border-border/50 px-3 py-2 last:border-b-0"
-                  >
-                    <span className="w-4 shrink-0 text-center text-[11px] font-bold text-muted-foreground">
-                      {i + 1}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium">{p.display_name || p.name}</div>
-                      <div className="truncate text-[11px] text-muted-foreground">
-                        {p.team} · {reason(p)}
-                      </div>
-                    </div>
-                    {formatPrice(p.price) && (
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        {formatPrice(p.price)}
-                      </span>
-                    )}
+      {ORDER.filter((pos) => result.picks[pos]?.length).map((pos) => (
+        <div key={pos} className="space-y-1">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {t(`ucl.score.${pos === 'GK' ? 'gk' : pos.toLowerCase()}`)}
+          </div>
+          <div className="overflow-hidden rounded-lg border border-border">
+            {result.picks[pos].map((p, i) => (
+              <div
+                key={p.id}
+                className="flex items-center gap-2 border-b border-border/50 px-3 py-2 last:border-b-0"
+              >
+                <span className="w-4 shrink-0 text-center text-[11px] font-bold text-muted-foreground">
+                  {i + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">{p.display_name || p.name}</div>
+                  <div className="truncate text-[11px] text-muted-foreground">
+                    {p.team} · {reason(p)}
                   </div>
-                ))}
+                </div>
+                {formatPrice(p.price) && (
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {formatPrice(p.price)}
+                  </span>
+                )}
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      )}
+      ))}
     </div>
   );
 };

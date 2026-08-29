@@ -91,6 +91,25 @@ export interface Optimisation {
   changes_needed: boolean;
 }
 
+export type Unlockable = 'optimisation' | 'captains' | 'chips';
+
+export interface UnlockPrices {
+  optimisation: number;
+  captains: number;
+  chips: number;
+  transfers: number;
+  max_transfers: number;
+}
+
+/** What exists but has not been paid for. Never carries the data itself. */
+export interface LockedState {
+  optimisation: boolean;
+  captains: boolean;
+  chips: boolean;
+  /** How many further transfer suggestions are available to buy. */
+  transfers: number;
+}
+
 export interface RatingResult {
   id: string | null;
   rating: number;
@@ -101,6 +120,19 @@ export interface RatingResult {
   optimisation: Optimisation | null;
   captain_ranking: CaptainOption[];
   chip_advice: ChipAdvice | null;
+  locked: LockedState;
+  prices: UnlockPrices;
+  credits_remaining: number | null;
+}
+
+/** Thrown when a paid action cannot proceed, so the UI can react precisely. */
+export class CreditError extends Error {
+  constructor(
+    public kind: 'sign_in_required' | 'insufficient_credits',
+    public cost: number,
+  ) {
+    super(kind);
+  }
 }
 
 export interface Fixture {
@@ -150,12 +182,61 @@ export interface BestPick {
  * Best players to own for the upcoming matchday, ranked per position.
  * Computed in Postgres, so opening the panel costs nothing and is instant.
  */
-export const getBestPicks = async (perPosition = 3): Promise<Record<Position, BestPick[]>> => {
-  const { data, error } = await (supabase as any).rpc('ucl_best_picks', { lim: perPosition });
+export const BEST_PICKS_PRICE = 2;
+
+export interface BestPicksResult {
+  picks: Record<Position, BestPick[]>;
+  /** False while the schedule is unpublished, so the UI can say what it ranked on. */
+  fixtures_known: boolean;
+  credits_remaining: number | null;
+}
+
+export const getBestPicks = async (perPosition = 3): Promise<BestPicksResult> => {
+  const { data, error } = await supabase.functions.invoke('ucl-best-picks', {
+    body: { perPosition },
+  });
+  const payload = data as { error?: string; cost?: number } | null;
+  const reason = payload?.error;
+  if (reason === 'sign_in_required' || reason === 'insufficient_credits') {
+    throw new CreditError(reason, payload?.cost ?? BEST_PICKS_PRICE);
+  }
   if (error) throw new Error(error.message);
-  const out: Record<Position, BestPick[]> = { GK: [], DEF: [], MID: [], FWD: [] };
-  for (const row of (data ?? []) as BestPick[]) out[row.position]?.push(row);
-  return out;
+  if (reason) throw new Error(reason);
+  const grouped = (data as { picks?: Record<string, BestPick[]> })?.picks ?? {};
+  return {
+    picks: {
+      GK: grouped.GK ?? [],
+      DEF: grouped.DEF ?? [],
+      MID: grouped.MID ?? [],
+      FWD: grouped.FWD ?? [],
+    },
+    fixtures_known: Boolean((data as { fixtures_known?: boolean })?.fixtures_known),
+    credits_remaining: (data as { credits_remaining?: number })?.credits_remaining ?? null,
+  };
+};
+
+/** Current wallet balance, or null when signed out. */
+export const getCreditBalance = async (): Promise<number | null> => {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth?.user) return null;
+  const { data } = await (supabase as any)
+    .from('user_credits')
+    .select('balance')
+    .eq('user_id', auth.user.id)
+    .maybeSingle();
+  return (data as { balance?: number } | null)?.balance ?? 0;
+};
+
+/** Start a Stripe checkout for a credit pack; returns the URL to send them to. */
+export const startTopUp = async (pack: 'starter' | 'plus' | 'pro' = 'starter') => {
+  const { data, error } = await supabase.functions.invoke('ucl-credits-checkout', {
+    body: { pack, returnUrl: `${window.location.origin}/fantasy` },
+  });
+  const payload = data as { error?: string; url?: string } | null;
+  if (payload?.error === 'sign_in_required') throw new CreditError('sign_in_required', 0);
+  if (error) throw new Error(error.message);
+  if (!payload?.url) throw new Error(payload?.error ?? 'checkout failed');
+  return payload.url;
 };
 
 /** Club crests, keyed by club name. The provider covers ~2/3 of the field. */
@@ -254,13 +335,31 @@ export const parseScreenshot = async (imageBase64: string): Promise<ParseResult>
 
 export const rateSquad = async (
   squad: Squad,
-  opts: { source: 'screenshot' | 'manual'; language: string; email?: string | null },
+  opts: {
+    source: 'screenshot' | 'manual';
+    language: string;
+    unlock?: Unlockable[];
+    transferCount?: number;
+  },
 ): Promise<RatingResult> => {
   const { data, error } = await supabase.functions.invoke('ucl-rate-squad', {
-    body: { squad, source: opts.source, language: opts.language, email: opts.email ?? null },
+    body: {
+      squad,
+      source: opts.source,
+      language: opts.language,
+      unlock: opts.unlock ?? [],
+      transferCount: opts.transferCount ?? 0,
+    },
   });
+  // supabase-js surfaces a non-2xx as `error` with the body still in `data`,
+  // so the credit reasons have to be read from either place.
+  const payload = data as { error?: string; cost?: number } | null;
+  const reason = payload?.error;
+  if (reason === 'sign_in_required' || reason === 'insufficient_credits') {
+    throw new CreditError(reason, payload?.cost ?? 0);
+  }
   if (error) throw new Error(error.message);
-  if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+  if (reason) throw new Error(reason);
   return data as RatingResult;
 };
 

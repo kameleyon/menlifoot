@@ -135,6 +135,41 @@ serve(async (req) => {
 
   const session = event.data.object as Stripe.Checkout.Session;
   const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+  // Credit top-ups are handled first and return early: they have no
+  // store_orders row, so falling through would look like an unknown order.
+  if (session.metadata?.kind === "ucl_credits") {
+    const userId = session.metadata.user_id;
+    const credits = parseInt(session.metadata.credits ?? "0", 10);
+    if (!userId || !Number.isFinite(credits) || credits <= 0) {
+      console.error("ucl_credits session missing user_id or credits", session.id);
+      return new Response("ok", { status: 200 });
+    }
+
+    // Idempotent: Stripe retries webhooks, and the ledger is the record of
+    // whether this particular session has already been credited.
+    const { data: already } = await db
+      .from("credit_ledger")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("reason", "topup")
+      .contains("metadata", { session_id: session.id })
+      .maybeSingle();
+    if (already) return new Response("ok", { status: 200 });
+
+    const { error: grantError } = await db.rpc("grant_credits", {
+      p_user_id: userId,
+      p_amount: credits,
+      p_reason: "topup",
+      p_metadata: { session_id: session.id, pack: session.metadata.pack ?? null },
+    });
+    if (grantError) {
+      console.error("grant_credits failed:", grantError.message);
+      return new Response("grant failed", { status: 500 });
+    }
+    return new Response("ok", { status: 200 });
+  }
+
   const { data: order } = await db.from("store_orders").select("*").eq("stripe_session_id", session.id).maybeSingle();
   if (!order || order.status !== "pending") return new Response("ok", { status: 200 }); // idempotent
 
