@@ -80,6 +80,9 @@ const BestPicks = ({ signedIn, balance, onBalance, onSignIn, onTopUp }: Props) =
     return (
       <div className="space-y-2">
         <LockedPanel
+          title={t('ucl.bestPicksTitle')}
+          description={t('ucl.bestPicksLockedBody')}
+          icon={<Telescope className="h-4 w-4 text-primary" />}
           cost={BEST_PICKS_PRICE}
           balance={balance}
           signedIn={signedIn}
@@ -88,15 +91,7 @@ const BestPicks = ({ signedIn, balance, onBalance, onSignIn, onTopUp }: Props) =
           onSignIn={onSignIn}
           onTopUp={onTopUp}
         >
-          <div className="p-3">
-            <div className="mb-2 flex items-center gap-2">
-              <Telescope className="h-4 w-4 text-primary" />
-              <span className="font-display text-sm uppercase tracking-wide">
-                {t('ucl.bestPicksTitle')}
-              </span>
-            </div>
-            <PlaceholderRows rows={4} />
-          </div>
+          <PlaceholderRows rows={4} />
         </LockedPanel>
         {error && <p className="text-xs text-destructive">{error}</p>}
       </div>

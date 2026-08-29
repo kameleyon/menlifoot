@@ -448,6 +448,9 @@ const FantasyUCL = () => {
                 missing feature rather than "your XI is already right". */}
             {result.locked.optimisation && (
               <LockedPanel
+                title={t('ucl.optimizeTitle')}
+                description={t('ucl.optimizeLockedBody')}
+                icon={<Wand2 className="h-4 w-4 text-primary" />}
                 cost={result.prices.optimisation}
                 balance={balance}
                 signedIn={signedIn}
@@ -456,15 +459,7 @@ const FantasyUCL = () => {
                 onSignIn={goSignIn}
                 onTopUp={topUp}
               >
-                <div className="p-4">
-                  <div className="mb-2 flex items-center gap-2">
-                    <Wand2 className="h-4 w-4 text-primary" />
-                    <span className="font-display text-sm uppercase tracking-wide">
-                      {t('ucl.optimizeTitle')}
-                    </span>
-                  </div>
-                  <PlaceholderRows rows={1} />
-                </div>
+                <PlaceholderRows rows={2} />
               </LockedPanel>
             )}
 
@@ -507,6 +502,9 @@ const FantasyUCL = () => {
 
             {result.locked.captains && (
               <LockedPanel
+                title={t('ucl.captainTitle')}
+                description={t('ucl.captainLockedBody')}
+                icon={<Star className="h-4 w-4 text-primary" />}
                 cost={result.prices.captains}
                 balance={balance}
                 signedIn={signedIn}
@@ -515,15 +513,7 @@ const FantasyUCL = () => {
                 onSignIn={goSignIn}
                 onTopUp={topUp}
               >
-                <div className="p-3">
-                  <div className="mb-2 flex items-center gap-2">
-                    <Star className="h-4 w-4 text-primary" />
-                    <span className="font-display text-sm uppercase tracking-wide">
-                      {t('ucl.captainTitle')}
-                    </span>
-                  </div>
-                  <PlaceholderRows rows={3} />
-                </div>
+                <PlaceholderRows rows={3} />
               </LockedPanel>
             )}
 
@@ -559,6 +549,9 @@ const FantasyUCL = () => {
 
             {result.locked.chips && (
               <LockedPanel
+                title={t('ucl.chipTitle')}
+                description={t('ucl.chipLockedBody')}
+                icon={<Zap className="h-4 w-4 text-primary" />}
                 cost={result.prices.chips}
                 balance={balance}
                 signedIn={signedIn}
@@ -567,15 +560,7 @@ const FantasyUCL = () => {
                 onSignIn={goSignIn}
                 onTopUp={topUp}
               >
-                <div className="p-3">
-                  <div className="mb-2 flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-primary" />
-                    <span className="font-display text-sm uppercase tracking-wide">
-                      {t('ucl.chipTitle')}
-                    </span>
-                  </div>
-                  <PlaceholderRows rows={1} />
-                </div>
+                <PlaceholderRows rows={2} />
               </LockedPanel>
             )}
 
@@ -621,27 +606,20 @@ const FantasyUCL = () => {
             {/* Transfers are bought one at a time, so a manager only pays for
                 the depth of advice they actually want. */}
             {result.locked.transfers > 0 && (
-              <div className="space-y-2">
-                {result.suggestions.length === 0 && (
-                  <h3 className="font-display text-sm uppercase tracking-wide">
-                    {t('ucl.transfers')}
-                  </h3>
-                )}
-                <LockedPanel
-                  cost={result.prices.transfers}
-                  balance={balance}
-                  signedIn={signedIn}
-                  busy={unlocking}
-                  onUnlock={() => unlockMore('transfer')}
-                  onSignIn={goSignIn}
-                  onTopUp={topUp}
-                >
-                  <PlaceholderRows rows={1} />
-                </LockedPanel>
-                <p className="text-center text-[11px] text-muted-foreground">
-                  {result.locked.transfers} {t('ucl.moreTransfersAvailable')}
-                </p>
-              </div>
+              <LockedPanel
+                title={t('ucl.transfers')}
+                description={`${result.locked.transfers} ${t('ucl.moreTransfersAvailable')}`}
+                icon={<ArrowRight className="h-4 w-4 text-primary" />}
+                cost={result.prices.transfers}
+                balance={balance}
+                signedIn={signedIn}
+                busy={unlocking}
+                onUnlock={() => unlockMore('transfer')}
+                onSignIn={goSignIn}
+                onTopUp={topUp}
+              >
+                <PlaceholderRows rows={2} />
+              </LockedPanel>
             )}
 
             <BestPicks
