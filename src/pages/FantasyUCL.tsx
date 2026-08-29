@@ -5,7 +5,6 @@ import {
 } from 'lucide-react';
 import AppShell from '@/components/mobile/AppShell';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import PitchView from '@/components/ucl/PitchView';
@@ -21,7 +20,7 @@ import {
   type Squad,
 } from '@/lib/uclFantasy';
 
-type Step = 'start' | 'import' | 'build' | 'analyzing' | 'email' | 'result' | 'fixtures';
+type Step = 'start' | 'import' | 'build' | 'analyzing' | 'result' | 'fixtures';
 
 const STAGE_KEYS = ['ucl.stage.reading', 'ucl.stage.measuring', 'ucl.stage.finding'];
 
@@ -36,7 +35,6 @@ const FantasyUCL = () => {
   const [unresolved, setUnresolved] = useState<string[]>([]);
   const [stage, setStage] = useState(0);
   const [result, setResult] = useState<RatingResult | null>(null);
-  const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [showAllTransfers, setShowAllTransfers] = useState(false);
 
@@ -66,15 +64,14 @@ const FantasyUCL = () => {
   });
 
   const analyze = useCallback(
-    async (next: Squad, src: 'screenshot' | 'manual', withEmail?: string) => {
+    async (next: Squad, src: 'screenshot' | 'manual') => {
       setSquad(next);
       setSource(src);
       setStep('analyzing');
       try {
-        const r = await rateSquad(next, { source: src, language, email: withEmail ?? null });
+        const r = await rateSquad(next, { source: src, language });
         setResult(r);
-        // Gate the score behind an email the first time only.
-        setStep(withEmail ? 'result' : 'email');
+        setStep('result');
       } catch (err) {
         toast({
           title: t('ucl.error'),
@@ -121,20 +118,6 @@ const FantasyUCL = () => {
     }
   };
 
-  const submitEmail = async () => {
-    if (!squad) return;
-    setBusy(true);
-    try {
-      await rateSquad(squad, { source, language, email: email.trim() });
-      setStep('result');
-    } catch {
-      // The score is already computed; a failed capture must not block it.
-      setStep('result');
-    } finally {
-      setBusy(false);
-    }
-  };
-
   /** Apply the suggested XI/captain, then re-run the rating so the score moves. */
   const applyOptimisation = async () => {
     if (!result?.optimisation) return;
@@ -144,7 +127,7 @@ const FantasyUCL = () => {
       bench: result.optimisation.bench,
     };
     setShowAllTransfers(false);
-    await analyze(next, source, email.trim() || undefined);
+    await analyze(next, source);
   };
 
   const reset = () => {
@@ -152,7 +135,6 @@ const FantasyUCL = () => {
     setSquad(null);
     setResult(null);
     setUnresolved([]);
-    setEmail('');
     setShowAllTransfers(false);
   };
 
@@ -299,35 +281,6 @@ const FantasyUCL = () => {
                 </div>
               ))}
             </div>
-          </div>
-        )}
-
-        {step === 'email' && result && (
-          <div className="space-y-5 pt-6 text-center">
-            <div>
-              <div className="font-sans text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
-                {t('ucl.almostThere')}
-              </div>
-              <h2 className="mt-2 font-display text-2xl uppercase">{t('ucl.ratingReady')}</h2>
-              <p className="mx-auto mt-2 max-w-xs text-sm text-muted-foreground">{t('ucl.emailWhy')}</p>
-            </div>
-            <Input
-              type="email"
-              inputMode="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder={t('ucl.emailPlaceholder')}
-            />
-            <Button className="w-full" disabled={busy || !email.includes('@')} onClick={submitEmail}>
-              {t('ucl.seeMyRating')}
-            </Button>
-            <button
-              type="button"
-              onClick={() => setStep('result')}
-              className="text-xs text-muted-foreground underline"
-            >
-              {t('ucl.skipEmail')}
-            </button>
           </div>
         )}
 
