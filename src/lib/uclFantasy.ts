@@ -129,6 +129,35 @@ export interface UclTeam {
   elo_rating: number | null;
 }
 
+export interface BestPick {
+  id: string;
+  name: string;
+  display_name: string;
+  team: string;
+  position: Position;
+  price: number | null;
+  form: number | null;
+  next_opponent: string | null;
+  next_difficulty: number | null;
+  jersey_number: number | null;
+  clean_sheet_rate: number | null;
+  avg_goals_scored: number | null;
+  score: number;
+  rank_in_position: number;
+}
+
+/**
+ * Best players to own for the upcoming matchday, ranked per position.
+ * Computed in Postgres, so opening the panel costs nothing and is instant.
+ */
+export const getBestPicks = async (perPosition = 3): Promise<Record<Position, BestPick[]>> => {
+  const { data, error } = await (supabase as any).rpc('ucl_best_picks', { lim: perPosition });
+  if (error) throw new Error(error.message);
+  const out: Record<Position, BestPick[]> = { GK: [], DEF: [], MID: [], FWD: [] };
+  for (const row of (data ?? []) as BestPick[]) out[row.position]?.push(row);
+  return out;
+};
+
 /** Club crests, keyed by club name. The provider covers ~2/3 of the field. */
 export const getTeamCrests = async (): Promise<Record<string, string>> => {
   const { data } = await (supabase as any).from('ucl_teams').select('name,logo_url');

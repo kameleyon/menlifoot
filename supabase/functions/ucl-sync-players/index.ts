@@ -56,6 +56,7 @@ type Player = {
   red_cards: number;
   availability: string;
   availability_note: string | null;
+  jersey_number: number | null;
   selected_by_pct: number | null;
   source: string;
   updated_at: string;
@@ -158,6 +159,7 @@ function mapUefaPlayer(raw: unknown): Player | null {
     red_cards: Math.round(num(p.rC)),
     availability: suspended ? "suspended" : injured ? "injured" : active ? "available" : "unavailable",
     availability_note: null,
+    jersey_number: null,
     selected_by_pct: p.selPer != null ? num(p.selPer) : null,
     source: "uefa",
     updated_at: new Date().toISOString(),
@@ -232,6 +234,7 @@ async function fetchSquadFromBigBalls(team: string, apiKey: string): Promise<Pla
         red_cards: 0,
         availability: "available",
         availability_note: null,
+        jersey_number: Number.isFinite(Number(r.jersey_number)) ? Number(r.jersey_number) : null,
         selected_by_pct: null,
         source: "bigballs",
         updated_at: new Date().toISOString(),
@@ -386,6 +389,7 @@ async function backfillViaPerplexity(apiKey: string, teams: string[]): Promise<P
             ? String(r.availability ?? "available")
             : "available",
           availability_note: r.availability_note ? String(r.availability_note) : null,
+          jersey_number: null,
           selected_by_pct: null,
           source: "perplexity",
           updated_at: new Date().toISOString(),

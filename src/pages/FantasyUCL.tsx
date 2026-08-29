@@ -12,6 +12,7 @@ import PitchView from '@/components/ucl/PitchView';
 import RatingRing from '@/components/ucl/RatingRing';
 import SquadBuilder from '@/components/ucl/SquadBuilder';
 import FixturesCalendar from '@/components/ucl/FixturesCalendar';
+import BestPicks from '@/components/ucl/BestPicks';
 import {
   fileToBase64,
   parseScreenshot,
@@ -483,13 +484,7 @@ const FantasyUCL = () => {
               </div>
             )}
 
-            <div className="space-y-2">
-              <h3 className="flex items-center gap-2 font-display text-sm uppercase tracking-wide">
-                <CalendarDays className="h-4 w-4 text-primary" />
-                {t('ucl.fixturesTitle')}
-              </h3>
-              <FixturesCalendar />
-            </div>
+            <BestPicks />
 
             <Button variant="outline" className="w-full" onClick={reset}>
               {t('ucl.rateAnother')}
