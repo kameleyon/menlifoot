@@ -22,6 +22,9 @@ import {
   parseScreenshot,
   rateSquad,
   startTopUp,
+  isFreeCompetition,
+  COMPETITION_LABEL,
+  type Competition,
   type RatingResult,
   type Squad,
   type Unlockable,
@@ -31,7 +34,13 @@ type Step = 'start' | 'import' | 'build' | 'analyzing' | 'result' | 'fixtures';
 
 const STAGE_KEYS = ['ucl.stage.reading', 'ucl.stage.measuring', 'ucl.stage.finding'];
 
-const FantasyUCL = () => {
+interface Props {
+  /** UCL is the credit-gated product; EPL is free for now. */
+  competition?: Competition;
+}
+
+const FantasyUCL = ({ competition = 'UCL' }: Props) => {
+  const free = isFreeCompetition(competition);
   const { t, language } = useLanguage();
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -109,7 +118,14 @@ const FantasyUCL = () => {
       setSource(src);
       setStep('analyzing');
       try {
-        const r = await rateSquad(next, { source: src, language, unlock, transferCount });
+        const r = await rateSquad(next, {
+          source: src,
+          language,
+          competition,
+          // A free competition asks for everything up front; nothing is locked.
+          unlock: free ? ['optimisation', 'captains', 'chips'] : unlock,
+          transferCount: free ? 3 : transferCount,
+        });
         setResult(r);
         if (r.credits_remaining != null) setBalance(r.credits_remaining);
         setStep('result');
@@ -131,7 +147,7 @@ const FantasyUCL = () => {
         setStep(src === 'screenshot' ? 'import' : 'build');
       }
     },
-    [language, t, toast],
+    [language, t, toast, competition, free],
   );
 
   const handleFile = async (file: File) => {
@@ -183,6 +199,7 @@ const FantasyUCL = () => {
       const r = await rateSquad(squad, {
         source,
         language,
+        competition,
         unlock: nextUnlocks,
         transferCount: nextTransfers,
       });
@@ -250,7 +267,11 @@ const FantasyUCL = () => {
 
           {/* Balance is always visible once signed in: a paywall the user cannot
               see their side of feels arbitrary. */}
-          {signedIn ? (
+          {free ? (
+            <span className="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground">
+              {COMPETITION_LABEL[competition]}
+            </span>
+          ) : signedIn ? (
             <button
               type="button"
               onClick={topUp}
@@ -364,14 +385,18 @@ const FantasyUCL = () => {
         {step === 'fixtures' && (
           <div className="space-y-4">
             <h2 className="font-display text-2xl uppercase">{t('ucl.fixturesTitle')}</h2>
-            <FixturesCalendar />
+            <FixturesCalendar competition={competition} />
           </div>
         )}
 
         {step === 'build' && (
           <div className="space-y-4">
             <h2 className="font-display text-2xl uppercase">{t('ucl.buildTitle')}</h2>
-            <SquadBuilder submitting={busy} onSubmit={(s) => analyze(s, 'manual')} />
+            <SquadBuilder
+              competition={competition}
+              submitting={busy}
+              onSubmit={(s) => analyze(s, 'manual')}
+            />
           </div>
         )}
 
@@ -623,6 +648,7 @@ const FantasyUCL = () => {
             )}
 
             <BestPicks
+              competition={competition}
               signedIn={signedIn}
               balance={balance}
               onBalance={setBalance}

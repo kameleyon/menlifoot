@@ -69,7 +69,8 @@ const App = () => (
                 <Route path="/quizzes" element={<QuizList />} />
                 <Route path="/quizzes/:id" element={<QuizPlay />} />
                 <Route path="/grenadiers" element={<GrenadiersApp />} />
-                <Route path="/fantasy" element={<FantasyUCL />} />
+                <Route path="/fantasy" element={<FantasyUCL competition="UCL" />} />
+                <Route path="/epl" element={<FantasyUCL competition="EPL" />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

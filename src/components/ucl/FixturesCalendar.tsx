@@ -5,6 +5,7 @@ import {
   getFixtures,
   getLoadedMatchdays,
   getTeamCrests,
+  type Competition,
   type Fixture,
   type Matchday,
 } from '@/lib/uclFantasy';
@@ -29,7 +30,7 @@ const Crest = ({ team, src }: { team: string; src?: string }) =>
     </span>
   );
 
-const FixturesCalendar = () => {
+const FixturesCalendar = ({ competition = 'UCL' }: { competition?: Competition }) => {
   const { t, language } = useLanguage();
   const [available, setAvailable] = useState<number[]>([]);
   const [matchday, setMatchday] = useState<number | null>(null);
@@ -39,30 +40,31 @@ const FixturesCalendar = () => {
   const [crests, setCrests] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    getTeamCrests().then(setCrests).catch(() => setCrests({}));
-  }, []);
+    getTeamCrests(competition).then(setCrests).catch(() => setCrests({}));
+  }, [competition]);
 
   useEffect(() => {
-    getLoadedMatchdays()
+    getLoadedMatchdays(competition)
       .then((mds) => {
         setAvailable(mds);
+        // Open on the round in progress rather than the first of the season.
         setMatchday((cur) => cur ?? mds[0] ?? null);
       })
       .catch(() => setAvailable([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [competition]);
 
   useEffect(() => {
     if (matchday == null) return;
     setLoading(true);
-    getFixtures(matchday)
+    getFixtures(matchday, competition)
       .then(({ fixtures: f, matchday: m }) => {
         setFixtures(f);
         setMeta(m);
       })
       .catch(() => setFixtures([]))
       .finally(() => setLoading(false));
-  }, [matchday]);
+  }, [matchday, competition]);
 
   const locale = { en: 'en-GB', fr: 'fr-FR', es: 'es-ES', ht: 'fr-FR' }[language as string] ?? 'en-GB';
 

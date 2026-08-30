@@ -41,9 +41,13 @@ const MAX_COMFORTABLE_PER_CLUB = 3;
 // the formation leaves over — it is NOT one player per position.
 const SQUAD_COMPOSITION: Record<string, number> = { GK: 2, DEF: 5, MID: 5, FWD: 3 };
 
-// UCL Fantasy has exactly two chips. Bench Boost and Triple Captain are Fantasy
-// Premier League chips and do not exist here.
-const CHIPS = ["Wildcard", "Limitless"] as const;
+// The two games have different chips, and mixing them up is a real error:
+// Bench Boost and Triple Captain are Fantasy Premier League chips that do not
+// exist in the UCL game, which has Limitless instead.
+const CHIPS_BY_COMPETITION: Record<string, string[]> = {
+  UCL: ["Wildcard", "Limitless"],
+  EPL: ["Wildcard", "Free Hit", "Bench Boost", "Triple Captain"],
+};
 
 // ---------------------------------------------------------------- credits ---
 // Advice costs credits; the rating, its breakdown and the narrative stay free,
@@ -137,7 +141,16 @@ serve(async (req) => {
       email: rawEmail = null,
       unlock: rawUnlock = [],
       transferCount: rawTransferCount = 0,
+      competition: rawCompetition = "UCL",
     } = await req.json();
+
+    // Credits gate the Champions League product only. The Premier League
+    // version is free for now, so it asks for everything and pays nothing.
+    const competition = ["UCL", "EPL"].includes(String(rawCompetition))
+      ? String(rawCompetition)
+      : "UCL";
+    const FREE_COMPETITIONS = new Set(["EPL"]);
+    const isFree = FREE_COMPETITIONS.has(competition);
 
     // What the caller is asking to pay for, normalised and bounded.
     const requested = new Set(
@@ -149,11 +162,12 @@ serve(async (req) => {
       0,
       Math.min(MAX_TRANSFERS, Math.floor(Number(rawTransferCount) || 0)),
     );
-    const cost =
-      (requested.has("optimisation") ? UNLOCK_PRICES.optimisation : 0) +
-      (requested.has("captains") ? UNLOCK_PRICES.captains : 0) +
-      (requested.has("chips") ? UNLOCK_PRICES.chips : 0) +
-      transferCount * UNLOCK_PRICES.transfers;
+    const cost = isFree
+      ? 0
+      : (requested.has("optimisation") ? UNLOCK_PRICES.optimisation : 0) +
+        (requested.has("captains") ? UNLOCK_PRICES.captains : 0) +
+        (requested.has("chips") ? UNLOCK_PRICES.chips : 0) +
+        transferCount * UNLOCK_PRICES.transfers;
 
     const rawStarterIds: unknown[] = (squad?.starters ?? []).map(
       (s: { player_id?: unknown }) => s?.player_id,
@@ -200,6 +214,7 @@ serve(async (req) => {
       .select(
         "id,name,display_name,team,position,price,total_points,form,minutes,availability,availability_note,next_opponent,next_difficulty",
       )
+      .eq("competition", competition)
       .in("id", [...starterIds, ...benchIds]);
     if (error) throw new Error(`player lookup failed: ${error.message}`);
 
@@ -406,19 +421,43 @@ serve(async (req) => {
     const unavailableStarters = starters.filter((p) => availabilityScore(p) === 0).length;
     const hardFixtures = starters.filter((p) => (p.next_difficulty ?? 0) >= 4).length;
     const chipAdvice = (() => {
+      const chips = CHIPS_BY_COMPETITION[competition] ?? CHIPS_BY_COMPETITION.UCL;
+      const holdText = `Hold your chips — nothing this ${competition === "EPL" ? "gameweek" : "matchday"} justifies one.`;
+
+      // A broken squad is a Wildcard case in both games.
       if (unavailableStarters >= 4) {
-        return { chip: CHIPS[0], urgency: "high",
+        return { chip: "Wildcard", urgency: "high",
           reason: `${unavailableStarters} of your XI cannot play — too many to fix with normal transfers.` };
       }
-      if (hardFixtures >= 7) {
-        return { chip: CHIPS[1], urgency: "medium",
+
+      if (competition === "EPL") {
+        // Triple Captain wants one standout on an easy fixture, not a good squad.
+        if (captain && (captain.next_difficulty ?? 5) <= 2 && (captain.form ?? 0) >= 6) {
+          return { chip: "Triple Captain", urgency: "medium",
+            reason: `${captain.name} is in form against a soft fixture — the best week to triple him.` };
+        }
+        // Bench Boost pays only when the bench itself is playable.
+        const benchPlayable = bench.filter(
+          (p) => availabilityScore(p) === 1 && (p.next_difficulty ?? 5) <= 3,
+        ).length;
+        if (bench.length >= 4 && benchPlayable === bench.length) {
+          return { chip: "Bench Boost", urgency: "medium",
+            reason: "Your whole bench is fit with a kind fixture — their points would all count." };
+        }
+        if (hardFixtures >= 8) {
+          return { chip: "Free Hit", urgency: "medium",
+            reason: `${hardFixtures} of your XI face a hard fixture; a one-week rebuild may beat taking hits.` };
+        }
+      } else if (hardFixtures >= 7) {
+        return { chip: "Limitless", urgency: "medium",
           reason: `${hardFixtures} of your XI face a top-tier opponent; a one-matchday reshape may pay.` };
       }
+
       if (unavailableStarters >= 2) {
-        return { chip: CHIPS[0], urgency: "medium",
+        return { chip: "Wildcard", urgency: "medium",
           reason: `${unavailableStarters} unavailable starters is more than a free transfer can cover.` };
       }
-      return { chip: null, urgency: "none", reason: "Hold both chips — nothing this matchday justifies one." };
+      return { chip: null, urgency: "none", reason: holdText, available: chips };
     })();
 
     // -------------------------------------------------- transfer shortlist ---
@@ -439,6 +478,7 @@ serve(async (req) => {
         .select(
           "id,name,display_name,team,position,price,total_points,form,minutes,availability,availability_note,next_opponent,next_difficulty",
         )
+        .eq("competition", competition)
         .eq("position", p.position)
         .eq("availability", "available")
         .not("id", "in", `(${[...starterIds, ...benchIds].join(",")})`);
@@ -572,6 +612,9 @@ serve(async (req) => {
       creditsRemaining = newBalance;
       paid = requested;
       paidTransfers = transferCount;
+    } else if (isFree) {
+      paid = new Set(["optimisation", "captains", "chips"]);
+      paidTransfers = MAX_TRANSFERS;
     } else if (userId) {
       const { data: wallet } = await supabase
         .from("user_credits")
@@ -590,6 +633,7 @@ serve(async (req) => {
         email_captured_at: email ? new Date().toISOString() : null,
         squad,
         rating,
+        competition,
         breakdown: { sub_scores: breakdown, formation: shape, narrative, chip_advice: chipAdvice },
         suggestions,
         source,
@@ -617,6 +661,8 @@ serve(async (req) => {
           chips: !paid.has("chips") && chipAdvice != null,
           transfers: Math.max(0, Math.min(MAX_TRANSFERS, suggestions.length) - paidTransfers),
         },
+        competition,
+        free: isFree,
         prices: { ...UNLOCK_PRICES, max_transfers: MAX_TRANSFERS },
         credits_remaining: creditsRemaining,
       }),

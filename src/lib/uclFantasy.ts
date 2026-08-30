@@ -8,6 +8,17 @@ import { supabase } from '@/integrations/supabase/client';
 
 export type Position = 'GK' | 'DEF' | 'MID' | 'FWD';
 
+/** The two products share this entire module; only the data is scoped. */
+export type Competition = 'UCL' | 'EPL';
+
+/** Premier League analysis is free for now; the UCL one is credit-gated. */
+export const isFreeCompetition = (c: Competition) => c === 'EPL';
+
+export const COMPETITION_LABEL: Record<Competition, string> = {
+  UCL: 'Champions League',
+  EPL: 'Premier League',
+};
+
 export interface UclPlayer {
   id: string;
   name: string;
@@ -111,6 +122,8 @@ export interface LockedState {
 }
 
 export interface RatingResult {
+  competition?: Competition;
+  free?: boolean;
   id: string | null;
   rating: number;
   formation: string;
@@ -162,6 +175,9 @@ export interface UclTeam {
 }
 
 export interface BestPick {
+  goals?: number | null;
+  assists?: number | null;
+  minutes?: number | null;
   id: string;
   name: string;
   display_name: string;
@@ -191,9 +207,12 @@ export interface BestPicksResult {
   credits_remaining: number | null;
 }
 
-export const getBestPicks = async (perPosition = 3): Promise<BestPicksResult> => {
+export const getBestPicks = async (
+  perPosition = 3,
+  competition: Competition = 'UCL',
+): Promise<BestPicksResult> => {
   const { data, error } = await supabase.functions.invoke('ucl-best-picks', {
-    body: { perPosition },
+    body: { perPosition, competition },
   });
   const payload = data as { error?: string; cost?: number } | null;
   const reason = payload?.error;
@@ -240,22 +259,33 @@ export const startTopUp = async (pack: 'starter' | 'plus' | 'pro' = 'starter') =
 };
 
 /** Club crests, keyed by club name. The provider covers ~2/3 of the field. */
-export const getTeamCrests = async (): Promise<Record<string, string>> => {
-  const { data } = await (supabase as any).from('ucl_teams').select('name,logo_url');
+export const getTeamCrests = async (
+  competition: Competition = 'UCL',
+): Promise<Record<string, string>> => {
+  const { data } = await (supabase as any)
+    .from('ucl_teams')
+    .select('name,logo_url')
+    .eq('competition', competition);
   const out: Record<string, string> = {};
   for (const t of (data ?? []) as UclTeam[]) if (t.logo_url) out[t.name] = t.logo_url;
   return out;
 };
 
 /** Fixtures for one matchday, plus that matchday's deadline. */
-export const getFixtures = async (matchday: number) => {
+export const getFixtures = async (matchday: number, competition: Competition = 'UCL') => {
   const [fx, md] = await Promise.all([
     (supabase as any)
       .from('ucl_fixtures')
       .select('id,matchday,kickoff,home_team,away_team,home_score,away_score,status')
+      .eq('competition', competition)
       .eq('matchday', matchday)
       .order('kickoff', { ascending: true, nullsFirst: false }),
-    (supabase as any).from('ucl_matchdays').select('*').eq('matchday', matchday).maybeSingle(),
+    (supabase as any)
+      .from('ucl_matchdays')
+      .select('*')
+      .eq('competition', competition)
+      .eq('matchday', matchday)
+      .maybeSingle(),
   ]);
   return {
     fixtures: (fx.data ?? []) as Fixture[],
@@ -264,8 +294,13 @@ export const getFixtures = async (matchday: number) => {
 };
 
 /** Which matchdays have any fixtures loaded, so the pager only offers real ones. */
-export const getLoadedMatchdays = async (): Promise<number[]> => {
-  const { data } = await (supabase as any).from('ucl_fixtures').select('matchday');
+export const getLoadedMatchdays = async (
+  competition: Competition = 'UCL',
+): Promise<number[]> => {
+  const { data } = await (supabase as any)
+    .from('ucl_fixtures')
+    .select('matchday')
+    .eq('competition', competition);
   const set = new Set<number>(((data ?? []) as { matchday: number }[]).map((r) => r.matchday));
   return [...set].sort((a, b) => a - b);
 };
@@ -340,6 +375,7 @@ export const rateSquad = async (
     language: string;
     unlock?: Unlockable[];
     transferCount?: number;
+    competition?: Competition;
   },
 ): Promise<RatingResult> => {
   const { data, error } = await supabase.functions.invoke('ucl-rate-squad', {
@@ -349,6 +385,7 @@ export const rateSquad = async (
       language: opts.language,
       unlock: opts.unlock ?? [],
       transferCount: opts.transferCount ?? 0,
+      competition: opts.competition ?? 'UCL',
     },
   });
   // supabase-js surfaces a non-2xx as `error` with the body still in `data`,
@@ -364,7 +401,11 @@ export const rateSquad = async (
 };
 
 /** Player search for the manual builder. Reads ucl_players directly (public). */
-export const searchPlayers = async (query: string, position?: Position | null) => {
+export const searchPlayers = async (
+  query: string,
+  position?: Position | null,
+  competition: Competition = 'UCL',
+) => {
   // `as any` matches how quizzes/grenadiers tables are read elsewhere: the
   // generated types.ts predates these tables.
   let q = (supabase as any)
@@ -372,6 +413,7 @@ export const searchPlayers = async (query: string, position?: Position | null) =
     .select(
       'id,name,display_name,team,team_code,position,price,total_points,form,availability,availability_note,next_opponent,next_difficulty',
     )
+    .eq('competition', competition)
     .limit(20);
   if (position) q = q.eq('position', position);
   if (query.trim()) q = q.ilike('name', `%${query.trim()}%`);

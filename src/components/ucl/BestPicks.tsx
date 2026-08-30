@@ -8,6 +8,8 @@ import {
   CreditError,
   formatPrice,
   getBestPicks,
+  isFreeCompetition,
+  type Competition,
   type BestPick,
   type BestPicksResult,
   type Position,
@@ -16,6 +18,7 @@ import {
 const ORDER: Position[] = ['GK', 'DEF', 'MID', 'FWD'];
 
 interface Props {
+  competition?: Competition;
   signedIn: boolean;
   balance: number | null;
   onBalance: (n: number | null) => void;
@@ -30,7 +33,15 @@ interface Props {
  * revoked from the browser roles, so the list simply does not exist client-side
  * until the edge function has taken the credits.
  */
-const BestPicks = ({ signedIn, balance, onBalance, onSignIn, onTopUp }: Props) => {
+const BestPicks = ({
+  competition = 'UCL',
+  signedIn,
+  balance,
+  onBalance,
+  onSignIn,
+  onTopUp,
+}: Props) => {
+  const free = isFreeCompetition(competition);
   const { t } = useLanguage();
   const [result, setResult] = useState<BestPicksResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -44,7 +55,7 @@ const BestPicks = ({ signedIn, balance, onBalance, onSignIn, onTopUp }: Props) =
     setLoading(true);
     setError(null);
     try {
-      const r = await getBestPicks(3);
+      const r = await getBestPicks(3, competition);
       setResult(r);
       onBalance(r.credits_remaining);
     } catch (err) {
@@ -77,6 +88,24 @@ const BestPicks = ({ signedIn, balance, onBalance, onSignIn, onTopUp }: Props) =
   // Before purchase, show a locked teaser rather than a bare button, so the
   // shape of what is on offer is visible without giving any of it away.
   if (!result) {
+    if (free) {
+      return (
+        <div className="space-y-2">
+          <Button variant="outline" className="w-full justify-between" onClick={load} disabled={loading}>
+            <span className="flex items-center gap-2">
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Telescope className="h-4 w-4 text-primary" />
+              )}
+              {t('ucl.bestPicksTitle')}
+            </span>
+            <ChevronDown className="h-4 w-4" />
+          </Button>
+          {error && <p className="text-xs text-destructive">{error}</p>}
+        </div>
+      );
+    }
     return (
       <div className="space-y-2">
         <LockedPanel

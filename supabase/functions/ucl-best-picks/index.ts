@@ -32,12 +32,42 @@ serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const perPosition = Math.max(1, Math.min(5, Math.floor(Number(body?.perPosition) || DEFAULT_PER_POSITION)));
+    const competition = ["UCL", "EPL"].includes(String(body?.competition ?? "UCL"))
+      ? String(body?.competition ?? "UCL")
+      : "UCL";
+    // Free while the Premier League version has no credit system.
+    const isFree = competition === "EPL";
 
     const authHeader = req.headers.get("Authorization") ?? "";
     const token = authHeader.toLowerCase().startsWith("bearer ")
       ? authHeader.slice(7).trim()
       : null;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+
+    const service0 = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    );
+
+    if (isFree) {
+      const { data, error } = await service0.rpc("ucl_best_picks", {
+        lim: perPosition,
+        p_competition: competition,
+      });
+      if (error) throw new Error(`best picks failed: ${error.message}`);
+      const grouped: Record<string, unknown[]> = { GK: [], DEF: [], MID: [], FWD: [] };
+      for (const row of (data ?? []) as Record<string, unknown>[]) {
+        const pos = String(row.position ?? "");
+        if (grouped[pos]) grouped[pos].push(row);
+      }
+      return json({
+        picks: grouped,
+        fixtures_known: ((data ?? []) as Record<string, unknown>[]).some((r) => r.next_difficulty != null),
+        credits_remaining: null,
+        price: 0,
+        free: true,
+      });
+    }
 
     // An anon-key bearer is not a signed-in user; treat it as signed out.
     if (!token || token === anonKey) {
@@ -65,7 +95,10 @@ serve(async (req) => {
       return json({ error: "insufficient_credits", cost: PRICE }, 402);
     }
 
-    const { data, error } = await service.rpc("ucl_best_picks", { lim: perPosition });
+    const { data, error } = await service.rpc("ucl_best_picks", {
+      lim: perPosition,
+      p_competition: competition,
+    });
     if (error) throw new Error(`best picks failed: ${error.message}`);
 
     const grouped: Record<string, unknown[]> = { GK: [], DEF: [], MID: [], FWD: [] };

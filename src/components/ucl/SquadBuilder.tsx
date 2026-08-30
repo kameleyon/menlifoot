@@ -12,6 +12,7 @@ import {
   searchPlayers,
   squadCost,
   SQUAD_BUDGET,
+  type Competition,
   type Position,
   type Squad,
   type SquadSlot,
@@ -21,6 +22,7 @@ import {
 interface Props {
   onSubmit: (squad: Squad) => void;
   submitting?: boolean;
+  competition?: Competition;
 }
 
 const emptySlot = (position: Position): SquadSlot => ({ player_id: null, position });
@@ -32,7 +34,7 @@ const buildStarters = (formation: string): SquadSlot[] => {
   );
 };
 
-const SquadBuilder = ({ onSubmit, submitting = false }: Props) => {
+const SquadBuilder = ({ onSubmit, submitting = false, competition = 'UCL' }: Props) => {
   const { t } = useLanguage();
   const [formation, setFormation] = useState<string>('4-3-3');
   const [starters, setStarters] = useState<SquadSlot[]>(() => buildStarters('4-3-3'));
@@ -65,14 +67,14 @@ const SquadBuilder = ({ onSubmit, submitting = false }: Props) => {
     if (!picking) return;
     let cancelled = false;
     setLoading(true);
-    searchPlayers(query, picking.position)
+    searchPlayers(query, picking.position, competition)
       .then((r) => !cancelled && setResults(r))
       .catch(() => !cancelled && setResults([]))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
-  }, [query, picking]);
+  }, [query, picking, competition]);
 
   const chosenIds = useMemo(
     () => new Set([...starters, ...bench].map((s) => s.player_id).filter(Boolean) as string[]),
