@@ -86,6 +86,10 @@ export interface Suggestion {
   in: string;
   reason: string;
   priority: 'high' | 'medium' | 'low';
+  /** Measured improvement over the player being replaced, 0-1. */
+  upgrade?: number | null;
+  /** True only for the clearest upgrades, so the badge stays meaningful. */
+  recommended?: boolean;
 }
 
 export interface CaptainOption {

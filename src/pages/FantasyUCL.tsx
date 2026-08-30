@@ -694,11 +694,23 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
               <div className="space-y-2">
                 <h3 className="font-display text-sm uppercase tracking-wide">{t('ucl.transfers')}</h3>
                 {(showAllTransfers ? result.suggestions : result.suggestions.slice(0, 3)).map((s, i) => (
-                  <div key={i} className="rounded-lg border border-border bg-card/60 p-3">
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                      <span className="text-muted-foreground line-through">{s.out}</span>
-                      <ArrowRight className="h-3.5 w-3.5 text-primary" />
-                      <span>{s.in}</span>
+                  <div
+                    key={i}
+                    className={`rounded-lg border p-3 ${
+                      s.recommended ? 'border-primary/50 bg-primary/5' : 'border-border bg-card/60'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
+                        <span className="truncate text-muted-foreground line-through">{s.out}</span>
+                        <ArrowRight className="h-3.5 w-3.5 shrink-0 text-primary" />
+                        <span className="truncate">{s.in}</span>
+                      </div>
+                      {s.recommended && (
+                        <span className="shrink-0 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">
+                          {t('ucl.recommended')}
+                        </span>
+                      )}
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">{s.reason}</p>
                   </div>

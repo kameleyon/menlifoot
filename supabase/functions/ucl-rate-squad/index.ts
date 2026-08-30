@@ -68,7 +68,12 @@ const UNLOCK_PRICES = {
   transfers: 1,
 } as const;
 
-const MAX_TRANSFERS = 3;
+const MAX_TRANSFERS = 5;
+
+// A suggestion is flagged as recommended when the replacement is clearly
+// better, not merely better. Below this the upgrade is real but marginal and
+// rarely worth a points hit, so it is offered without a badge.
+const STRONG_UPGRADE = 0.10;
 
 const PLAYER_FIELDS =
   "id,name,display_name,team,position,price,total_points,form,minutes,availability," +
@@ -580,7 +585,7 @@ serve(async (req) => {
     const weakest = [...starters]
       .map((p) => ({ p, s: expectedValue(p) }))
       .sort((a, b) => a.s - b.s)
-      .slice(0, 5);
+      .slice(0, MAX_TRANSFERS);
 
     // Money available if this player is sold: their price plus whatever the
     // squad has not spent. Without prices the budget is simply not applied.
@@ -685,8 +690,9 @@ serve(async (req) => {
                 "ONLY from the supplied transfer_options. Each option carries an `upgrade` score " +
                 "and both players' points, per-game rate, starts and fixture: justify every " +
                 "recommendation from those numbers, and never claim a player is in form when " +
-                "his per_game and starts say otherwise. Recommend fewer transfers, or none, " +
-                "rather than padding the list. Return raw JSON, no markdown fences: " +
+                "his per_game and starts say otherwise. Give up to five suggestions, ordered by " +
+                "how much they improve the squad, and recommend fewer or none rather than " +
+                "padding the list. Return raw JSON, no markdown fences: " +
                 '{"verdict":"one punchy sentence","strengths":["..."],"weaknesses":["..."],' +
                 '"suggestions":[{"out":"name","in":"name","reason":"one sentence","priority":"high|medium|low"}]}',
             },
@@ -708,7 +714,39 @@ serve(async (req) => {
               strengths: parsed?.strengths ?? [],
               weaknesses: parsed?.weaknesses ?? [],
             };
-            suggestions = Array.isArray(parsed?.suggestions) ? parsed.suggestions : [];
+            const raw = Array.isArray(parsed?.suggestions) ? parsed.suggestions : [];
+
+            // The model picks and explains; the ranking stays ours. Each
+            // suggestion is matched back to the candidate it names so the
+            // measured upgrade travels with it, rather than trusting a
+            // priority label the model assigned itself.
+            const gainFor = (outName: string, inName: string): number | null => {
+              for (const [outId, alts] of Object.entries(candidates)) {
+                const out = byId.get(outId);
+                if (!out || !String(outName ?? "").includes(out.name.split(" ").pop() ?? "")) continue;
+                const hit = alts.find((a) =>
+                  String(inName ?? "").includes(a.player.name.split(" ").pop() ?? "")
+                );
+                if (hit) return hit.gain;
+              }
+              return null;
+            };
+
+            suggestions = raw
+              .map((sg: Record<string, unknown>) => ({
+                ...sg,
+                upgrade: gainFor(String(sg.out ?? ""), String(sg.in ?? "")),
+              }))
+              .sort((a: Record<string, unknown>, c: Record<string, unknown>) =>
+                Number(c.upgrade ?? 0) - Number(a.upgrade ?? 0)
+              )
+              .map((sg: Record<string, unknown>, i: number) => ({
+                ...sg,
+                // Top two, and only when the gain is clear enough to be worth
+                // acting on. A marginal upgrade badged "recommended" is how a
+                // manager gets talked into a pointless hit.
+                recommended: i < 2 && Number(sg.upgrade ?? 0) >= STRONG_UPGRADE,
+              }));
           } catch {
             console.error("narrative JSON parse failed");
           }
