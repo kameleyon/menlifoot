@@ -470,6 +470,22 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
                   {result.target_gameweek}
                 </div>
               )}
+              {/* What the score becomes if the advice below is followed. The
+                  number is computed, not claimed, so it is safe to show. */}
+              {result.projected_rating != null &&
+                result.projected_rating > result.rating && (
+                  <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/5 px-3 py-1 text-xs">
+                    <span className="text-muted-foreground">{t('ucl.couldReach')}</span>
+                    <span className="font-display text-sm text-primary">
+                      {result.projected_rating}
+                    </span>
+                    {result.target_rating != null && (
+                      <span className="text-muted-foreground">
+                        / {t('ucl.target')} {result.target_rating}
+                      </span>
+                    )}
+                  </div>
+                )}
               {result.narrative?.verdict && (
                 <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">
                   {result.narrative.verdict}

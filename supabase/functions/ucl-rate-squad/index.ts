@@ -192,6 +192,118 @@ const valueScore = (p: Player) => {
   return clamp01(p.total_points / p.price / 8);
 };
 
+
+/**
+ * One definition of how good a player is right now, shared by the optimiser,
+ * the captain ranking and the transfer shortlist. Three separate notions of
+ * "good" was how the optimiser and the suggestions ended up contradicting each
+ * other on the same screen.
+ */
+const expectedValue = (p: Player): number => {
+  const parts: [number, number][] = [[0.4, availabilityScore(p)]];
+  parts.push([0.4, formScore(p)]);
+  if (p.next_difficulty != null) parts.push([0.2, fixtureScore(p)]);
+  const w = parts.reduce((t, [x]) => t + x, 0);
+  return w ? parts.reduce((t, [x, sc]) => t + x * sc, 0) / w : 0.5;
+};
+
+/**
+ * A captain is only as good as their form, fixture and fitness combined, but
+ * weight only the components with data behind them - otherwise a captain pick
+ * scores a fraction of its allowance purely because the season is young.
+ */
+const captainScore = (p: Player): number => {
+  const parts: [number, number][] = [[0.2, availabilityScore(p)]];
+  parts.push([0.5, formScore(p)]);
+  if (p.next_difficulty != null) parts.push([0.3, fixtureScore(p)]);
+  const w = parts.reduce((t, [x]) => t + x, 0);
+  return w ? clamp01(parts.reduce((t, [x, sc]) => t + x * sc, 0) / w) : 0.5;
+};
+
+/**
+ * Score a squad, 0-100.
+ *
+ * Pulled out of the request handler so a hypothetical squad can be run through
+ * exactly the same maths. Projecting an improvement with a second, slightly
+ * different formula would be worse than not projecting one at all - the two
+ * numbers have to be comparable to mean anything.
+ */
+function scoreSquad(starters: Player[], bench: Player[], captain: Player | null) {
+  const perClub = [...starters, ...bench].reduce<Record<string, number>>((acc, p) => {
+    acc[p.team] = (acc[p.team] ?? 0) + 1;
+    return acc;
+  }, {});
+  const maxPerClub = Math.max(0, ...Object.values(perClub));
+
+  const counts = starters.reduce<Record<string, number>>((acc, p) => {
+    acc[p.position] = (acc[p.position] ?? 0) + 1;
+    return acc;
+  }, {});
+  const shape = `${counts.DEF ?? 0}-${counts.MID ?? 0}-${counts.FWD ?? 0}`;
+  const benchedBetter = bench.filter((b) =>
+    starters.some(
+      (st) => st.position === b.position && availabilityScore(st) === 0 && availabilityScore(b) === 1,
+    ),
+  ).length;
+  const squadCounts = [...starters, ...bench].reduce<Record<string, number>>((acc, p) => {
+    acc[p.position] = (acc[p.position] ?? 0) + 1;
+    return acc;
+  }, {});
+  const compositionOk = starters.length + bench.length !== 15
+    ? false
+    : Object.entries(SQUAD_COMPOSITION).every(([pos, n]) => (squadCounts[pos] ?? 0) === n);
+
+  let structure = 1;
+  if (starters.length !== 11) structure -= 0.3;
+  if ((counts.GK ?? 0) !== 1) structure -= 0.2;
+  if (!VALID_FORMATIONS.has(shape)) structure -= 0.2;
+  if (!captain) structure -= 0.25;
+  // Only penalise composition when a full 15 was submitted; a screenshot that
+  // captured just the XI should not be marked down for a bench never seen.
+  if (bench.length > 0 && !compositionOk) structure -= 0.15;
+  structure -= Math.min(0.3, benchedBetter * 0.15);
+
+  const sub = {
+    captain: captain ? captainScore(captain) : 0,
+    availability: avg(starters.map(availabilityScore)),
+    form: avg(starters.map(formScore)),
+    fixtures: avg(starters.map(fixtureScore)),
+    structure: clamp01(structure),
+    diversity: clamp01(1 - (maxPerClub - MAX_COMFORTABLE_PER_CLUB) / 5),
+    value: avg([...starters, ...bench].map(valueScore)),
+  };
+
+  const squadAll = [...starters, ...bench];
+  const applicable: Record<keyof typeof WEIGHTS, boolean> = {
+    captain: true,
+    availability: true,
+    structure: true,
+    diversity: true,
+    form: starters.some((p) => p.form != null || p.points_per_game != null),
+    fixtures: starters.some((p) => p.next_difficulty != null),
+    value: squadAll.some((p) => p.price != null && p.total_points > 0),
+  };
+
+  const liveKeys = (Object.keys(WEIGHTS) as (keyof typeof WEIGHTS)[]).filter((k) => applicable[k]);
+  const totalWeight = liveKeys.reduce((t, k) => t + WEIGHTS[k], 0) || 1;
+  const rating = Math.round(
+    (liveKeys.reduce((t, k) => t + sub[k] * WEIGHTS[k], 0) / totalWeight) * 100,
+  );
+
+  const breakdown = (Object.keys(WEIGHTS) as (keyof typeof WEIGHTS)[]).map((k) => ({
+    key: k,
+    earned: Math.round(sub[k] * WEIGHTS[k]),
+    max: WEIGHTS[k],
+    ratio: Number(sub[k].toFixed(3)),
+    applicable: applicable[k],
+    // Points still on the table here, which is what closing the gap to the
+    // target actually means in practice.
+    shortfall: applicable[k] ? Math.round((1 - sub[k]) * WEIGHTS[k]) : 0,
+  }));
+
+  return { rating, breakdown, sub, shape, maxPerClub, perClub };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -305,107 +417,8 @@ serve(async (req) => {
     const captain = captainId ? byId.get(captainId) ?? null : null;
 
     // ------------------------------------------------------------ scoring ---
-    // A captain is only as good as their form, fixture and fitness combined —
-    // but weight only the components we actually have data for, or a captain
-    // pick scores 0.35 out of 20 purely because the season has not started.
-    const captainScore = (p: Player): number => {
-      const parts: [number, number][] = [[0.2, availabilityScore(p)]];
-      if (p.form != null) parts.push([0.5, formScore(p)]);
-      if (p.next_difficulty != null) parts.push([0.3, fixtureScore(p)]);
-      const w = parts.reduce((t, [x]) => t + x, 0);
-      return w ? clamp01(parts.reduce((t, [x, sc]) => t + x * sc, 0) / w) : 0.5;
-    };
-
-    const perClub = [...starters, ...bench].reduce<Record<string, number>>((acc, p) => {
-      acc[p.team] = (acc[p.team] ?? 0) + 1;
-      return acc;
-    }, {});
-    const maxPerClub = Math.max(0, ...Object.values(perClub));
-
-    const sub = {
-      captain: captain ? captainScore(captain) : 0,
-      availability: avg(starters.map(availabilityScore)),
-      form: avg(starters.map(formScore)),
-      fixtures: avg(starters.map(fixtureScore)),
-      structure: 0,
-      // Full marks up to three from one club, sliding to zero by eight.
-      diversity: clamp01(1 - (maxPerClub - MAX_COMFORTABLE_PER_CLUB) / 5),
-      value: avg([...starters, ...bench].map(valueScore)),
-    };
-
-    // Structure: legal shape, a captain set, and nobody good left rotting on
-    // the bench while an unavailable player starts.
-    const counts = starters.reduce<Record<string, number>>((acc, p) => {
-      acc[p.position] = (acc[p.position] ?? 0) + 1;
-      return acc;
-    }, {});
-    const shape = `${counts.DEF ?? 0}-${counts.MID ?? 0}-${counts.FWD ?? 0}`;
-    const benchedBetter = bench.filter(
-      (b) => starters.some((s) => s.position === b.position && availabilityScore(s) === 0 && availabilityScore(b) === 1),
-    ).length;
-    // Squad-wide composition must be 2/5/5/3 across all 15, not just a legal XI.
-    const squadCounts = [...starters, ...bench].reduce<Record<string, number>>((acc, p) => {
-      acc[p.position] = (acc[p.position] ?? 0) + 1;
-      return acc;
-    }, {});
-    const compositionOk =
-      starters.length + bench.length !== 15
-        ? false
-        : Object.entries(SQUAD_COMPOSITION).every(([pos, n]) => (squadCounts[pos] ?? 0) === n);
-
-    let structure = 1;
-    if (starters.length !== 11) structure -= 0.3;
-    if ((counts.GK ?? 0) !== 1) structure -= 0.2;
-    if (!VALID_FORMATIONS.has(shape)) structure -= 0.2;
-    if (!captain) structure -= 0.25;
-    // Only penalise composition when a full 15 was submitted; a screenshot that
-    // only captured the XI should not be marked down for a bench we never saw.
-    if (bench.length > 0 && !compositionOk) structure -= 0.15;
-    structure -= Math.min(0.3, benchedBetter * 0.15);
-    sub.structure = clamp01(structure);
-
-    // Before matchday 1 there is no form, no points and usually no price.
-    // Scoring those dimensions zero would cap every squad in the 60s and make
-    // the rating meaningless pre-season, so a dimension with no underlying data
-    // is dropped and the remaining weights are renormalised back to 100.
-    const squadAll = [...starters, ...bench];
-    const applicable: Record<keyof typeof WEIGHTS, boolean> = {
-      captain: true,
-      availability: true,
-      structure: true,
-      diversity: true,
-      form: starters.some((p) => p.form != null),
-      fixtures: starters.some((p) => p.next_difficulty != null),
-      value: squadAll.some((p) => p.price != null && p.total_points > 0),
-    };
-
-    const liveKeys = (Object.keys(WEIGHTS) as (keyof typeof WEIGHTS)[]).filter((k) => applicable[k]);
-    const totalWeight = liveKeys.reduce((t, k) => t + WEIGHTS[k], 0) || 1;
-    const rating = Math.round(
-      (liveKeys.reduce((t, k) => t + sub[k] * WEIGHTS[k], 0) / totalWeight) * 100,
-    );
-
-    const breakdown = (Object.keys(WEIGHTS) as (keyof typeof WEIGHTS)[]).map((k) => ({
-      key: k,
-      earned: Math.round(sub[k] * WEIGHTS[k]),
-      max: WEIGHTS[k],
-      ratio: Number(sub[k].toFixed(3)),
-      applicable: applicable[k],
-    }));
-
-    /**
-     * One definition of how good a player is right now, used by the optimiser,
-     * the captain ranking and the transfer shortlist alike. Three separate
-     * notions of "good" was how the optimiser and the suggestions ended up
-     * disagreeing with each other on the same screen.
-     */
-    const expectedValue = (p: Player): number => {
-      const parts: [number, number][] = [[0.4, availabilityScore(p)]];
-      parts.push([0.4, formScore(p)]);
-      if (p.next_difficulty != null) parts.push([0.2, fixtureScore(p)]);
-      const w = parts.reduce((t, [x]) => t + x, 0);
-      return w ? parts.reduce((t, [x, sc]) => t + x * sc, 0) / w : 0.5;
-    };
+    const scored = scoreSquad(starters, bench, captain);
+    const { rating, breakdown, shape, maxPerClub, perClub } = scored;
 
     // ---------------------------------------------------- optimise the XI ---
     // Pure re-arrangement of the 15 players already owned: no transfers, no
@@ -621,6 +634,36 @@ serve(async (req) => {
         .slice(0, 5);
     }
 
+    // ---------------------------------------------------------- projection ---
+    // What the score becomes if the manager acts on this. Computed by running
+    // the improved squad through the same scorer, never asserted by the model:
+    // a projection the model invents is a number nobody can check.
+    const TARGET_RATING = 90;
+
+    const optimisedStarters = optimised?.xi ?? starters;
+    const optimisedBench = optimised?.benchOut ?? bench;
+    const optimisedCaptain = optimised?.captain ?? captain;
+
+    // Apply the transfers on top of the optimised XI, best upgrade first.
+    const swaps = Object.entries(candidates)
+      .filter(([, alts]) => alts.length > 0)
+      .map(([outId, alts]) => ({ outId, incoming: alts[0].player, gain: alts[0].gain }))
+      .sort((a, b) => b.gain - a.gain);
+
+    const applySwaps = (list: Player[]) =>
+      list.map((p) => {
+        const swap = swaps.find((sw) => sw.outId === p.id);
+        return swap ? swap.incoming : p;
+      });
+
+    const projectedStarters = applySwaps(optimisedStarters);
+    const projectedBench = applySwaps(optimisedBench);
+    const projectedCaptain =
+      projectedStarters.find((p) => p.id === optimisedCaptain?.id) ??
+      [...projectedStarters].sort((a, b) => captaincyValue(b) - captaincyValue(a))[0] ?? null;
+
+    const projected = scoreSquad(projectedStarters, projectedBench, projectedCaptain);
+
     // ----------------------------------------------------------- narrative ---
     const apiKey = Deno.env.get("OPENROUTER_API_KEY");
     let narrative: Record<string, unknown> | null = null;
@@ -629,9 +672,17 @@ serve(async (req) => {
     if (apiKey) {
       const brief = {
         rating,
+        target_rating: TARGET_RATING,
+        // Points still available in each dimension, largest first: this is
+        // where a squad actually gains ground toward the target.
+        biggest_losses: [...breakdown]
+          .filter((b) => b.applicable && b.shortfall > 0)
+          .sort((a, b) => b.shortfall - a.shortfall)
+          .slice(0, 3)
+          .map((b) => ({ area: b.key, points_lost: b.shortfall, of: b.max })),
+        projected_rating_if_followed: projected.rating,
         breakdown,
-        dimensions_without_data: (Object.keys(applicable) as (keyof typeof WEIGHTS)[])
-          .filter((k) => !applicable[k]),
+        dimensions_without_data: breakdown.filter((x) => !x.applicable).map((x) => x.key),
         formation: shape,
         club_concentration: { max_from_one_club: maxPerClub, by_club: perClub },
         chip_advice: chipAdvice,
@@ -683,6 +734,11 @@ serve(async (req) => {
               content:
                 `You are a UEFA Champions League Fantasy analyst writing in ${langName}. ` +
                 "The rating and breakdown are already final — never dispute or restate a different number. " +
+                `The goal is to get this squad above ${TARGET_RATING} out of 100. Use biggest_losses ` +
+                "to say plainly where the points are going and what would recover them, and " +
+                "projected_rating_if_followed as the honest outcome of taking this advice - do " +
+                "not promise a different number. Not every squad can reach the target; say so " +
+                "rather than overstating what a transfer can do. " +
                 "Any dimension listed in dimensions_without_data scored zero ONLY because the season has " +
                 "not started and that data does not exist yet. Never treat it as a weakness, never say the " +
                 "manager is overpaying or out of form because of it, and do not mention it at all. " +
@@ -831,6 +887,9 @@ serve(async (req) => {
       JSON.stringify({
         id: saved?.id ?? null,
         rating,
+        target_rating: TARGET_RATING,
+        // Where the score lands if the optimised XI and the transfers are taken.
+        projected_rating: projected.rating,
         formation: shape,
         breakdown,
         narrative,

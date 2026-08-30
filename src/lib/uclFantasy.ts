@@ -73,10 +73,12 @@ export interface ParseResult extends Squad {
 }
 
 export interface SubScore {
-  key: 'captain' | 'availability' | 'form' | 'fixtures' | 'structure' | 'value';
+  key: 'captain' | 'availability' | 'form' | 'fixtures' | 'structure' | 'diversity' | 'value';
   earned: number;
   max: number;
   ratio: number;
+  /** Points still available in this dimension. */
+  shortfall?: number;
   /** False when the season has not produced this data yet (form, price, fixtures). */
   applicable: boolean;
 }
@@ -147,6 +149,10 @@ export interface RatingResult {
   chips_used?: string[];
   /** The round every player was rated against. */
   target_gameweek?: number | null;
+  /** The score we are aiming to get a squad above. */
+  target_rating?: number;
+  /** Where the score lands if the optimiser and transfers are acted on. */
+  projected_rating?: number;
   id: string | null;
   rating: number;
   formation: string;
