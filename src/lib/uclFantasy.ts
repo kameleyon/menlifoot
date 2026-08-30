@@ -443,6 +443,49 @@ export const benchShape = (formation: string): Position[] => {
   );
 };
 
+/** An unfilled slot, which still knows which line it belongs to. */
+export const emptySlot = (position: Position): SquadSlot => ({ player_id: null, position });
+
+/**
+ * Deal a pool of players into a formation, returning the XI and the bench.
+ *
+ * A formation is a constraint, not a label. Choosing a default shape and then
+ * handing the untouched pool to the pitch put all fifteen players in the XI -
+ * two goalkeepers and all five defenders - because nothing ever enforced the
+ * shape that had just been chosen.
+ *
+ * Order within a line is preserved, so whoever the screenshot listed first in a
+ * position starts. Any player the shape has no room for stays on the bench
+ * rather than being dropped.
+ */
+export const applyFormation = (
+  pool: SquadSlot[],
+  formation: string,
+): { starters: SquadSlot[]; bench: SquadSlot[] } => {
+  const need = formationSlots(formation);
+  const remaining = pool.filter((s) => s.player_id);
+  const take = (pos: Position): SquadSlot => {
+    const i = remaining.findIndex((s) => s.position === pos);
+    return i === -1 ? emptySlot(pos) : remaining.splice(i, 1)[0];
+  };
+  const starters = (['GK', 'DEF', 'MID', 'FWD'] as Position[]).flatMap((pos) =>
+    Array.from({ length: need[pos] }, () => take(pos)),
+  );
+  const bench = benchShape(formation).map(take);
+  return { starters, bench: [...bench, ...remaining] };
+};
+
+/** True when a squad already matches its own formation, line for line. */
+export const matchesFormation = (starters: SquadSlot[], formation: string): boolean => {
+  const need = formationSlots(formation);
+  if (starters.length !== Object.values(need).reduce((t, n) => t + n, 0)) return false;
+  const have = starters.reduce<Record<string, number>>((acc, s) => {
+    if (s.position) acc[s.position] = (acc[s.position] ?? 0) + 1;
+    return acc;
+  }, {});
+  return (['GK', 'DEF', 'MID', 'FWD'] as Position[]).every((p) => (have[p] ?? 0) === need[p]);
+};
+
 export const parseScreenshot = async (
   imageBase64: string,
   competition: Competition = 'UCL',

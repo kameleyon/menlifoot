@@ -8,6 +8,9 @@ import ScrollRow from './ScrollRow';
 import {
   benchShape,
   DEFAULT_FORMATION,
+  applyFormation,
+  emptySlot,
+  matchesFormation,
   formatPrice,
   FORMATIONS,
   formationSlots,
@@ -39,7 +42,6 @@ interface Props {
   onUsedChipsChange?: (chips: string[]) => void;
 }
 
-const emptySlot = (position: Position): SquadSlot => ({ player_id: null, position });
 
 const buildStarters = (formation: string): SquadSlot[] => {
   const slots = formationSlots(formation);
@@ -63,16 +65,35 @@ const SquadBuilder = ({
 }: Props) => {
   const { t } = useLanguage();
   const seedFormation = initialSquad?.formation ?? DEFAULT_FORMATION;
+  // Deal the incoming squad into its own formation before showing it. A caller
+  // can hand over a shape and a player list that disagree - a screenshot read
+  // as fifteen starters, say - and the XI must obey the shape, not the list.
+  //
+  // Bench composition follows from the formation against the 2/5/5/3 squad
+  // rule, so a 4-3-3 benches 1 GK / 1 DEF / 2 MID rather than one per position.
+  const seed = useMemo(() => {
+    const incoming = initialSquad?.starters ?? [];
+    if (!incoming.length) {
+      return { starters: buildStarters(seedFormation), bench: benchShape(seedFormation).map(emptySlot) };
+    }
+    if (matchesFormation(incoming, seedFormation)) {
+      return {
+        starters: incoming,
+        bench: initialSquad?.bench?.length
+          ? initialSquad.bench
+          : benchShape(seedFormation).map(emptySlot),
+      };
+    }
+    return applyFormation([...incoming, ...(initialSquad?.bench ?? [])], seedFormation);
+    // Seeded once from the squad this builder was opened with; later edits are
+    // the component's own state and must not be reset by a re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [formation, setFormation] = useState<string>(seedFormation);
   const [dirty, setDirty] = useState(false);
-  const [starters, setStarters] = useState<SquadSlot[]>(
-    () => initialSquad?.starters?.length ? initialSquad.starters : buildStarters(seedFormation),
-  );
-  // Bench composition is derived from the formation against the 2/5/5/3 squad
-  // rule, so a 4-3-3 benches 1 GK / 1 DEF / 2 MID rather than one per position.
-  const [bench, setBench] = useState<SquadSlot[]>(
-    () => initialSquad?.bench?.length ? initialSquad.bench : benchShape(seedFormation).map(emptySlot),
-  );
+  const [starters, setStarters] = useState<SquadSlot[]>(seed.starters);
+  const [bench, setBench] = useState<SquadSlot[]>(seed.bench);
   const [picking, setPicking] = useState<{ index: number; onBench: boolean; position: Position } | null>(
     null,
   );
@@ -83,28 +104,15 @@ const SquadBuilder = ({
   // Changing formation rebuilds the pitch. Players already picked are carried
   // over per position so a manager doesn't lose their whole XI to a reshape.
   const changeFormation = (next: string) => {
-    // Pool every player currently held, refill the new XI and bench from it,
-    // then keep whatever is left over on the bench.
-    //
-    // The previous version dropped those leftovers on the floor. A squad that
-    // is not exactly 2/5/5/3 - which is any squad read off a screenshot, or one
-    // mid-edit - has more of some position than the new shape has slots, and
-    // those players simply vanished when the manager tried another formation.
-    const pool = [...starters, ...bench].filter((s) => s.player_id);
-    const take = (pos: Position) => {
-      const i = pool.findIndex((c) => c.position === pos);
-      return i === -1 ? emptySlot(pos) : pool.splice(i, 1)[0];
-    };
-
-    const nextStarters = buildStarters(next).map((slot) => take(slot.position as Position));
-    const nextBench = benchShape(next).map((pos) => take(pos));
-
+    // Pool every player currently held and re-deal them into the new shape.
+    // Anything the new shape has no room for stays on the bench rather than
+    // being lost - an earlier version dropped those leftovers on the floor, so
+    // any squad that was not exactly 2/5/5/3 lost players to a reshape.
+    const dealt = applyFormation([...starters, ...bench], next);
     setFormation(next);
     setDirty(true);
-    setStarters(nextStarters);
-    // Anything the new shape had no room for stays on the bench rather than
-    // being lost; the manager can move it back when they reshape again.
-    setBench([...nextBench, ...pool]);
+    setStarters(dealt.starters);
+    setBench(dealt.bench);
   };
 
   useEffect(() => {

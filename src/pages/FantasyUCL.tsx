@@ -26,6 +26,8 @@ import {
   isFreeCompetition,
   CHIPS_BY_COMPETITION,
   DEFAULT_FORMATION,
+  applyFormation,
+  matchesFormation,
   FORMATIONS,
   COMPETITION_LABEL,
   type Competition,
@@ -197,11 +199,15 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
         : (FORMATIONS as readonly string[]).includes(parsed.formation ?? '')
         ? (parsed.formation as string)
         : DEFAULT_FORMATION;
-      const next: Squad = {
-        formation: shape,
-        starters: resolved,
-        bench: parsed.bench ?? [],
-      };
+      // Deal the players into that shape. Picking a formation and then passing
+      // the untouched list through left every player in the XI - the pitch
+      // showed two keepers and no bench, because the shape was only ever a
+      // label on the squad and never a constraint on it.
+      const pool = [...resolved, ...(parsed.bench ?? [])];
+      const dealt = matchesFormation(resolved, shape)
+        ? { starters: resolved, bench: parsed.bench ?? [] }
+        : applyFormation(pool, shape);
+      const next: Squad = { formation: shape, ...dealt };
       // Anything the OCR could not resolve goes to the builder for correction
       // rather than being scored with holes in it.
       if (parsed.needs_review) {
