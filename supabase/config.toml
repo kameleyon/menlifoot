@@ -45,3 +45,5 @@ project_id = "tjotexujwnfltszqqovk"
     verify_jwt = true
   [functions.fantasy-player-stats]
     verify_jwt = true
+  [functions.fpl-sync]
+    verify_jwt = true
