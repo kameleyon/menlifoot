@@ -114,7 +114,9 @@ const FixturesCalendar = ({ competition = 'UCL' }: { competition?: Competition }
 
         <div className="text-center">
           <div className="font-display text-lg uppercase">
-            {t('ucl.matchday')} {matchday ?? '—'}
+            {/* The Premier League calls a round a gameweek; the UCL calls it a
+                matchday. Using one word for both reads wrong in either. */}
+            {competition === 'EPL' ? t('ucl.gameweek') : t('ucl.matchday')} {matchday ?? '—'}
           </div>
           {meta?.deadline && (
             <div className="text-[11px] text-muted-foreground">

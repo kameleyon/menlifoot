@@ -331,14 +331,7 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
                 <PenLine className="h-4 w-4" />
                 {t('ucl.buildManually')}
               </Button>
-              <Button
-                variant="ghost"
-                className="h-12 w-full justify-start gap-3"
-                onClick={() => setStep('fixtures')}
-              >
-                <CalendarDays className="h-4 w-4" />
-                {t('ucl.viewFixtures')}
-              </Button>
+
             </div>
           </div>
         )}

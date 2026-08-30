@@ -24,6 +24,7 @@ const corsHeaders = {
 };
 
 const FPL = "https://fantasy.premierleague.com/api/bootstrap-static/";
+const FPL_FIXTURES = "https://fantasy.premierleague.com/api/fixtures/";
 const COMPETITION = "EPL";
 
 // The game publishes an official headshot keyed on its own player code.
@@ -197,6 +198,54 @@ serve(async (req) => {
       await supabase.from("ucl_matchdays").upsert(days, { onConflict: "competition,matchday" });
     }
 
+    // ---------------------------------------------------------- fixtures ---
+    // The game numbers its own gameweeks, so take them rather than inferring
+    // rounds from kick-off dates. Clustering by date merged rounds played close
+    // together and produced 32 gameweeks instead of 38.
+    const fixRes = await fetch(FPL_FIXTURES, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; Menlifoot/1.0)", Accept: "application/json" },
+    });
+    let fixtureCount = 0;
+    if (fixRes.ok) {
+      const fixtures = (await fixRes.json()) as Record<string, unknown>[];
+      const rows = fixtures
+        .filter((f) => Number(f.event) >= 1 && Number(f.event) <= 38)
+        .map((f) => {
+          const home = teams.get(Number(f.team_h)) ?? "";
+          const away = teams.get(Number(f.team_a)) ?? "";
+          if (!home || !away) return null;
+          const played = Boolean(f.finished) && f.team_h_score != null;
+          return {
+            competition: COMPETITION,
+            matchday: Number(f.event),
+            kickoff: f.kickoff_time ? String(f.kickoff_time) : null,
+            home_team: home,
+            away_team: away,
+            home_score: played ? Math.round(num(f.team_h_score)) : null,
+            away_score: played ? Math.round(num(f.team_a_score)) : null,
+            // The game's own fixture difficulty, from each side's perspective.
+            home_difficulty: f.team_h_difficulty != null ? Math.round(num(f.team_h_difficulty)) : null,
+            away_difficulty: f.team_a_difficulty != null ? Math.round(num(f.team_a_difficulty)) : null,
+            status: played ? "finished" : Boolean(f.started) ? "live" : "scheduled",
+            updated_at: new Date().toISOString(),
+          };
+        })
+        .filter(Boolean) as Record<string, unknown>[];
+
+      if (rows.length) {
+        const { error } = await supabase
+          .from("ucl_fixtures")
+          .upsert(rows, { onConflict: "competition,matchday,home_team,away_team" });
+        if (error) console.error("fixtures upsert:", error.message);
+        else fixtureCount = rows.length;
+      }
+    }
+
+    // Difficulty depends on the fixtures above, so refresh after writing them.
+    const { data: touched } = await supabase.rpc("refresh_player_fixtures", {
+      p_competition: COMPETITION,
+    });
+
     const current = events.find((ev) => ev.is_current);
     const next = events.find((ev) => ev.is_next);
 
@@ -207,6 +256,8 @@ serve(async (req) => {
       players_inserted: inserted,
       failed: unmatched.length,
       gameweeks: days.length,
+      fixtures: fixtureCount,
+      players_touched: touched ?? 0,
       current_gameweek: current ? Number(current.id) : null,
       next_gameweek: next ? Number(next.id) : null,
       next_deadline: next?.deadline_time ?? null,
