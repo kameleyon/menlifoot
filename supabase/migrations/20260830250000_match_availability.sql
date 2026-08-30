@@ -1,6 +1,11 @@
 -- Return availability when resolving a name, so an imported squad can show
 -- which players are injured. Without it the pitch had no way to know, and a
 -- manager could be looking at an XI with an unavailable starter in it.
+-- The return type changes, and Postgres refuses to replace a function whose
+-- signature differs - it fails rather than swapping it, so the drop is required
+-- or the old version silently stays in place.
+drop function if exists public.match_ucl_player(text, text, int, text);
+
 create or replace function public.match_ucl_player(
   q text,
   pos text default null,
