@@ -230,6 +230,7 @@ serve(async (req) => {
                 team: club,
                 position,
                 jersey_number: Number.isFinite(Number(r.jersey_number)) ? Number(r.jersey_number) : null,
+                photo_url: r.headshot_url ? String(r.headshot_url) : null,
                 availability: "available",
                 source: "bigballs",
                 updated_at: new Date().toISOString(),

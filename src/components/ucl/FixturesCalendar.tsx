@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import {
   getFixtures,
+  getCurrentMatchday,
   getLoadedMatchdays,
   getTeamCrests,
   type Competition,
@@ -44,11 +45,12 @@ const FixturesCalendar = ({ competition = 'UCL' }: { competition?: Competition }
   }, [competition]);
 
   useEffect(() => {
-    getLoadedMatchdays(competition)
-      .then((mds) => {
+    // Open on the round in play. Landing on matchday 1 in February means
+    // paging through five months to reach anything useful.
+    Promise.all([getLoadedMatchdays(competition), getCurrentMatchday(competition)])
+      .then(([mds, current]) => {
         setAvailable(mds);
-        // Open on the round in progress rather than the first of the season.
-        setMatchday((cur) => cur ?? mds[0] ?? null);
+        setMatchday((cur) => cur ?? (current && mds.includes(current) ? current : mds[0] ?? null));
       })
       .catch(() => setAvailable([]))
       .finally(() => setLoading(false));

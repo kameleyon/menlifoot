@@ -62,6 +62,8 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
   // The chip the manager intends to play, so the advice judges their choice
   // instead of proposing a different one.
   const [chip, setChip] = useState<string | null>(null);
+  // Chips already spent this season. They narrow what can still be advised.
+  const [usedChips, setUsedChips] = useState<string[]>([]);
   const navigate = useNavigate();
   const { user } = useAuth();
   const signedIn = Boolean(user);
@@ -130,6 +132,7 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
           language,
           competition,
           chip,
+          usedChips,
           // A free competition asks for everything up front; nothing is locked.
           unlock: free ? ['optimisation', 'captains', 'chips'] : unlock,
           transferCount: free ? 3 : transferCount,
@@ -155,7 +158,7 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
         setStep(src === 'screenshot' ? 'import' : 'build');
       }
     },
-    [language, t, toast, competition, free, chip],
+    [language, t, toast, competition, free, chip, usedChips],
   );
 
   const handleFile = async (file: File) => {
@@ -209,6 +212,7 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
         language,
         competition,
         chip,
+        usedChips,
         unlock: nextUnlocks,
         transferCount: nextTransfers,
       });
@@ -255,6 +259,7 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
     setShowAllTransfers(false);
     setEditing(false);
     setChip(null);
+    setUsedChips([]);
     setPaidUnlocks([]);
     setPaidTransfers(0);
   };
@@ -409,6 +414,8 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
               chips={CHIPS_BY_COMPETITION[competition]}
               chip={chip}
               onChipChange={setChip}
+              usedChips={usedChips}
+              onUsedChipsChange={setUsedChips}
               onSubmit={(s) => analyze(s, 'manual')}
             />
           </div>
@@ -463,6 +470,8 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
                   chips={CHIPS_BY_COMPETITION[competition]}
                   chip={chip}
                   onChipChange={setChip}
+                  usedChips={usedChips}
+                  onUsedChipsChange={setUsedChips}
                   submitLabel={t('ucl.doneReanalyse')}
                   onSubmit={(next) => {
                     setEditing(false);

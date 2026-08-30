@@ -31,6 +31,7 @@ export const COMPETITION_LABEL: Record<Competition, string> = {
 
 export interface UclPlayer {
   id: string;
+  photo_url: string | null;
   name: string;
   display_name: string;
   team: string;
@@ -47,6 +48,7 @@ export interface UclPlayer {
 
 export interface SquadSlot {
   player_id: string | null;
+  photo_url?: string | null;
   read_as?: string;
   name?: string;
   display_name?: string;
@@ -312,6 +314,34 @@ export const getFixtures = async (matchday: number, competition: Competition = '
   };
 };
 
+/**
+ * The round currently in play: the next one whose deadline has not passed,
+ * falling back to the earliest with an unplayed fixture.
+ */
+export const getCurrentMatchday = async (
+  competition: Competition = 'UCL',
+): Promise<number | null> => {
+  const nowIso = new Date().toISOString();
+  const { data: byDeadline } = await (supabase as any)
+    .from('ucl_matchdays')
+    .select('matchday,deadline')
+    .eq('competition', competition)
+    .gt('deadline', nowIso)
+    .order('deadline', { ascending: true })
+    .limit(1);
+  const d = (byDeadline ?? [])[0] as { matchday?: number } | undefined;
+  if (d?.matchday) return d.matchday;
+
+  const { data: byFixture } = await (supabase as any)
+    .from('ucl_fixtures')
+    .select('matchday,kickoff')
+    .eq('competition', competition)
+    .eq('status', 'scheduled')
+    .order('kickoff', { ascending: true })
+    .limit(1);
+  return ((byFixture ?? [])[0] as { matchday?: number } | undefined)?.matchday ?? null;
+};
+
 /** Which matchdays have any fixtures loaded, so the pager only offers real ones. */
 export const getLoadedMatchdays = async (
   competition: Competition = 'UCL',
@@ -399,6 +429,7 @@ export const rateSquad = async (
     transferCount?: number;
     competition?: Competition;
     chip?: string | null;
+    usedChips?: string[];
   },
 ): Promise<RatingResult> => {
   const { data, error } = await supabase.functions.invoke('ucl-rate-squad', {
@@ -410,6 +441,7 @@ export const rateSquad = async (
       transferCount: opts.transferCount ?? 0,
       competition: opts.competition ?? 'UCL',
       chip: opts.chip ?? null,
+      usedChips: opts.usedChips ?? [],
     },
   });
   // supabase-js surfaces a non-2xx as `error` with the body still in `data`,
@@ -435,7 +467,7 @@ export const searchPlayers = async (
   let q = (supabase as any)
     .from('ucl_players')
     .select(
-      'id,name,display_name,team,team_code,position,price,total_points,form,availability,availability_note,next_opponent,next_difficulty',
+      'id,name,display_name,team,team_code,position,price,total_points,form,availability,availability_note,next_opponent,next_difficulty,photo_url',
     )
     .eq('competition', competition)
     .limit(20);

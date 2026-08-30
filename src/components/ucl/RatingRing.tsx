@@ -21,8 +21,11 @@ const RatingRing = ({ value, size = 168, label = '/ 100' }: Props) => {
     return () => cancelAnimationFrame(id);
   }, [value]);
 
-  // Red below 50, amber to 74, green above — matches how managers read a score.
-  const color = value >= 75 ? 'hsl(142 71% 45%)' : value >= 50 ? 'hsl(38 92% 50%)' : 'hsl(0 84% 60%)';
+  // The app's palette is gold, so the ring stays within it rather than
+  // introducing a red that appears nowhere else: bright gold for a strong
+  // score, muted gold for a weak one.
+  const color =
+    value >= 75 ? 'hsl(45 93% 58%)' : value >= 50 ? 'hsl(40 75% 48%)' : 'hsl(36 45% 38%)';
 
   return (
     <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>

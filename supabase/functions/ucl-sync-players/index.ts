@@ -37,6 +37,8 @@ const SEASON_CANDIDATES = [96, 94, 92, 90, 88, 86, 84];
 const SKILL_TO_POSITION: Record<number, string> = { 1: "GK", 2: "DEF", 3: "MID", 4: "FWD" };
 
 type Player = {
+  competition?: string;
+  photo_url?: string | null;
   uefa_id: string | null;
   name: string;
   normalized_name: string;
@@ -162,6 +164,7 @@ function mapUefaPlayer(raw: unknown): Player | null {
     jersey_number: null,
     selected_by_pct: p.selPer != null ? num(p.selPer) : null,
     source: "uefa",
+    competition: "UCL",
     updated_at: new Date().toISOString(),
   };
 }
@@ -235,8 +238,10 @@ async function fetchSquadFromBigBalls(team: string, apiKey: string): Promise<Pla
         availability: "available",
         availability_note: null,
         jersey_number: Number.isFinite(Number(r.jersey_number)) ? Number(r.jersey_number) : null,
+        photo_url: r.headshot_url ? String(r.headshot_url) : null,
         selected_by_pct: null,
         source: "bigballs",
+        competition: "UCL",
         updated_at: new Date().toISOString(),
       };
     })
@@ -392,6 +397,7 @@ async function backfillViaPerplexity(apiKey: string, teams: string[]): Promise<P
           jersey_number: null,
           selected_by_pct: null,
           source: "perplexity",
+          competition: "UCL",
           updated_at: new Date().toISOString(),
         });
       }
@@ -490,7 +496,7 @@ serve(async (req) => {
       if (uefa) {
         const { error } = await supabase
           .from("ucl_players")
-          .upsert(dedupe(uefa.players), { onConflict: "normalized_name,team" });
+          .upsert(dedupe(uefa.players), { onConflict: "competition,normalized_name,team" });
         if (error) throw new Error(`upsert failed: ${error.message}`);
         // UEFA is authoritative. Drop Perplexity stopgap rows it did not claim
         // (usually a team-name spelling the fallback got slightly different),
@@ -498,6 +504,7 @@ serve(async (req) => {
         await supabase
           .from("ucl_players")
           .delete()
+          .eq("competition", "UCL")
           .eq("source", "perplexity")
           .lt("updated_at", startedAt);
         return await finish("success", `uefa:${uefa.seasonId}`, uefa.players.length, null);
@@ -514,7 +521,7 @@ serve(async (req) => {
     if (bbsKey && (mode === "auto" || mode === "roster")) {
       const seedTeams: string[] = Array.isArray(body?.teams) && body.teams.length
         ? body.teams.map(String)
-        : ((await supabase.from("ucl_players").select("team")).data ?? [])
+        : ((await supabase.from("ucl_players").select("team").eq("competition", "UCL")).data ?? [])
             .map((r: { team: string }) => r.team)
             .filter((t: string, i: number, a: string[]) => a.indexOf(t) === i);
 
@@ -537,7 +544,7 @@ serve(async (req) => {
         if (players.length > 0) {
           const { error } = await supabase
             .from("ucl_players")
-            .upsert(players, { onConflict: "normalized_name,team" });
+            .upsert(players, { onConflict: "competition,normalized_name,team" });
           if (error) throw new Error(`upsert failed: ${error.message}`);
 
           // Real squad data wins outright for the clubs it covers. Without this
@@ -548,6 +555,7 @@ serve(async (req) => {
             await supabase
               .from("ucl_players")
               .delete()
+              .eq("competition", "UCL")
               .eq("source", "perplexity")
               .in("team", covered);
           }
@@ -576,7 +584,7 @@ serve(async (req) => {
       : isEmpty
       ? []
       : (
-        await supabase.from("ucl_players").select("team").not("team", "is", null)
+        await supabase.from("ucl_players").select("team").eq("competition", "UCL").not("team", "is", null)
       ).data?.map((r: { team: string }) => r.team).filter((t, i, a) => a.indexOf(t) === i) ?? [];
 
     // Nothing supplied and nothing in the pool yet — find the field ourselves.
@@ -601,7 +609,7 @@ serve(async (req) => {
       }
       const { error } = await supabase
         .from("ucl_players")
-        .upsert(dedupe(players), { onConflict: "normalized_name,team" });
+        .upsert(dedupe(players), { onConflict: "competition,normalized_name,team" });
       if (error) throw new Error(`upsert failed: ${error.message}`);
       return await finish("partial", "perplexity:backfill", players.length, "UEFA feed unreachable; prices are approximate");
     }

@@ -26,6 +26,10 @@ const corsHeaders = {
 const FPL = "https://fantasy.premierleague.com/api/bootstrap-static/";
 const COMPETITION = "EPL";
 
+// The game publishes an official headshot keyed on its own player code.
+const photoUrl = (code: unknown): string | null =>
+  code ? `https://resources.premierleague.com/premierleague/photos/players/250x250/p${code}.png` : null;
+
 // element_type in the feed.
 const POSITION: Record<number, string> = { 1: "GK", 2: "DEF", 3: "MID", 4: "FWD" };
 
@@ -111,6 +115,10 @@ serve(async (req) => {
       const news = String(e.news ?? "").trim();
 
       const patch: Record<string, unknown> = {
+        // web_name is the name the game itself shows and the name fans use -
+        // "Haaland", not "Erling Braut Haaland".
+        display_name: web || full,
+        photo_url: photoUrl(e.code),
         price: num(e.now_cost) / 10,
         total_points: Math.round(num(e.total_points)),
         form: num(e.form),

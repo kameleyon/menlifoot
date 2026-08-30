@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, X, Star, Shield, Zap } from 'lucide-react';
+import { Search, X, Star, Shield, Zap, CheckCircle2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -32,6 +32,9 @@ interface Props {
   chips?: string[];
   chip?: string | null;
   onChipChange?: (chip: string | null) => void;
+  /** Chips already spent this season; they cannot be played again. */
+  usedChips?: string[];
+  onUsedChipsChange?: (chips: string[]) => void;
 }
 
 const emptySlot = (position: Position): SquadSlot => ({ player_id: null, position });
@@ -53,6 +56,8 @@ const SquadBuilder = ({
   chips = [],
   chip = null,
   onChipChange,
+  usedChips = [],
+  onUsedChipsChange,
 }: Props) => {
   const { t } = useLanguage();
   const seedFormation = initialSquad?.formation ?? '4-3-3';
@@ -117,6 +122,7 @@ const SquadBuilder = ({
       team_code: player.team_code,
       position: player.position,
       price: player.price,
+      photo_url: player.photo_url,
     };
     if (picking.onBench) {
       setBench((b) => b.map((s, i) => (i === picking.index ? slot : s)));
@@ -175,7 +181,7 @@ const SquadBuilder = ({
           ) : (
             <span
               className={`font-display text-sm tabular-nums ${
-                budget.overBudget ? 'text-destructive' : 'text-foreground'
+                budget.overBudget ? 'text-amber-400' : 'text-foreground'
               }`}
             >
               {formatPrice(budget.spent)} / {formatPrice(SQUAD_BUDGET)}
@@ -188,13 +194,13 @@ const SquadBuilder = ({
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
               <div
                 className={`h-full rounded-full transition-all ${
-                  budget.overBudget ? 'bg-destructive' : 'bg-primary'
+                  budget.overBudget ? 'bg-amber-400' : 'bg-primary'
                 }`}
                 style={{ width: `${Math.min(100, (budget.spent / SQUAD_BUDGET) * 100)}%` }}
               />
             </div>
             <div className="mt-1.5 flex items-center justify-between text-[11px]">
-              <span className={budget.overBudget ? 'text-destructive' : 'text-muted-foreground'}>
+              <span className={budget.overBudget ? 'text-amber-400' : 'text-muted-foreground'}>
                 {budget.overBudget
                   ? `${t('ucl.overBudget')} ${formatPrice(Math.abs(budget.remaining))}`
                   : `${t('ucl.remaining')} ${formatPrice(budget.remaining)}`}
@@ -278,35 +284,80 @@ const SquadBuilder = ({
         </div>
       )}
 
-      {/* Chip. Selecting one changes the advice rather than just recording it. */}
+      {/* Chips, in two parts. What is already spent is a fact about the season
+          and narrows what can still be advised; what is being played now is a
+          decision the analysis should judge. */}
       {chips.length > 0 && onChipChange && (
-        <div className="rounded-lg border border-border bg-card/60 p-3">
-          <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <Zap className="h-3.5 w-3.5" />
-            {t('ucl.playAChip')}
-          </div>
-          <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 py-0.5">
-            <button
-              type="button"
-              onClick={() => { onChipChange(null); setDirty(true); }}
-              className={`shrink-0 rounded-full px-3 py-1 text-xs transition-colors ${
-                !chip ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-              }`}
-            >
-              {t('ucl.noChip')}
-            </button>
-            {chips.map((c) => (
+        <div className="space-y-3 rounded-lg border border-border bg-card/60 p-3">
+          {onUsedChipsChange && (
+            <div>
+              <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                {t('ucl.chipsUsed')}
+              </div>
+              <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 py-0.5">
+                {chips.map((c) => {
+                  const on = usedChips.includes(c);
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => {
+                        const next = on ? usedChips.filter((x) => x !== c) : [...usedChips, c];
+                        onUsedChipsChange(next);
+                        // A chip cannot be spent and planned at once.
+                        if (!on && chip === c) onChipChange(null);
+                        setDirty(true);
+                      }}
+                      className={`shrink-0 rounded-full px-3 py-1 text-xs transition-colors ${
+                        on
+                          ? 'bg-muted-foreground/30 text-foreground line-through'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/70'
+                      }`}
+                    >
+                      {c}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <Zap className="h-3.5 w-3.5" />
+              {t('ucl.playAChip')}
+            </div>
+            <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 py-0.5">
               <button
-                key={c}
                 type="button"
-                onClick={() => { onChipChange(c); setDirty(true); }}
+                onClick={() => { onChipChange(null); setDirty(true); }}
                 className={`shrink-0 rounded-full px-3 py-1 text-xs transition-colors ${
-                  chip === c ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                  !chip ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
                 }`}
               >
-                {c}
+                {t('ucl.noChip')}
               </button>
-            ))}
+              {chips
+                .filter((c) => !usedChips.includes(c))
+                .map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => { onChipChange(c); setDirty(true); }}
+                    className={`shrink-0 rounded-full px-3 py-1 text-xs transition-colors ${
+                      chip === c ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+            </div>
+            {usedChips.length > 0 && (
+              <p className="mt-1.5 text-[11px] text-muted-foreground">
+                {usedChips.length} {t('ucl.chipsAlreadySpent')}
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -356,8 +407,16 @@ const SquadBuilder = ({
                     onClick={() => assign(p)}
                     className="flex w-full items-center justify-between gap-2 border-b border-border/50 p-3 text-left disabled:opacity-40"
                   >
+                    {p.photo_url ? (
+                      <img
+                        src={p.photo_url}
+                        alt=""
+                        loading="lazy"
+                        className="h-8 w-8 shrink-0 rounded-full bg-muted object-cover"
+                      />
+                    ) : null}
                     <div className="min-w-0">
-                      <div className="truncate text-sm font-medium">{p.name}</div>
+                      <div className="truncate text-sm font-medium">{p.display_name || p.name}</div>
                       <div className="truncate text-xs text-muted-foreground">
                         {p.team} · {p.position}
                         {p.availability !== 'available' && ` · ${p.availability}`}

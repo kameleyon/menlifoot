@@ -274,7 +274,8 @@ serve(async (req) => {
 
     // Club names already in the pool are the canonical spellings; everything
     // written here must match them or the joins silently produce nothing.
-    const { data: teamRows } = await supabase.from("ucl_players").select("team");
+    const { data: teamRows } = await supabase
+      .from("ucl_players").select("team").eq("competition", "UCL");
     const teams: string[] = [...new Set(((teamRows ?? []) as { team: string }[]).map((r) => r.team))];
 
     // ------------------------------------------------------------- teams ---
@@ -353,10 +354,12 @@ serve(async (req) => {
         r.logo_url = dir.get(normalize(CLUB_ALIASES[club] ?? club))?.logo ?? null;
       }
 
-      const { error } = await supabase.from("ucl_teams").upsert(payload, { onConflict: "name" });
+      const { error } = await supabase.from("ucl_teams").upsert(payload, { onConflict: "competition,name" });
       if (error) throw new Error(`teams upsert: ${error.message}`);
 
-      const { data: touched } = await supabase.rpc("refresh_player_fixtures");
+      const { data: touched } = await supabase.rpc("refresh_player_fixtures", {
+        p_competition: "UCL",
+      });
       return json({
         mode,
         teams: payload.length,
@@ -385,6 +388,7 @@ serve(async (req) => {
                 if (home === away) return null;
                 const played = f.status === "finished" && f.hs !== null && f.as !== null;
                 return {
+                  competition: "UCL",
                   matchday: f.matchday,
                   kickoff: f.kickoff,
                   home_team: home,
@@ -405,9 +409,11 @@ serve(async (req) => {
             if (deduped.length > 0) {
               const { error } = await supabase
                 .from("ucl_fixtures")
-                .upsert(deduped, { onConflict: "matchday,home_team,away_team" });
+                .upsert(deduped, { onConflict: "competition,matchday,home_team,away_team" });
               if (error) throw new Error(`fixtures upsert: ${error.message}`);
-              const { data: touched } = await supabase.rpc("refresh_player_fixtures");
+              const { data: touched } = await supabase.rpc("refresh_player_fixtures", {
+        p_competition: "UCL",
+      });
               return json({ mode, source: "bigballs", fixtures: deduped.length, players_touched: touched ?? 0 });
             }
           }
@@ -471,6 +477,7 @@ serve(async (req) => {
           if (kickoff) kickoffs.push(kickoff);
           const played = f.home_score != null && f.away_score != null;
           fixtures.push({
+            competition: "UCL",
             matchday: md,
             kickoff,
             home_team: home,
@@ -483,6 +490,7 @@ serve(async (req) => {
         }
         const sorted = kickoffs.sort();
         days.push({
+          competition: "UCL",
           matchday: md,
           deadline: res.deadline ? String(res.deadline) : null,
           starts_on: sorted[0]?.slice(0, 10) ?? null,
@@ -499,14 +507,16 @@ serve(async (req) => {
       if (deduped.length) {
         const { error } = await supabase
           .from("ucl_fixtures")
-          .upsert(deduped, { onConflict: "matchday,home_team,away_team" });
+          .upsert(deduped, { onConflict: "competition,matchday,home_team,away_team" });
         if (error) throw new Error(`fixtures upsert: ${error.message}`);
       }
       if (days.length) {
-        await supabase.from("ucl_matchdays").upsert(days, { onConflict: "matchday" });
+        await supabase.from("ucl_matchdays").upsert(days, { onConflict: "competition,matchday" });
       }
 
-      const { data: touched } = await supabase.rpc("refresh_player_fixtures");
+      const { data: touched } = await supabase.rpc("refresh_player_fixtures", {
+        p_competition: "UCL",
+      });
       return json({ mode, fixtures: deduped.length, matchdays: days.length, players_touched: touched ?? 0 });
     }
 

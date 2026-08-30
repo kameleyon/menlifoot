@@ -37,13 +37,27 @@ const PlayerCard = ({
     >
       <div className="relative">
         <div
-          className={`flex h-11 w-11 items-center justify-center rounded-full border-2 text-[11px] font-semibold ${
+          className={`flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border-2 text-[11px] font-semibold ${
             unresolved
               ? 'border-dashed border-muted-foreground/50 bg-muted/40 text-muted-foreground'
               : 'border-primary/60 bg-card text-foreground'
           }`}
         >
-          {slot.team_code ?? (unresolved ? '?' : name.slice(0, 3).toUpperCase())}
+          {/* A face where we have one; initials are the fallback, since photo
+              coverage is not complete across every squad. */}
+          {slot.photo_url ? (
+            <img
+              src={slot.photo_url}
+              alt=""
+              loading="lazy"
+              className="h-full w-full object-cover"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = 'none';
+              }}
+            />
+          ) : (
+            slot.team_code ?? (unresolved ? '?' : name.slice(0, 3).toUpperCase())
+          )}
         </div>
         {/* A corner badge is what tells a manager the card does something:
             plus for an empty slot, swap arrows for one already filled. */}

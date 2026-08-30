@@ -143,6 +143,7 @@ serve(async (req) => {
       transferCount: rawTransferCount = 0,
       competition: rawCompetition = "UCL",
       chip: rawChip = null,
+      usedChips: rawUsedChips = [],
     } = await req.json();
 
     // Credits gate the Champions League product only. The Premier League
@@ -156,7 +157,14 @@ serve(async (req) => {
     // The chip a manager plans to play this round, if any. It changes what the
     // advice should say: with Bench Boost the bench stops being a reserve and
     // becomes four more scorers.
-    const plannedChip = rawChip && (CHIPS_BY_COMPETITION[competition] ?? []).includes(String(rawChip))
+    const allChips = CHIPS_BY_COMPETITION[competition] ?? [];
+    // A chip already spent cannot be played again, so it is removed from both
+    // what can be planned and what can be recommended.
+    const usedChips = (Array.isArray(rawUsedChips) ? rawUsedChips : [])
+      .map(String)
+      .filter((c) => allChips.includes(c));
+    const remainingChips = allChips.filter((c) => !usedChips.includes(c));
+    const plannedChip = rawChip && remainingChips.includes(String(rawChip))
       ? String(rawChip)
       : null;
 
@@ -429,7 +437,11 @@ serve(async (req) => {
     const unavailableStarters = starters.filter((p) => availabilityScore(p) === 0).length;
     const hardFixtures = starters.filter((p) => (p.next_difficulty ?? 0) >= 4).length;
     const chipAdvice = (() => {
-      const chips = CHIPS_BY_COMPETITION[competition] ?? CHIPS_BY_COMPETITION.UCL;
+      const chips = remainingChips;
+      if (chips.length === 0 && !plannedChip) {
+        return { chip: null, urgency: "none", available: [],
+          reason: "You have used every chip — this round comes down to transfers." };
+      }
 
       // If the manager has already picked one, judge that choice rather than
       // proposing a different one they did not ask about.
@@ -456,14 +468,14 @@ serve(async (req) => {
 
       // A broken squad is a Wildcard case in both games.
       if (unavailableStarters >= 4) {
-        return { chip: "Wildcard", urgency: "high",
+        if (chips.includes("Wildcard")) return { chip: "Wildcard", urgency: "high",
           reason: `${unavailableStarters} of your XI cannot play — too many to fix with normal transfers.` };
       }
 
       if (competition === "EPL") {
         // Triple Captain wants one standout on an easy fixture, not a good squad.
         if (captain && (captain.next_difficulty ?? 5) <= 2 && (captain.form ?? 0) >= 6) {
-          return { chip: "Triple Captain", urgency: "medium",
+          if (chips.includes("Triple Captain")) return { chip: "Triple Captain", urgency: "medium",
             reason: `${captain.name} is in form against a soft fixture — the best week to triple him.` };
         }
         // Bench Boost pays only when the bench itself is playable.
@@ -471,20 +483,20 @@ serve(async (req) => {
           (p) => availabilityScore(p) === 1 && (p.next_difficulty ?? 5) <= 3,
         ).length;
         if (bench.length >= 4 && benchPlayable === bench.length) {
-          return { chip: "Bench Boost", urgency: "medium",
+          if (chips.includes("Bench Boost")) return { chip: "Bench Boost", urgency: "medium",
             reason: "Your whole bench is fit with a kind fixture — their points would all count." };
         }
         if (hardFixtures >= 8) {
-          return { chip: "Free Hit", urgency: "medium",
+          if (chips.includes("Free Hit")) return { chip: "Free Hit", urgency: "medium",
             reason: `${hardFixtures} of your XI face a hard fixture; a one-week rebuild may beat taking hits.` };
         }
       } else if (hardFixtures >= 7) {
-        return { chip: "Limitless", urgency: "medium",
+        if (chips.includes("Limitless")) return { chip: "Limitless", urgency: "medium",
           reason: `${hardFixtures} of your XI face a top-tier opponent; a one-matchday reshape may pay.` };
       }
 
       if (unavailableStarters >= 2) {
-        return { chip: "Wildcard", urgency: "medium",
+        if (chips.includes("Wildcard")) return { chip: "Wildcard", urgency: "medium",
           reason: `${unavailableStarters} unavailable starters is more than a free transfer can cover.` };
       }
       return { chip: null, urgency: "none", reason: holdText, available: chips };
@@ -694,7 +706,8 @@ serve(async (req) => {
         competition,
         free: isFree,
         planned_chip: plannedChip,
-        chips_available: CHIPS_BY_COMPETITION[competition] ?? [],
+        chips_available: remainingChips,
+        chips_used: usedChips,
         prices: { ...UNLOCK_PRICES, max_transfers: MAX_TRANSFERS },
         credits_remaining: creditsRemaining,
       }),
