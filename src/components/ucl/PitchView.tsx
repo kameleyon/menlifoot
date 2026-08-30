@@ -57,7 +57,7 @@ const PlayerCard = ({
             unresolved
               ? 'border-dashed border-muted-foreground/50 bg-muted/40 text-muted-foreground'
               : out
-              ? 'border-amber-500 bg-amber-500/25 text-amber-200'
+              ? 'border-destructive bg-destructive/30 text-foreground'
               : 'border-primary bg-primary text-primary-foreground'
           }`}
         >
@@ -78,7 +78,9 @@ const PlayerCard = ({
           <span
             title={slot.availability_note ?? slot.availability ?? ''}
             className={`absolute -bottom-0.5 -right-1 flex h-4 w-4 items-center justify-center rounded-full ${
-              out ? 'bg-amber-500 text-black' : 'bg-amber-500/50 text-black'
+              out
+                ? 'bg-destructive text-destructive-foreground'
+                : 'bg-destructive/50 text-destructive-foreground'
             }`}
           >
             <Cross className="h-2.5 w-2.5" />
@@ -95,12 +97,12 @@ const PlayerCard = ({
           </span>
         )}
         {unreadable && (
-          <AlertTriangle className="absolute -left-1 -top-1 h-4 w-4 text-amber-500" />
+          <AlertTriangle className="absolute -left-1 -top-1 h-4 w-4 text-primary" />
         )}
       </div>
       <span
         className={`w-full truncate rounded px-1 py-0.5 text-center text-[11px] font-medium ${
-          out ? 'bg-amber-500/20 text-amber-300' : 'bg-card/90'
+          out ? 'bg-destructive/20 text-destructive' : 'bg-card/90'
         }`}
       >
         {name}
@@ -119,9 +121,9 @@ const PlayerCard = ({
           type="button"
           aria-label={`Remove ${name}`}
           onClick={onRemove}
-          className="absolute right-1 top-[-6px] flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-black shadow-md transition-transform hover:scale-110"
+          className="absolute right-1 top-[-5px] flex h-4 w-4 items-center justify-center rounded-full bg-black text-primary ring-1 ring-primary/60 transition-transform hover:scale-110"
         >
-          <X className="h-3 w-3" />
+          <X className="h-2.5 w-2.5" strokeWidth={3} />
         </button>
       )}
     </div>

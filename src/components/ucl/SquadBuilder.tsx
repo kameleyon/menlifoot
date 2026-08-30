@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import PitchView from './PitchView';
+import ScrollRow from './ScrollRow';
 import {
   benchShape,
   DEFAULT_FORMATION,
@@ -203,7 +204,7 @@ const SquadBuilder = ({
           ) : (
             <span
               className={`font-display text-sm tabular-nums ${
-                budget.overBudget ? 'text-amber-400' : 'text-foreground'
+                budget.overBudget ? 'text-destructive' : 'text-foreground'
               }`}
             >
               {formatPrice(budget.spent)} / {formatPrice(SQUAD_BUDGET)}
@@ -216,13 +217,13 @@ const SquadBuilder = ({
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
               <div
                 className={`h-full rounded-full transition-all ${
-                  budget.overBudget ? 'bg-amber-400' : 'bg-primary'
+                  budget.overBudget ? 'bg-destructive' : 'bg-primary'
                 }`}
                 style={{ width: `${Math.min(100, (budget.spent / SQUAD_BUDGET) * 100)}%` }}
               />
             </div>
             <div className="mt-1.5 flex items-center justify-between text-[11px]">
-              <span className={budget.overBudget ? 'text-amber-400' : 'text-muted-foreground'}>
+              <span className={budget.overBudget ? 'text-destructive' : 'text-muted-foreground'}>
                 {budget.overBudget
                   ? `${t('ucl.overBudget')} ${formatPrice(Math.abs(budget.remaining))}`
                   : `${t('ucl.remaining')} ${formatPrice(budget.remaining)}`}
@@ -244,7 +245,7 @@ const SquadBuilder = ({
         <span className="shrink-0 text-xs font-medium text-muted-foreground">
           {t('ucl.formation')}
         </span>
-        <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 py-0.5">
+        <ScrollRow>
           {FORMATIONS.map((f) => (
             <button
               key={f}
@@ -259,7 +260,7 @@ const SquadBuilder = ({
               {f}
             </button>
           ))}
-        </div>
+        </ScrollRow>
       </div>
 
       <PitchView
@@ -283,7 +284,7 @@ const SquadBuilder = ({
           ] as const).map(([key, label, onPick, isSet, Icon]) => (
             <div key={key}>
               <div className="mb-2 text-xs font-medium text-muted-foreground">{label}</div>
-              <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 py-0.5">
+              <ScrollRow>
                 {starters.map((s, i) =>
                   s.player_id ? (
                     <button
@@ -301,7 +302,7 @@ const SquadBuilder = ({
                     </button>
                   ) : null,
                 )}
-              </div>
+              </ScrollRow>
             </div>
           ))}
         </div>
@@ -318,7 +319,7 @@ const SquadBuilder = ({
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 {t('ucl.chipsUsed')}
               </div>
-              <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 py-0.5">
+              <ScrollRow>
                 {chips.map((c) => {
                   const on = usedChips.includes(c);
                   return (
@@ -342,7 +343,7 @@ const SquadBuilder = ({
                     </button>
                   );
                 })}
-              </div>
+              </ScrollRow>
             </div>
           )}
 
@@ -351,7 +352,7 @@ const SquadBuilder = ({
               <Zap className="h-3.5 w-3.5" />
               {t('ucl.playAChip')}
             </div>
-            <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 py-0.5">
+            <ScrollRow>
               <button
                 type="button"
                 onClick={() => { onChipChange(null); setDirty(true); }}
@@ -375,7 +376,7 @@ const SquadBuilder = ({
                     {c}
                   </button>
                 ))}
-            </div>
+            </ScrollRow>
             {usedChips.length > 0 && (
               <p className="mt-1.5 text-[11px] text-muted-foreground">
                 {usedChips.length} {t('ucl.chipsAlreadySpent')}

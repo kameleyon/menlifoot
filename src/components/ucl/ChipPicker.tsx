@@ -1,5 +1,6 @@
 import { Zap, CheckCircle2 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import ScrollRow from './ScrollRow';
 
 interface Props {
   chips: string[];
@@ -38,7 +39,7 @@ const ChipPicker = ({
           <Zap className="h-3.5 w-3.5" />
           {t('ucl.playAChip')}
         </div>
-        <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 py-0.5">
+        <ScrollRow>
           <button
             type="button"
             onClick={() => onChipChange(null)}
@@ -62,7 +63,7 @@ const ChipPicker = ({
                 {c}
               </button>
             ))}
-        </div>
+        </ScrollRow>
       </div>
 
       {!compact && (
@@ -71,7 +72,7 @@ const ChipPicker = ({
             <CheckCircle2 className="h-3.5 w-3.5" />
             {t('ucl.chipsUsed')}
           </div>
-          <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 py-0.5">
+          <ScrollRow>
             {chips.map((c) => {
               const on = usedChips.includes(c);
               return (
@@ -94,7 +95,7 @@ const ChipPicker = ({
                 </button>
               );
             })}
-          </div>
+          </ScrollRow>
         </div>
       )}
     </div>

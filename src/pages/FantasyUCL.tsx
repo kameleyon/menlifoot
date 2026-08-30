@@ -411,8 +411,8 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
             />
 
             {unresolved.length > 0 && (
-              <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
-                <div className="flex items-center gap-2 text-sm font-medium text-amber-600 dark:text-amber-400">
+              <div className="rounded-lg border border-primary/40 bg-primary/10 p-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-primary">
                   <AlertTriangle className="h-4 w-4" />
                   {t('ucl.couldNotRead')}
                 </div>

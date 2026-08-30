@@ -102,7 +102,7 @@ const BestPicks = ({
             </span>
             <ChevronDown className="h-4 w-4" />
           </Button>
-          {error && <p className="text-xs text-amber-400">{error}</p>}
+          {error && <p className="text-xs text-destructive">{error}</p>}
         </div>
       );
     }
@@ -122,7 +122,7 @@ const BestPicks = ({
         >
           <PlaceholderRows rows={4} />
         </LockedPanel>
-        {error && <p className="text-xs text-amber-400">{error}</p>}
+        {error && <p className="text-xs text-destructive">{error}</p>}
       </div>
     );
   }
