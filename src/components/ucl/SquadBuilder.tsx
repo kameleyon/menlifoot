@@ -23,6 +23,11 @@ interface Props {
   onSubmit: (squad: Squad) => void;
   submitting?: boolean;
   competition?: Competition;
+  /** Seed the pitch with an existing squad, so the same builder can edit one. */
+  initialSquad?: Squad | null;
+  submitLabel?: string;
+  /** Only enable submit once something has actually changed. */
+  requireChange?: boolean;
 }
 
 const emptySlot = (position: Position): SquadSlot => ({ player_id: null, position });
@@ -34,13 +39,26 @@ const buildStarters = (formation: string): SquadSlot[] => {
   );
 };
 
-const SquadBuilder = ({ onSubmit, submitting = false, competition = 'UCL' }: Props) => {
+const SquadBuilder = ({
+  onSubmit,
+  submitting = false,
+  competition = 'UCL',
+  initialSquad = null,
+  submitLabel,
+  requireChange = false,
+}: Props) => {
   const { t } = useLanguage();
-  const [formation, setFormation] = useState<string>('4-3-3');
-  const [starters, setStarters] = useState<SquadSlot[]>(() => buildStarters('4-3-3'));
+  const seedFormation = initialSquad?.formation ?? '4-3-3';
+  const [formation, setFormation] = useState<string>(seedFormation);
+  const [dirty, setDirty] = useState(false);
+  const [starters, setStarters] = useState<SquadSlot[]>(
+    () => initialSquad?.starters?.length ? initialSquad.starters : buildStarters(seedFormation),
+  );
   // Bench composition is derived from the formation against the 2/5/5/3 squad
   // rule, so a 4-3-3 benches 1 GK / 1 DEF / 2 MID rather than one per position.
-  const [bench, setBench] = useState<SquadSlot[]>(() => benchShape('4-3-3').map(emptySlot));
+  const [bench, setBench] = useState<SquadSlot[]>(
+    () => initialSquad?.bench?.length ? initialSquad.bench : benchShape(seedFormation).map(emptySlot),
+  );
   const [picking, setPicking] = useState<{ index: number; onBench: boolean; position: Position } | null>(
     null,
   );
@@ -59,6 +77,7 @@ const SquadBuilder = ({ onSubmit, submitting = false, competition = 'UCL' }: Pro
       return i === -1 ? emptySlot(pos) : pool.splice(i, 1)[0];
     };
     setFormation(next);
+    setDirty(true);
     setStarters(buildStarters(next).map((slot) => take(slot.position as Position)));
     setBench(benchShape(next).map((pos) => take(pos)));
   };
@@ -99,16 +118,25 @@ const SquadBuilder = ({ onSubmit, submitting = false, competition = 'UCL' }: Pro
     }
     setPicking(null);
     setQuery('');
+    setDirty(true);
   };
 
-  const setCaptain = (index: number) =>
+  const setCaptain = (index: number) => {
     setStarters((s) => s.map((x, i) => ({ ...x, is_captain: i === index })));
+    setDirty(true);
+  };
 
-  const filled = starters.filter((s) => s.player_id).length;
+  const filled = [...starters, ...bench].filter((s) => s.player_id).length;
+  const squadSize = starters.length + bench.length;
+  const startersFilled = starters.filter((s) => s.player_id).length;
   const hasCaptain = starters.some((s) => s.is_captain);
   const budget = useMemo(() => squadCost([...starters, ...bench]), [starters, bench]);
   // Over-budget blocks submission, but only once prices actually exist.
-  const ready = filled === starters.length && hasCaptain && !budget.overBudget;
+  const ready =
+    startersFilled === starters.length &&
+    hasCaptain &&
+    !budget.overBudget &&
+    (!requireChange || dirty);
 
   return (
     <div className="space-y-4">
@@ -222,11 +250,13 @@ const SquadBuilder = ({ onSubmit, submitting = false, competition = 'UCL' }: Pro
           ? t('ucl.analyzing')
           : budget.overBudget
           ? `${t('ucl.overBudget')} ${formatPrice(Math.abs(budget.remaining))}`
+          : requireChange && !dirty
+          ? t('ucl.makeAChange')
           : ready
-          ? t('ucl.rateMyTeam')
-          : !hasCaptain && filled === starters.length
+          ? submitLabel ?? t('ucl.rateMyTeam')
+          : !hasCaptain && startersFilled === starters.length
           ? t('ucl.needCaptain')
-          : `${filled}/${starters.length} ${t('ucl.playersPicked')}`}
+          : `${filled}/${squadSize} ${t('ucl.playersPicked')}`}
       </Button>
 
       {picking && (

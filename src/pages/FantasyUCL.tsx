@@ -55,6 +55,9 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
   const [showAllTransfers, setShowAllTransfers] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
   const [unlocking, setUnlocking] = useState(false);
+  // The results pitch is read-only until the manager chooses to change it, so
+  // the score stays the thing on screen rather than a builder.
+  const [editing, setEditing] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
   const signedIn = Boolean(user);
@@ -244,6 +247,7 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
     setResult(null);
     setUnresolved([]);
     setShowAllTransfers(false);
+    setEditing(false);
     setPaidUnlocks([]);
     setPaidTransfers(0);
   };
@@ -436,12 +440,41 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
               )}
             </div>
 
-            <PitchView
-              starters={squad.starters}
-              bench={squad.bench}
-              benchLabel={t('ucl.bench')}
-              emptyLabel={t('ucl.unknown')}
-            />
+            {/* Swap players straight from the result, then re-run the rating.
+                Editing is opt-in: the score is what the manager came for, and a
+                builder in its place would bury it. */}
+            {editing ? (
+              <div className="space-y-2">
+                <SquadBuilder
+                  competition={competition}
+                  submitting={busy}
+                  initialSquad={squad}
+                  requireChange
+                  submitLabel={t('ucl.doneReanalyse')}
+                  onSubmit={(next) => {
+                    setEditing(false);
+                    analyze(next, source, paidUnlocks, paidTransfers);
+                  }}
+                />
+                <Button variant="ghost" className="w-full" onClick={() => setEditing(false)}>
+                  {t('ucl.cancelEdit')}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <PitchView
+                  starters={squad.starters}
+                  bench={squad.bench}
+                  benchLabel={t('ucl.bench')}
+                  emptyLabel={t('ucl.unknown')}
+                  onSlotClick={() => setEditing(true)}
+                />
+                <Button variant="outline" className="w-full" onClick={() => setEditing(true)}>
+                  <PenLine className="mr-2 h-4 w-4" />
+                  {t('ucl.changePlayers')}
+                </Button>
+              </div>
+            )}
 
             <div className="space-y-2">
               <h3 className="font-display text-sm uppercase tracking-wide">{t('ucl.breakdown')}</h3>

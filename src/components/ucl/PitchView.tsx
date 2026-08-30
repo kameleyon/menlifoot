@@ -21,6 +21,10 @@ const PlayerCard = ({
   emptyLabel?: string;
 }) => {
   const unresolved = !slot.player_id;
+  // A triangle means "we read a name here and could not match it", not "this
+  // slot is empty". Flagging every empty slot on a fresh squad put fourteen
+  // warnings on screen before the manager had done anything wrong.
+  const unreadable = unresolved && Boolean(slot.read_as);
   const name = slot.display_name || slot.name || slot.read_as || emptyLabel || '—';
 
   return (
@@ -50,7 +54,7 @@ const PlayerCard = ({
             V
           </span>
         )}
-        {unresolved && (
+        {unreadable && (
           <AlertTriangle className="absolute -left-1 -top-1 h-4 w-4 text-amber-500" />
         )}
       </div>
