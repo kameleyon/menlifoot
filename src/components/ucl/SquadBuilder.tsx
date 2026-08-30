@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import PitchView from './PitchView';
+import PlayerAvatar from './PlayerAvatar';
 import {
   benchShape,
   formatPrice,
@@ -407,14 +408,12 @@ const SquadBuilder = ({
                     onClick={() => assign(p)}
                     className="flex w-full items-center justify-between gap-2 border-b border-border/50 p-3 text-left disabled:opacity-40"
                   >
-                    {p.photo_url ? (
-                      <img
-                        src={p.photo_url}
-                        alt=""
-                        loading="lazy"
-                        className="h-8 w-8 shrink-0 rounded-full bg-muted object-cover"
-                      />
-                    ) : null}
+                    <PlayerAvatar
+                      photoUrl={p.photo_url}
+                      fallback={(p.display_name || p.name).slice(0, 2).toUpperCase()}
+                      size={32}
+                      className="text-[10px] text-muted-foreground"
+                    />
                     <div className="min-w-0">
                       <div className="truncate text-sm font-medium">{p.display_name || p.name}</div>
                       <div className="truncate text-xs text-muted-foreground">

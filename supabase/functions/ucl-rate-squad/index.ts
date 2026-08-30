@@ -41,6 +41,10 @@ const MAX_COMFORTABLE_PER_CLUB = 3;
 // the formation leaves over — it is NOT one player per position.
 const SQUAD_COMPOSITION: Record<string, number> = { GK: 2, DEF: 5, MID: 5, FWD: 3 };
 
+// Both games give 100m for the 15. Used to work out what is left in the bank,
+// which is what a manager can actually spend on a replacement.
+const SQUAD_BUDGET = 100;
+
 // The two games have different chips, and mixing them up is a real error:
 // Bench Boost and Triple Captain are Fantasy Premier League chips that do not
 // exist in the UCL game, which has Limitless instead.
@@ -65,6 +69,10 @@ const UNLOCK_PRICES = {
 } as const;
 
 const MAX_TRANSFERS = 3;
+
+const PLAYER_FIELDS =
+  "id,name,display_name,team,position,price,total_points,form,minutes,availability," +
+  "availability_note,next_opponent,next_difficulty,starts,points_per_game,ict_index";
 
 const VALID_FORMATIONS = new Set([
   "3-4-3", "3-5-2", "4-3-3", "4-4-2", "4-5-1", "5-3-2", "5-4-1", "3-6-1", "5-2-3",
@@ -279,9 +287,7 @@ serve(async (req) => {
 
     const { data: rows, error } = await supabase
       .from("ucl_players")
-      .select(
-        "id,name,display_name,team,position,price,total_points,form,minutes,availability,availability_note,next_opponent,next_difficulty,starts,points_per_game,ict_index",
-      )
+      .select(PLAYER_FIELDS)
       .eq("competition", competition)
       .in("id", [...starterIds, ...benchIds]);
     if (error) throw new Error(`player lookup failed: ${error.message}`);
@@ -382,18 +388,24 @@ serve(async (req) => {
       applicable: applicable[k],
     }));
 
-    // ---------------------------------------------------- optimise the XI ---
-    // Pure re-arrangement of the 15 players already owned: no transfers, no
-    // budget, so it works today even with zero price data. Deterministic — the
-    // same squad always yields the same optimal XI.
+    /**
+     * One definition of how good a player is right now, used by the optimiser,
+     * the captain ranking and the transfer shortlist alike. Three separate
+     * notions of "good" was how the optimiser and the suggestions ended up
+     * disagreeing with each other on the same screen.
+     */
     const expectedValue = (p: Player): number => {
       const parts: [number, number][] = [[0.4, availabilityScore(p)]];
-      if (p.form != null) parts.push([0.4, formScore(p)]);
+      parts.push([0.4, formScore(p)]);
       if (p.next_difficulty != null) parts.push([0.2, fixtureScore(p)]);
       const w = parts.reduce((t, [x]) => t + x, 0);
       return w ? parts.reduce((t, [x, sc]) => t + x * sc, 0) / w : 0.5;
     };
 
+    // ---------------------------------------------------- optimise the XI ---
+    // Pure re-arrangement of the 15 players already owned: no transfers, no
+    // budget, so it works today even with zero price data. Deterministic — the
+    // same squad always yields the same optimal XI.
     // Attacking returns dominate fantasy captaincy: a keeper's ceiling is a
     // clean sheet and some saves, a forward's is a hat-trick. Without this the
     // optimiser captains whoever sorts first when everyone ties on availability
@@ -555,38 +567,53 @@ serve(async (req) => {
     })();
 
     // -------------------------------------------------- transfer shortlist ---
-    // Rank starters worst-first, then pull same-position replacements the user
-    // could plausibly afford. The model picks from THIS list; it never invents.
+    // Candidates are ranked by the SAME expected value the optimiser uses, not
+    // by the raw form column. Ordering by raw form was the reason suggestions
+    // looked arbitrary: it surfaced whoever had spiked over two games, which is
+    // the exact small-sample noise the scoring elsewhere was corrected for.
+    //
+    // A transfer is only proposed when the replacement is meaningfully better
+    // than the incumbent. Filling a fixed quota means recommending sideways
+    // moves that cost a manager a hit for nothing.
+    const UPGRADE_MARGIN = 0.06;
+
     const weakest = [...starters]
-      .map((p) => ({
-        p,
-        s: 0.4 * formScore(p) + 0.3 * availabilityScore(p) + 0.3 * fixtureScore(p),
-      }))
+      .map((p) => ({ p, s: expectedValue(p) }))
       .sort((a, b) => a.s - b.s)
       .slice(0, 5);
 
-    const candidates: Record<string, Player[]> = {};
-    for (const { p } of weakest) {
+    // Money available if this player is sold: their price plus whatever the
+    // squad has not spent. Without prices the budget is simply not applied.
+    const squadSpend = [...starters, ...bench].reduce((t, p) => t + (p.price ?? 0), 0);
+    const anyPriced = [...starters, ...bench].some((p) => p.price != null);
+    const bank = anyPriced ? Math.max(0, SQUAD_BUDGET - squadSpend) : null;
+
+    const candidates: Record<string, { player: Player; gain: number }[]> = {};
+    for (const { p, s: incumbentScore } of weakest) {
       let q = supabase
         .from("ucl_players")
-        .select(
-          "id,name,display_name,team,position,price,total_points,form,minutes,availability,availability_note,next_opponent,next_difficulty,starts,points_per_game,ict_index",
-        )
+        .select(PLAYER_FIELDS)
         .eq("competition", competition)
         .eq("position", p.position)
         .eq("availability", "available")
         .not("id", "in", `(${[...starterIds, ...benchIds].join(",")})`);
 
-      // Only constrain by budget when we actually know what the outgoing player
-      // costs. `lte` against a null column matches nothing, so applying this
-      // pre-season silently returned zero candidates for every slot.
-      if (p.price != null) q = q.lte("price", p.price + 2.0);
+      if (p.price != null && bank != null) {
+        q = q.lte("price", Number((p.price + bank).toFixed(1)));
+      }
 
+      // Pull a wide net on a stable measure, then rank it properly in code.
+      // Ordering the query itself by form would pre-filter on the noisy signal
+      // before the real ranking ever sees the alternatives.
       const { data: alts } = await q
-        .order("form", { ascending: false, nullsFirst: false })
-        .order("next_difficulty", { ascending: true, nullsFirst: false })
-        .limit(6);
-      candidates[p.id] = (alts ?? []) as Player[];
+        .order("total_points", { ascending: false, nullsFirst: false })
+        .limit(40);
+
+      candidates[p.id] = ((alts ?? []) as Player[])
+        .map((c) => ({ player: c, gain: expectedValue(c) - incumbentScore }))
+        .filter((c) => c.gain >= UPGRADE_MARGIN)
+        .sort((a, b) => b.gain - a.gain)
+        .slice(0, 5);
     }
 
     // ----------------------------------------------------------- narrative ---
@@ -611,13 +638,29 @@ serve(async (req) => {
           difficulty: p.next_difficulty,
         })),
         bench: bench.map((p) => ({ name: p.name, position: p.position, form: p.form })),
-        transfer_options: Object.entries(candidates).map(([outId, alts]) => ({
-          out: byId.get(outId)?.name,
-          options: alts.map((a) => ({
-            name: a.name, team: a.team, price: a.price, form: a.form,
-            next: a.next_opponent, difficulty: a.next_difficulty,
-          })),
-        })),
+        transfer_options: Object.entries(candidates)
+          .filter(([, alts]) => alts.length > 0)
+          .map(([outId, alts]) => {
+            const out = byId.get(outId);
+            return {
+              out: out?.name,
+              out_stats: out
+                ? {
+                    price: out.price, points: out.total_points,
+                    per_game: out.points_per_game, starts: out.starts,
+                    next: out.next_opponent, difficulty: out.next_difficulty,
+                  }
+                : null,
+              options: alts.map(({ player: a, gain }) => ({
+                name: a.name, team: a.team, price: a.price,
+                points: a.total_points, per_game: a.points_per_game,
+                starts: a.starts, next: a.next_opponent,
+                difficulty: a.next_difficulty,
+                // How much better this player is than the one being replaced.
+                upgrade: Number(gain.toFixed(3)),
+              })),
+            };
+          }),
       };
 
       const langName = { en: "English", fr: "French", es: "Spanish", ht: "Haitian Creole" }[
@@ -639,7 +682,11 @@ serve(async (req) => {
                 "not started and that data does not exist yet. Never treat it as a weakness, never say the " +
                 "manager is overpaying or out of form because of it, and do not mention it at all. " +
                 "Explain what the squad does well and what costs it points, then recommend transfers " +
-                "ONLY from the supplied transfer_options. Return raw JSON, no markdown fences: " +
+                "ONLY from the supplied transfer_options. Each option carries an `upgrade` score " +
+                "and both players' points, per-game rate, starts and fixture: justify every " +
+                "recommendation from those numbers, and never claim a player is in form when " +
+                "his per_game and starts say otherwise. Recommend fewer transfers, or none, " +
+                "rather than padding the list. Return raw JSON, no markdown fences: " +
                 '{"verdict":"one punchy sentence","strengths":["..."],"weaknesses":["..."],' +
                 '"suggestions":[{"out":"name","in":"name","reason":"one sentence","priority":"high|medium|low"}]}',
             },
