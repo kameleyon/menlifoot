@@ -40,6 +40,8 @@ export interface UclPlayer {
   price: number | null;
   total_points: number;
   form: number | null;
+  points_per_game: number | null;
+  ict_index: number | null;
   availability: string;
   availability_note: string | null;
   next_opponent: string | null;
@@ -540,6 +542,26 @@ export const rateSquad = async (
   return data as RatingResult;
 };
 
+/**
+ * How many players the picker pulls.
+ *
+ * Was 20, which is too few to browse by price: the twenty dearest defenders
+ * are all premium, so the cheap end of the list a manager is usually shopping
+ * in never appeared at all.
+ */
+const PICKER_LIMIT = 120;
+
+/**
+ * The stat that ranks two players who cost the same.
+ *
+ * Points per game rather than total points, because within a price band the
+ * comparison is "who returns more when he plays": total points quietly
+ * punishes someone who missed a month injured and is now fit, which is the
+ * opposite of the advice a manager wants when choosing between two GBP 8.0m
+ * midfielders. Total points breaks the remaining ties.
+ */
+export const rankStat = (p: UclPlayer): number | null => p.points_per_game;
+
 /** Player search for the manual builder. Reads ucl_players directly (public). */
 export const searchPlayers = async (
   query: string,
@@ -551,13 +573,23 @@ export const searchPlayers = async (
   let q = (supabase as any)
     .from('ucl_players')
     .select(
-      'id,name,display_name,team,team_code,position,price,total_points,form,availability,availability_note,next_opponent,next_difficulty,photo_url',
+      'id,name,display_name,team,team_code,position,price,total_points,form,points_per_game,ict_index,availability,availability_note,next_opponent,next_difficulty,photo_url',
     )
     .eq('competition', competition)
-    .limit(20);
+    // Ordering has to happen in the database, not on what comes back: the
+    // limit is applied after the sort server-side but before anything the
+    // client could do, so sorting here would only reorder an arbitrary slice.
+    //
+    // Price first, so equally-priced players sit together, then the ranking
+    // stat inside each band. Players with no price sort last rather than
+    // first - UEFA publishes prices late, and a null is "not known yet", not
+    // "free".
+    .order('price', { ascending: false, nullsFirst: false })
+    .order('points_per_game', { ascending: false, nullsFirst: false })
+    .order('total_points', { ascending: false })
+    .limit(PICKER_LIMIT);
   if (position) q = q.eq('position', position);
   if (query.trim()) q = q.ilike('name', `%${query.trim()}%`);
-  else q = q.order('total_points', { ascending: false });
   const { data, error } = await q;
   if (error) throw new Error(error.message);
   return (data ?? []) as unknown as UclPlayer[];

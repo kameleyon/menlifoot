@@ -14,6 +14,7 @@ import {
   formatPrice,
   FORMATIONS,
   formationSlots,
+  rankStat,
   searchPlayers,
   squadCost,
   SQUAD_BUDGET,
@@ -99,6 +100,24 @@ const SquadBuilder = ({
   );
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<UclPlayer[]>([]);
+
+  /**
+   * Split the results into price bands.
+   *
+   * Consecutive grouping, not a sort: the query already returns players in
+   * price order with the ranking stat deciding within each price, so re-sorting
+   * here would only risk disagreeing with the order the rows arrived in.
+   */
+  const priceBands = useMemo(() => {
+    const bands: { price: number | null; players: UclPlayer[] }[] = [];
+    for (const p of results) {
+      const price = p.price ?? null;
+      const last = bands[bands.length - 1];
+      if (last && last.price === price) last.players.push(p);
+      else bands.push({ price, players: [p] });
+    }
+    return bands;
+  }, [results]);
   const [loading, setLoading] = useState(false);
 
   // Changing formation rebuilds the pitch. Players already picked are carried
@@ -429,30 +448,49 @@ const SquadBuilder = ({
               {!loading && results.length === 0 && (
                 <div className="p-4 text-sm text-muted-foreground">{t('ucl.noPlayers')}</div>
               )}
-              {results.map((p) => {
-                const taken = chosenIds.has(p.id);
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    disabled={taken}
-                    onClick={() => assign(p)}
-                    className="flex w-full items-center justify-between gap-2 border-b border-border/50 p-3 text-left disabled:opacity-40"
-                  >
-
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium">{p.display_name || p.name}</div>
-                      <div className="truncate text-xs text-muted-foreground">
-                        {p.team} · {p.position}
-                        {p.availability !== 'available' && ` · ${p.availability}`}
-                      </div>
-                    </div>
-                    {p.price != null && (
-                      <span className="shrink-0 text-xs text-muted-foreground">{formatPrice(p.price)}</span>
-                    )}
-                  </button>
-                );
-              })}
+              {priceBands.map((band) => (
+                <div key={band.price ?? 'unpriced'}>
+                  {/* The band header is what makes the ordering legible. Without
+                      it a list sorted by price then form just looks unsorted. */}
+                  <div className="sticky top-0 z-10 flex items-center justify-between bg-muted/95 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground backdrop-blur">
+                    <span>{formatPrice(band.price) ?? t('ucl.priceTbc')}</span>
+                    <span className="font-normal normal-case tracking-normal">
+                      {band.players.length}
+                    </span>
+                  </div>
+                  {band.players.map((p) => {
+                    const taken = chosenIds.has(p.id);
+                    const stat = rankStat(p);
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        disabled={taken}
+                        onClick={() => assign(p)}
+                        className="flex w-full items-center justify-between gap-2 border-b border-border/50 p-3 text-left disabled:opacity-40"
+                      >
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-medium">{p.display_name || p.name}</div>
+                          <div className="truncate text-xs text-muted-foreground">
+                            {p.team} · {p.position}
+                            {p.availability !== 'available' && ` · ${p.availability}`}
+                          </div>
+                        </div>
+                        {/* Show the stat that put this player above the next one,
+                            so the ranking can be checked rather than trusted. */}
+                        <div className="shrink-0 text-right">
+                          <div className="text-xs font-medium text-primary">
+                            {stat != null ? `${stat.toFixed(1)} ${t('ucl.perGame')}` : '—'}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {p.total_points} {t('ucl.ptsShort')}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           </div>
         </div>
