@@ -155,7 +155,7 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
     setStep('analyzing');
     try {
       const b64 = await fileToBase64(file);
-      const parsed = await parseScreenshot(b64);
+      const parsed = await parseScreenshot(b64, competition);
       setUnresolved(parsed.unresolved ?? []);
       const next: Squad = {
         formation: parsed.formation,

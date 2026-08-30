@@ -17,7 +17,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-api-version",
 };
 
-const VISION_PROMPT = `You are reading a screenshot of a UEFA Champions League Fantasy squad.
+const visionPrompt = (game: string) => `You are reading a screenshot of a ${game} squad.
 
 Extract ONLY what is visibly present. Return raw JSON, no markdown fences:
 
@@ -41,6 +41,13 @@ Rules:
 - Copy names exactly as printed, abbreviations included (e.g. "B.Fernandes").
 - If a value is not visible, use null. Never invent players or prices.`;
 
+// The two games lay their pitches out the same way but label things
+// differently, so the model is told which one it is looking at.
+const GAME_NAME: Record<string, string> = {
+  UCL: "UEFA Champions League Fantasy",
+  EPL: "Fantasy Premier League",
+};
+
 type ParsedPlayer = {
   name: string;
   position: string | null;
@@ -57,7 +64,12 @@ serve(async (req) => {
     const apiKey = Deno.env.get("OPENROUTER_API_KEY");
     if (!apiKey) throw new Error("OPENROUTER_API_KEY is not configured");
 
-    const { imageBase64, imageUrl } = await req.json();
+    const { imageBase64, imageUrl, competition: rawCompetition = "UCL" } = await req.json();
+    // Without this every screenshot resolved against the Champions League pool,
+    // so a Premier League squad came back with Real Madrid and Sporting players.
+    const competition = ["UCL", "EPL"].includes(String(rawCompetition))
+      ? String(rawCompetition)
+      : "UCL";
     if (!imageUrl && !imageBase64) throw new Error("imageBase64 or imageUrl is required");
 
     // imageUrl is relayed to OpenRouter, which fetches it. Restrict to https so
@@ -81,7 +93,7 @@ serve(async (req) => {
         model: "openai/gpt-5.6-luna",
         messages: [
           { role: "system", content: "You return only raw JSON. No prose, no markdown fences." },
-          { role: "user", content: [{ type: "text", text: VISION_PROMPT }, imageContent] },
+          { role: "user", content: [{ type: "text", text: visionPrompt(GAME_NAME[competition] ?? GAME_NAME.UCL) }, imageContent] },
         ],
         temperature: 0,
       }),
@@ -119,6 +131,7 @@ serve(async (req) => {
             q: name,
             pos: attempt,
             lim: 1,
+            p_competition: competition,
           });
           if (Array.isArray(data) && data[0]) {
             hit = data[0];
@@ -163,6 +176,7 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
+        competition,
         formation: parsed?.formation ?? null,
         starters,
         bench,

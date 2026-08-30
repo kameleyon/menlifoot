@@ -359,9 +359,12 @@ export const benchShape = (formation: string): Position[] => {
   );
 };
 
-export const parseScreenshot = async (imageBase64: string): Promise<ParseResult> => {
+export const parseScreenshot = async (
+  imageBase64: string,
+  competition: Competition = 'UCL',
+): Promise<ParseResult> => {
   const { data, error } = await supabase.functions.invoke('ucl-parse-screenshot', {
-    body: { imageBase64 },
+    body: { imageBase64, competition },
   });
   if (error) throw new Error(error.message);
   if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
