@@ -321,6 +321,18 @@ export const getFixtures = async (matchday: number, competition: Competition = '
 export const getCurrentMatchday = async (
   competition: Competition = 'UCL',
 ): Promise<number | null> => {
+  // The round the game says is in play. Deadline-based guessing lands on the
+  // NEXT round the moment the current one kicks off, which skips past the
+  // fixtures being played right now.
+  const { data: flagged } = await (supabase as any)
+    .from('ucl_matchdays')
+    .select('matchday')
+    .eq('competition', competition)
+    .eq('is_current', true)
+    .limit(1);
+  const c = (flagged ?? [])[0] as { matchday?: number } | undefined;
+  if (c?.matchday) return c.matchday;
+
   const nowIso = new Date().toISOString();
   const { data: byDeadline } = await (supabase as any)
     .from('ucl_matchdays')

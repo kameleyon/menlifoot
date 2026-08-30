@@ -192,6 +192,7 @@ serve(async (req) => {
         competition: COMPETITION,
         matchday: Number(ev.id),
         deadline: ev.deadline_time ? String(ev.deadline_time) : null,
+        is_current: Boolean(ev.is_current),
         updated_at: new Date().toISOString(),
       }));
     if (days.length) {
@@ -214,19 +215,20 @@ serve(async (req) => {
           const home = teams.get(Number(f.team_h)) ?? "";
           const away = teams.get(Number(f.team_a)) ?? "";
           if (!home || !away) return null;
-          const played = Boolean(f.finished) && f.team_h_score != null;
+          const hasScore = f.team_h_score != null && f.team_a_score != null;
+          const finished = Boolean(f.finished);
           return {
             competition: COMPETITION,
             matchday: Number(f.event),
             kickoff: f.kickoff_time ? String(f.kickoff_time) : null,
             home_team: home,
             away_team: away,
-            home_score: played ? Math.round(num(f.team_h_score)) : null,
-            away_score: played ? Math.round(num(f.team_a_score)) : null,
+            home_score: hasScore ? Math.round(num(f.team_h_score)) : null,
+            away_score: hasScore ? Math.round(num(f.team_a_score)) : null,
             // The game's own fixture difficulty, from each side's perspective.
             home_difficulty: f.team_h_difficulty != null ? Math.round(num(f.team_h_difficulty)) : null,
             away_difficulty: f.team_a_difficulty != null ? Math.round(num(f.team_a_difficulty)) : null,
-            status: played ? "finished" : Boolean(f.started) ? "live" : "scheduled",
+            status: finished ? "finished" : Boolean(f.started) ? "live" : "scheduled",
             updated_at: new Date().toISOString(),
           };
         })

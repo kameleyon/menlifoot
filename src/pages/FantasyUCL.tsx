@@ -331,7 +331,17 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
                 <PenLine className="h-4 w-4" />
                 {t('ucl.buildManually')}
               </Button>
+            </div>
 
+            {/* Fixtures live on the page, not behind a button. The schedule is
+                the first thing a manager checks, and it opens on the round in
+                play with arrows to step back and forward. */}
+            <div className="space-y-2 text-left">
+              <h3 className="flex items-center gap-2 font-display text-sm uppercase tracking-wide">
+                <CalendarDays className="h-4 w-4 text-primary" />
+                {t('ucl.fixturesTitle')}
+              </h3>
+              <FixturesCalendar competition={competition} />
             </div>
           </div>
         )}
