@@ -162,6 +162,7 @@ serve(async (req) => {
           team_code: hit.team_code,
           position: hit.position,
           price: hit.price,
+          photo_url: hit.photo_url,
           match_score: hit.score,
           is_captain: !!p?.is_captain,
           is_vice: !!p?.is_vice,

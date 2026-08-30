@@ -131,6 +131,12 @@ serve(async (req) => {
         yellow_cards: Math.round(num(e.yellow_cards)),
         red_cards: Math.round(num(e.red_cards)),
         selected_by_pct: num(e.selected_by_percent),
+        // Steadier than a 30-day form figure two games into a season, and
+        // starts is what decides whether a player can score at all.
+        starts: Math.round(num(e.starts)),
+        points_per_game: num(e.points_per_game),
+        ict_index: num(e.ict_index),
+        ep_next: e.ep_next != null ? num(e.ep_next) : null,
         xg: e.expected_goals != null ? num(e.expected_goals) : null,
         xa: e.expected_assists != null ? num(e.expected_assists) : null,
         availability: AVAILABILITY[status] ?? "available",

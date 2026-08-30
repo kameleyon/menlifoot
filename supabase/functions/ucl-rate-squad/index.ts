@@ -72,6 +72,9 @@ const VALID_FORMATIONS = new Set([
 
 type Player = {
   id: string;
+  starts: number | null;
+  points_per_game: number | null;
+  ict_index: number | null;
   name: string;
   display_name: string;
   team: string;
@@ -103,8 +106,57 @@ const cleanEmail = (v: unknown): string | null => {
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 
-/** Form is roughly 0-10 points per match in this game; normalise onto 0-1. */
-const formScore = (p: Player) => clamp01((p.form ?? 0) / 8);
+/**
+ * How much football this player has actually played, 0-1.
+ *
+ * Two appearances is not evidence. Everything derived from form is shrunk
+ * toward a prior by this weight, so a hot start cannot outrank an established
+ * player until there is enough of a season to justify it. Five full matches is
+ * treated as a complete sample.
+ */
+const sampleWeight = (p: Player) => clamp01((p.minutes ?? 0) / 450);
+
+/**
+ * What a player's price implies about expected output, 0-1.
+ *
+ * Price is the market's standing estimate of a player - set by the game and
+ * moved by millions of managers - so it is the right thing to fall back on when
+ * this season has barely started. Roughly 4.0m floor to 15.0m ceiling.
+ */
+const priceExpectation = (p: Player) =>
+  p.price == null ? 0.45 : clamp01((p.price - 4) / 11);
+
+/**
+ * Scoring rate per appearance, which is steadier than a 30-day form window
+ * because it is not distorted by a single blank or a single haul.
+ */
+const perGameScore = (p: Player) =>
+  p.points_per_game == null ? null : clamp01(p.points_per_game / 8);
+
+/**
+ * Form, regressed toward what the player's price implies.
+ *
+ * The old version read raw form only, which two games into a season meant a
+ * 5.5m midfielder with one good haul outranked an 8.5m forward who had started
+ * quietly - and the optimiser duly benched the better player. Now the two are
+ * blended by sample size: early on price dominates, and by five matches played
+ * the actual returns do.
+ */
+const formScore = (p: Player) => {
+  const w = sampleWeight(p);
+  const observed = perGameScore(p) ?? clamp01((p.form ?? 0) / 8);
+  const prior = priceExpectation(p);
+  const blended = w * observed + (1 - w) * prior;
+
+  // A player who is not starting cannot return points, whatever the blend says.
+  // Only applied once there are matches to have started.
+  if (p.starts != null && p.minutes != null && p.minutes > 0) {
+    const appearances = Math.max(1, Math.round(p.minutes / 90));
+    const startRate = clamp01(p.starts / appearances);
+    if (startRate < 0.5) return blended * (0.55 + startRate * 0.9);
+  }
+  return blended;
+};
 
 /** next_difficulty is 1 (easiest) to 5 (hardest). */
 const fixtureScore = (p: Player) =>
@@ -228,7 +280,7 @@ serve(async (req) => {
     const { data: rows, error } = await supabase
       .from("ucl_players")
       .select(
-        "id,name,display_name,team,position,price,total_points,form,minutes,availability,availability_note,next_opponent,next_difficulty",
+        "id,name,display_name,team,position,price,total_points,form,minutes,availability,availability_note,next_opponent,next_difficulty,starts,points_per_game,ict_index",
       )
       .eq("competition", competition)
       .in("id", [...starterIds, ...benchIds]);
@@ -518,7 +570,7 @@ serve(async (req) => {
       let q = supabase
         .from("ucl_players")
         .select(
-          "id,name,display_name,team,position,price,total_points,form,minutes,availability,availability_note,next_opponent,next_difficulty",
+          "id,name,display_name,team,position,price,total_points,form,minutes,availability,availability_note,next_opponent,next_difficulty,starts,points_per_game,ict_index",
         )
         .eq("competition", competition)
         .eq("position", p.position)
