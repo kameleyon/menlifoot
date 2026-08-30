@@ -37,6 +37,12 @@ Rules:
   strip usually labelled BENCH.
 - Infer position from the row a player sits in: goalkeeper row = GK, then DEF,
   MID, FWD moving up the pitch.
+- If the image is NOT a pitch - a plain list, a table, a screenshot with no
+  rows to read positions from - do not guess a shape from the ordering. Put the
+  first 11 players in a 3-4-3 as starters (1 GK, 3 DEF, 4 MID, 3 FWD, in that
+  order) and the rest on the bench, and return "3-4-3" as the formation. A
+  position read off a list is a guess, and the squad is re-sorted against the
+  real positions afterwards anyway.
 - A "C" badge means is_captain. A "V" badge means is_vice.
 - Copy names exactly as printed, abbreviations included (e.g. "B.Fernandes").
 - If a value is not visible, use null. Never invent players or prices.`;

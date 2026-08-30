@@ -6,6 +6,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import PitchView from './PitchView';
 import {
   benchShape,
+  DEFAULT_FORMATION,
   formatPrice,
   FORMATIONS,
   formationSlots,
@@ -60,7 +61,7 @@ const SquadBuilder = ({
   onUsedChipsChange,
 }: Props) => {
   const { t } = useLanguage();
-  const seedFormation = initialSquad?.formation ?? '4-3-3';
+  const seedFormation = initialSquad?.formation ?? DEFAULT_FORMATION;
   const [formation, setFormation] = useState<string>(seedFormation);
   const [dirty, setDirty] = useState(false);
   const [starters, setStarters] = useState<SquadSlot[]>(

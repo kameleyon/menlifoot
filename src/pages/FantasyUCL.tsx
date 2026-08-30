@@ -25,6 +25,8 @@ import {
   startTopUp,
   isFreeCompetition,
   CHIPS_BY_COMPETITION,
+  DEFAULT_FORMATION,
+  FORMATIONS,
   COMPETITION_LABEL,
   type Competition,
   type RatingResult,
@@ -187,8 +189,16 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
         return acc;
       }, {});
       const derived = `${counts.DEF ?? 0}-${counts.MID ?? 0}-${counts.FWD ?? 0}`;
+      // Fall back to 3-4-3 when neither the picture nor the resolved positions
+      // give a legal shape - an unreadable layout should still produce a squad
+      // a manager can edit, not a pitch with nothing on it.
+      const shape = (FORMATIONS as readonly string[]).includes(derived)
+        ? derived
+        : (FORMATIONS as readonly string[]).includes(parsed.formation ?? '')
+        ? (parsed.formation as string)
+        : DEFAULT_FORMATION;
       const next: Squad = {
-        formation: derived === parsed.formation ? parsed.formation : derived,
+        formation: shape,
         starters: resolved,
         bench: parsed.bench ?? [],
       };

@@ -384,6 +384,14 @@ export const getLoadedMatchdays = async (
 export const FORMATIONS = ['3-4-3', '3-5-2', '4-3-3', '4-4-2', '4-5-1', '5-3-2', '5-4-1'] as const;
 
 /**
+ * Used when nothing legible says otherwise - an unreadable screenshot, a plain
+ * list, a squad built from scratch. 3-4-3 is the most common attacking shape
+ * and is easy to reshape from, since it leaves spare defenders on the bench
+ * rather than needing new ones.
+ */
+export const DEFAULT_FORMATION = '3-4-3';
+
+/**
  * UCL Fantasy squad rules: 15 players for EUR 100m, split 2/5/5/3.
  * (Confirmed against the 2026/27 rules — this is NOT the same as FPL.)
  */
