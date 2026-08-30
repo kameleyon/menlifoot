@@ -140,6 +140,9 @@ export interface RatingResult {
   free?: boolean;
   planned_chip?: string | null;
   chips_available?: string[];
+  chips_used?: string[];
+  /** The round every player was rated against. */
+  target_gameweek?: number | null;
   id: string | null;
   rating: number;
   formation: string;

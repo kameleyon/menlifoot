@@ -28,6 +28,9 @@ const DEFAULT_PER_POSITION = 3;
  */
 async function nextGameweek(service: ReturnType<typeof createClient>, competition: string) {
   const nowIso = new Date().toISOString();
+  // Same target the rating uses, so the two never disagree about which round
+  // the manager is being advised on.
+  const { data: rpcGw } = await service.rpc("target_gameweek", { p_competition: competition });
   const { data: byDeadline } = await service
     .from("ucl_matchdays")
     .select("matchday,deadline")
@@ -35,6 +38,10 @@ async function nextGameweek(service: ReturnType<typeof createClient>, competitio
     .gt("deadline", nowIso)
     .order("deadline", { ascending: true })
     .limit(1);
+  if (typeof rpcGw === "number") {
+    const dl = (byDeadline ?? [])[0] as { deadline?: string } | undefined;
+    return { matchday: rpcGw, deadline: dl?.deadline ?? null };
+  }
   const d = (byDeadline ?? [])[0] as { matchday?: number; deadline?: string } | undefined;
   if (d?.matchday) return { matchday: d.matchday, deadline: d.deadline ?? null };
 

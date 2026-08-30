@@ -14,6 +14,7 @@ import SquadBuilder from '@/components/ucl/SquadBuilder';
 import FixturesCalendar from '@/components/ucl/FixturesCalendar';
 import BestPicks from '@/components/ucl/BestPicks';
 import LockedPanel, { PlaceholderRows } from '@/components/ucl/LockedPanel';
+import ChipPicker from '@/components/ucl/ChipPicker';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   CreditError,
@@ -371,6 +372,16 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
               {t('ucl.orPaste')}
             </div>
 
+            {/* Set before uploading, so the first analysis already accounts for
+                the chip rather than needing a second run. */}
+            <ChipPicker
+              chips={CHIPS_BY_COMPETITION[competition]}
+              chip={chip}
+              onChipChange={setChip}
+              usedChips={usedChips}
+              onUsedChipsChange={setUsedChips}
+            />
+
             {unresolved.length > 0 && (
               <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
                 <div className="flex items-center gap-2 text-sm font-medium text-amber-600 dark:text-amber-400">
@@ -453,6 +464,12 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
             <div className="text-center">
               <RatingRing value={result.rating} />
               <h2 className="mt-3 font-display text-2xl uppercase">{t('ucl.teamRated')}</h2>
+              {result.target_gameweek != null && (
+                <div className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                  {competition === 'EPL' ? t('ucl.gameweek') : t('ucl.matchday')}{' '}
+                  {result.target_gameweek}
+                </div>
+              )}
               {result.narrative?.verdict && (
                 <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">
                   {result.narrative.verdict}
@@ -645,6 +662,19 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
               >
                 <PlaceholderRows rows={2} />
               </LockedPanel>
+            )}
+
+            {!editing && (
+              <ChipPicker
+                chips={CHIPS_BY_COMPETITION[competition]}
+                chip={chip}
+                onChipChange={(c) => {
+                  setChip(c);
+                  if (squad) analyze(squad, source, paidUnlocks, paidTransfers);
+                }}
+                usedChips={usedChips}
+                onUsedChipsChange={setUsedChips}
+              />
             )}
 
             {result.chip_advice && (

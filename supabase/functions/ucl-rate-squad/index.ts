@@ -619,6 +619,12 @@ serve(async (req) => {
       }
     }
 
+    // The round every player was rated against, so the UI can name it and a
+    // manager knows the advice is about a week they can still act on.
+    const { data: targetGw } = await supabase.rpc("target_gameweek", {
+      p_competition: competition,
+    });
+
     // ------------------------------------------------------------ charge ---
     // Spend as the signed-in user rather than with the service role, so the
     // balance check and decrement run under spend_credits' own auth.uid()
@@ -705,6 +711,7 @@ serve(async (req) => {
         },
         competition,
         free: isFree,
+        target_gameweek: targetGw ?? null,
         planned_chip: plannedChip,
         chips_available: remainingChips,
         chips_used: usedChips,

@@ -32,6 +32,23 @@ const SEASON_START = "2026-07-01";
 const GAMEWEEK_GAP_DAYS = 4;
 const POOL_SIZE = 6;
 
+// The fantasy game's club names are canonical for this competition, because
+// fixtures, prices and points all key on them. The provider spells several
+// clubs differently, and an unaligned name means a squad with no fixture.
+const CANONICAL_CLUB: Record<string, string> = {
+  "AFC Bournemouth": "Bournemouth",
+  "Brighton & Hove Albion": "Brighton",
+  "Leeds United": "Leeds",
+  "Manchester City": "Man City",
+  "Manchester United": "Man Utd",
+  "Newcastle United": "Newcastle",
+  "Nottingham Forest": "Nott'm Forest",
+  "Tottenham Hotspur": "Spurs",
+  "Wolverhampton Wanderers": "Wolves",
+  "West Ham United": "West Ham",
+};
+const canonical = (club: string) => CANONICAL_CLUB[club] ?? club;
+
 const BBS_POSITION: Record<string, string> = {
   goalkeeper: "GK", gk: "GK", keeper: "GK",
   defender: "DEF", def: "DEF", defence: "DEF",
@@ -147,7 +164,7 @@ serve(async (req) => {
     // Clubs are discovered from the fixture list rather than hardcoded, so
     // promotion and relegation need no code change.
     const fixtures = await fetchFixtures(apiKey);
-    const clubs = [...new Set(fixtures.flatMap((f) => [f.home, f.away]))].sort();
+    const clubs = [...new Set(fixtures.flatMap((f) => [canonical(f.home), canonical(f.away)]))].sort();
     result.clubs_found = clubs.length;
 
     // ------------------------------------------------------------- teams ---
@@ -227,7 +244,7 @@ serve(async (req) => {
                 name,
                 normalized_name: normalize(name),
                 display_name: name,
-                team: club,
+                team: canonical(club),
                 position,
                 jersey_number: Number.isFinite(Number(r.jersey_number)) ? Number(r.jersey_number) : null,
                 photo_url: r.headshot_url ? String(r.headshot_url) : null,
@@ -268,8 +285,8 @@ serve(async (req) => {
           competition: COMPETITION,
           matchday: Math.min(gw, 38),
           kickoff: f.kickoff,
-          home_team: f.home,
-          away_team: f.away,
+          home_team: canonical(f.home),
+          away_team: canonical(f.away),
           home_score: played ? f.hs : null,
           away_score: played ? f.as : null,
           status: f.status === "finished" ? "finished" : f.status === "live" ? "live" : "scheduled",
