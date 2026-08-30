@@ -178,9 +178,18 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
       const b64 = await fileToBase64(file);
       const parsed = await parseScreenshot(b64, competition);
       setUnresolved(parsed.unresolved ?? []);
+      // Trust the shape the screenshot showed, but only if the resolved
+      // positions actually support it: the vision model reads rows off a
+      // picture, while positions come from the game, and the game wins.
+      const resolved = parsed.starters ?? [];
+      const counts = resolved.reduce<Record<string, number>>((acc, p) => {
+        if (p.position) acc[p.position] = (acc[p.position] ?? 0) + 1;
+        return acc;
+      }, {});
+      const derived = `${counts.DEF ?? 0}-${counts.MID ?? 0}-${counts.FWD ?? 0}`;
       const next: Squad = {
-        formation: parsed.formation,
-        starters: parsed.starters ?? [],
+        formation: derived === parsed.formation ? parsed.formation : derived,
+        starters: resolved,
         bench: parsed.bench ?? [],
       };
       // Anything the OCR could not resolve goes to the builder for correction

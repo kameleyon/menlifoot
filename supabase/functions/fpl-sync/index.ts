@@ -116,6 +116,11 @@ serve(async (req) => {
       const news = String(e.news ?? "").trim();
 
       const patch: Record<string, unknown> = {
+        // The game decides what a player counts as, and it is the only
+        // definition that matters for squad legality. The sports provider
+        // called Semenyo, Gakpo and Ndiaye attackers; the game lists all three
+        // as midfielders, and a squad built on the wrong answer is invalid.
+        position,
         // web_name is the name the game itself shows and the name fans use -
         // "Haaland", not "Erling Braut Haaland".
         display_name: web || full,

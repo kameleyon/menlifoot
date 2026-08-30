@@ -1,5 +1,4 @@
-import { AlertTriangle, Plus, Repeat2 } from 'lucide-react';
-import PlayerAvatar from './PlayerAvatar';
+import { AlertTriangle, Plus, Repeat2, Cross } from 'lucide-react';
 import { formatPrice, type Position, type SquadSlot } from '@/lib/uclFantasy';
 
 interface Props {
@@ -27,6 +26,11 @@ const PlayerCard = ({
   // slot is empty". Flagging every empty slot on a fresh squad put fourteen
   // warnings on screen before the manager had done anything wrong.
   const unreadable = unresolved && Boolean(slot.read_as);
+  // An unavailable starter is the single most costly thing in a squad, and it
+  // was invisible: the pitch showed nothing to distinguish him from a fit one.
+  const out = slot.availability === 'injured' || slot.availability === 'unavailable' ||
+    slot.availability === 'suspended';
+  const doubtful = slot.availability === 'doubtful';
   const name = slot.display_name || slot.name || slot.read_as || emptyLabel || '—';
 
   return (
@@ -37,20 +41,33 @@ const PlayerCard = ({
       className="flex w-[92px] flex-col items-center gap-1 disabled:cursor-default"
     >
       <div className="relative">
-        <PlayerAvatar
-          photoUrl={slot.photo_url}
-          fallback={slot.team_code ?? (unresolved ? '?' : name.slice(0, 3).toUpperCase())}
-          className={`border-2 ${
+        {/* Initials, not a photo. The published headshots lag transfers badly
+            enough to show players in a former club's kit, which reads as a bug
+            rather than a stale image. */}
+        <span
+          className={`flex h-11 w-11 items-center justify-center rounded-full border-2 text-[11px] font-semibold ${
             unresolved
-              ? 'border-dashed border-muted-foreground/50 text-muted-foreground'
-              : 'border-primary/60 text-foreground'
+              ? 'border-dashed border-muted-foreground/50 bg-muted/40 text-muted-foreground'
+              : 'border-primary/60 bg-card text-foreground'
           }`}
-        />
+        >
+          {slot.team_code ?? (unresolved ? '?' : name.slice(0, 3).toUpperCase())}
+        </span>
         {/* A corner badge is what tells a manager the card does something:
             plus for an empty slot, swap arrows for one already filled. */}
         {interactive && (
           <span className="absolute -bottom-0.5 -left-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
             {unresolved ? <Plus className="h-2.5 w-2.5" /> : <Repeat2 className="h-2.5 w-2.5" />}
+          </span>
+        )}
+        {(out || doubtful) && (
+          <span
+            title={slot.availability_note ?? slot.availability ?? ''}
+            className={`absolute -bottom-0.5 -right-1 flex h-4 w-4 items-center justify-center rounded-full ${
+              out ? 'bg-amber-500 text-black' : 'bg-amber-500/50 text-black'
+            }`}
+          >
+            <Cross className="h-2.5 w-2.5" />
           </span>
         )}
         {slot.is_captain && (
@@ -67,7 +84,11 @@ const PlayerCard = ({
           <AlertTriangle className="absolute -left-1 -top-1 h-4 w-4 text-amber-500" />
         )}
       </div>
-      <span className="w-full truncate rounded bg-card/90 px-1 py-0.5 text-center text-[11px] font-medium">
+      <span
+        className={`w-full truncate rounded px-1 py-0.5 text-center text-[11px] font-medium ${
+          out ? 'bg-amber-500/20 text-amber-300' : 'bg-card/90'
+        }`}
+      >
         {name}
       </span>
       {/* Price is null until the UEFA game opens; show the club instead. */}

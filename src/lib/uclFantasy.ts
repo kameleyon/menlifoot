@@ -49,6 +49,8 @@ export interface UclPlayer {
 export interface SquadSlot {
   player_id: string | null;
   photo_url?: string | null;
+  availability?: string | null;
+  availability_note?: string | null;
   read_as?: string;
   name?: string;
   display_name?: string;

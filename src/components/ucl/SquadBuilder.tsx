@@ -4,7 +4,6 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import PitchView from './PitchView';
-import PlayerAvatar from './PlayerAvatar';
 import {
   benchShape,
   formatPrice,
@@ -82,17 +81,28 @@ const SquadBuilder = ({
   // Changing formation rebuilds the pitch. Players already picked are carried
   // over per position so a manager doesn't lose their whole XI to a reshape.
   const changeFormation = (next: string) => {
-    // Pool every player currently held, then refill the new XI and the new
-    // bench from it, so a reshape never silently drops someone.
+    // Pool every player currently held, refill the new XI and bench from it,
+    // then keep whatever is left over on the bench.
+    //
+    // The previous version dropped those leftovers on the floor. A squad that
+    // is not exactly 2/5/5/3 - which is any squad read off a screenshot, or one
+    // mid-edit - has more of some position than the new shape has slots, and
+    // those players simply vanished when the manager tried another formation.
     const pool = [...starters, ...bench].filter((s) => s.player_id);
     const take = (pos: Position) => {
       const i = pool.findIndex((c) => c.position === pos);
       return i === -1 ? emptySlot(pos) : pool.splice(i, 1)[0];
     };
+
+    const nextStarters = buildStarters(next).map((slot) => take(slot.position as Position));
+    const nextBench = benchShape(next).map((pos) => take(pos));
+
     setFormation(next);
     setDirty(true);
-    setStarters(buildStarters(next).map((slot) => take(slot.position as Position)));
-    setBench(benchShape(next).map((pos) => take(pos)));
+    setStarters(nextStarters);
+    // Anything the new shape had no room for stays on the bench rather than
+    // being lost; the manager can move it back when they reshape again.
+    setBench([...nextBench, ...pool]);
   };
 
   useEffect(() => {
@@ -123,7 +133,8 @@ const SquadBuilder = ({
       team_code: player.team_code,
       position: player.position,
       price: player.price,
-      photo_url: player.photo_url,
+      availability: player.availability,
+      availability_note: player.availability_note,
     };
     if (picking.onBench) {
       setBench((b) => b.map((s, i) => (i === picking.index ? slot : s)));
@@ -408,12 +419,7 @@ const SquadBuilder = ({
                     onClick={() => assign(p)}
                     className="flex w-full items-center justify-between gap-2 border-b border-border/50 p-3 text-left disabled:opacity-40"
                   >
-                    <PlayerAvatar
-                      photoUrl={p.photo_url}
-                      fallback={(p.display_name || p.name).slice(0, 2).toUpperCase()}
-                      size={32}
-                      className="text-[10px] text-muted-foreground"
-                    />
+
                     <div className="min-w-0">
                       <div className="truncate text-sm font-medium">{p.display_name || p.name}</div>
                       <div className="truncate text-xs text-muted-foreground">
