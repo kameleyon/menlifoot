@@ -1,4 +1,4 @@
-import { AlertTriangle, Plus, Repeat2, Cross } from 'lucide-react';
+import { AlertTriangle, Plus, Repeat2, Cross, X } from 'lucide-react';
 import { formatPrice, type Position, type SquadSlot } from '@/lib/uclFantasy';
 
 interface Props {
@@ -6,6 +6,8 @@ interface Props {
   bench: SquadSlot[];
   benchLabel: string;
   onSlotClick?: (slot: SquadSlot, index: number, onBench: boolean) => void;
+  /** Empty a slot without having to pick a replacement first. */
+  onRemove?: (index: number, onBench: boolean) => void;
   emptyLabel?: string;
 }
 
@@ -14,10 +16,12 @@ const LINES: Position[] = ['GK', 'DEF', 'MID', 'FWD'];
 const PlayerCard = ({
   slot,
   onClick,
+  onRemove,
   emptyLabel,
 }: {
   slot: SquadSlot;
   onClick?: () => void;
+  onRemove?: () => void;
   emptyLabel?: string;
 }) => {
   const interactive = Boolean(onClick);
@@ -34,21 +38,27 @@ const PlayerCard = ({
   const name = slot.display_name || slot.name || slot.read_as || emptyLabel || '—';
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={!onClick}
-      className="flex w-[92px] flex-col items-center gap-1 disabled:cursor-default"
-    >
+    <div className="relative flex w-[92px] flex-col items-center gap-1">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={!onClick}
+        className="flex w-full flex-col items-center gap-1 disabled:cursor-default"
+      >
       <div className="relative">
         {/* Initials, not a photo. The published headshots lag transfers badly
             enough to show players in a former club's kit, which reads as a bug
             rather than a stale image. */}
+        {/* Filled slots are solid, empty ones are a dashed outline. Without
+            photos this is the only thing telling a manager at a glance how much
+            of the squad is actually picked. */}
         <span
           className={`flex h-11 w-11 items-center justify-center rounded-full border-2 text-[11px] font-semibold ${
             unresolved
               ? 'border-dashed border-muted-foreground/50 bg-muted/40 text-muted-foreground'
-              : 'border-primary/60 bg-card text-foreground'
+              : out
+              ? 'border-amber-500 bg-amber-500/25 text-amber-200'
+              : 'border-primary bg-primary text-primary-foreground'
           }`}
         >
           {slot.team_code ?? (unresolved ? '?' : name.slice(0, 3).toUpperCase())}
@@ -56,7 +66,11 @@ const PlayerCard = ({
         {/* A corner badge is what tells a manager the card does something:
             plus for an empty slot, swap arrows for one already filled. */}
         {interactive && (
-          <span className="absolute -bottom-0.5 -left-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
+          <span
+            className={`absolute -bottom-0.5 -left-1 flex h-4 w-4 items-center justify-center rounded-full ${
+              unresolved ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'
+            }`}
+          >
             {unresolved ? <Plus className="h-2.5 w-2.5" /> : <Repeat2 className="h-2.5 w-2.5" />}
           </span>
         )}
@@ -95,11 +109,33 @@ const PlayerCard = ({
       <span className="text-[10px] text-muted-foreground">
         {formatPrice(slot.price) ?? slot.team ?? ''}
       </span>
-    </button>
+      </button>
+
+      {/* Clearing a slot is its own action: a manager often wants a player out
+          before deciding who replaces him, and tapping the card opens the
+          picker instead. */}
+      {onRemove && !unresolved && (
+        <button
+          type="button"
+          aria-label={`Remove ${name}`}
+          onClick={onRemove}
+          className="absolute right-1 top-[-6px] flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-black shadow-md transition-transform hover:scale-110"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
+    </div>
   );
 };
 
-const PitchView = ({ starters, bench, benchLabel, onSlotClick, emptyLabel }: Props) => {
+const PitchView = ({
+  starters,
+  bench,
+  benchLabel,
+  onSlotClick,
+  onRemove,
+  emptyLabel,
+}: Props) => {
   const lines = LINES.map((pos) => ({
     pos,
     players: starters
@@ -125,6 +161,7 @@ const PitchView = ({ starters, bench, benchLabel, onSlotClick, emptyLabel }: Pro
                   slot={s}
                   emptyLabel={emptyLabel}
                   onClick={onSlotClick ? () => onSlotClick(s, i, false) : undefined}
+                  onRemove={onRemove ? () => onRemove(i, false) : undefined}
                 />
               ))}
             </div>
@@ -144,6 +181,7 @@ const PitchView = ({ starters, bench, benchLabel, onSlotClick, emptyLabel }: Pro
                 slot={s}
                 emptyLabel={emptyLabel}
                 onClick={onSlotClick ? () => onSlotClick(s, i, true) : undefined}
+                onRemove={onRemove ? () => onRemove(i, true) : undefined}
               />
             ))}
           </div>

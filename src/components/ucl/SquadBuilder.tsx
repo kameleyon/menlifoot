@@ -146,6 +146,15 @@ const SquadBuilder = ({
     setDirty(true);
   };
 
+  /** Empty a slot, keeping its position so the shape is unchanged. */
+  const removeAt = (index: number, onBench: boolean) => {
+    const clear = (list: SquadSlot[]) =>
+      list.map((s, i) => (i === index ? emptySlot((s.position ?? 'MID') as Position) : s));
+    if (onBench) setBench(clear);
+    else setStarters(clear);
+    setDirty(true);
+  };
+
   const setCaptain = (index: number) => {
     // A player cannot be both, so taking the armband clears the vice flag.
     setStarters((s) =>
@@ -260,6 +269,7 @@ const SquadBuilder = ({
         onSlotClick={(slot, index, onBench) =>
           setPicking({ index, onBench, position: (slot.position ?? 'MID') as Position })
         }
+        onRemove={removeAt}
       />
 
       {/* Captain and vice. The vice matters: if the captain does not play, his
