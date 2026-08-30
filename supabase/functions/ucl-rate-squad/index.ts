@@ -142,6 +142,7 @@ serve(async (req) => {
       unlock: rawUnlock = [],
       transferCount: rawTransferCount = 0,
       competition: rawCompetition = "UCL",
+      chip: rawChip = null,
     } = await req.json();
 
     // Credits gate the Champions League product only. The Premier League
@@ -151,6 +152,13 @@ serve(async (req) => {
       : "UCL";
     const FREE_COMPETITIONS = new Set(["EPL"]);
     const isFree = FREE_COMPETITIONS.has(competition);
+
+    // The chip a manager plans to play this round, if any. It changes what the
+    // advice should say: with Bench Boost the bench stops being a reserve and
+    // becomes four more scorers.
+    const plannedChip = rawChip && (CHIPS_BY_COMPETITION[competition] ?? []).includes(String(rawChip))
+      ? String(rawChip)
+      : null;
 
     // What the caller is asking to pay for, normalised and bounded.
     const requested = new Set(
@@ -422,6 +430,28 @@ serve(async (req) => {
     const hardFixtures = starters.filter((p) => (p.next_difficulty ?? 0) >= 4).length;
     const chipAdvice = (() => {
       const chips = CHIPS_BY_COMPETITION[competition] ?? CHIPS_BY_COMPETITION.UCL;
+
+      // If the manager has already picked one, judge that choice rather than
+      // proposing a different one they did not ask about.
+      if (plannedChip) {
+        const benchFit = bench.filter((p) => availabilityScore(p) === 1).length;
+        if (plannedChip === "Bench Boost") {
+          return benchFit === bench.length && bench.length > 0
+            ? { chip: plannedChip, urgency: "medium", planned: true,
+                reason: "Your whole bench is fit, so every one of them would score." }
+            : { chip: plannedChip, urgency: "high", planned: true,
+                reason: `Only ${benchFit} of ${bench.length} bench players are fit — you would be boosting blanks.` };
+        }
+        if (plannedChip === "Triple Captain" && captain) {
+          const soft = (captain.next_difficulty ?? 5) <= 2;
+          return { chip: plannedChip, urgency: soft ? "medium" : "high", planned: true,
+            reason: soft
+              ? `${captain.name} faces a soft fixture — a good week to triple.`
+              : `${captain.name} faces a difficult fixture; tripling him is a gamble.` };
+        }
+        return { chip: plannedChip, urgency: "medium", planned: true,
+          reason: `You plan to play ${plannedChip} this round.`, available: chips };
+      }
       const holdText = `Hold your chips — nothing this ${competition === "EPL" ? "gameweek" : "matchday"} justifies one.`;
 
       // A broken squad is a Wildcard case in both games.
@@ -663,6 +693,8 @@ serve(async (req) => {
         },
         competition,
         free: isFree,
+        planned_chip: plannedChip,
+        chips_available: CHIPS_BY_COMPETITION[competition] ?? [],
         prices: { ...UNLOCK_PRICES, max_transfers: MAX_TRANSFERS },
         credits_remaining: creditsRemaining,
       }),

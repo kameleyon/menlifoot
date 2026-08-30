@@ -141,6 +141,25 @@ const BestPicks = ({
         <ChevronDown className="h-4 w-4 rotate-180 transition-transform" />
       </Button>
 
+      {/* Name the round explicitly. "This matchday" left the manager guessing
+          which one the advice applied to. */}
+      {result.gameweek != null && (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
+          <div className="font-display text-sm uppercase tracking-wide">
+            {t('ucl.forGameweek')} {t('ucl.gameweek')} {result.gameweek}
+          </div>
+          {result.deadline && (
+            <div className="text-[11px] text-muted-foreground">
+              {t('ucl.deadline')}:{' '}
+              {new Date(result.deadline).toLocaleString(undefined, {
+                weekday: 'short', day: 'numeric', month: 'short',
+                hour: '2-digit', minute: '2-digit',
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       <p className="text-xs text-muted-foreground">
         {result.fixtures_known ? t('ucl.bestPicksBody') : t('ucl.bestPicksNoFixtures')}
       </p>

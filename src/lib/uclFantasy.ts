@@ -14,6 +14,16 @@ export type Competition = 'UCL' | 'EPL';
 /** Premier League analysis is free for now; the UCL one is credit-gated. */
 export const isFreeCompetition = (c: Competition) => c === 'EPL';
 
+/**
+ * The chips each game actually has. Bench Boost, Free Hit and Triple Captain
+ * are Fantasy Premier League chips; the UCL game has Limitless instead.
+ * Confirmed against the FPL feed, which lists wildcard/freehit/bboost/3xc.
+ */
+export const CHIPS_BY_COMPETITION: Record<Competition, string[]> = {
+  UCL: ['Wildcard', 'Limitless'],
+  EPL: ['Wildcard', 'Free Hit', 'Bench Boost', 'Triple Captain'],
+};
+
 export const COMPETITION_LABEL: Record<Competition, string> = {
   UCL: 'Champions League',
   EPL: 'Premier League',
@@ -87,10 +97,12 @@ export interface CaptainOption {
 }
 
 export interface ChipAdvice {
-  /** UCL Fantasy has only Wildcard and Limitless. Null means hold them both. */
-  chip: 'Wildcard' | 'Limitless' | null;
+  /** UCL has Wildcard and Limitless; FPL adds Free Hit, Bench Boost, Triple Captain. */
+  chip: string | null;
   urgency: 'high' | 'medium' | 'none';
   reason: string;
+  /** True when this judges a chip the manager chose, rather than proposing one. */
+  planned?: boolean;
 }
 
 export interface Optimisation {
@@ -124,6 +136,8 @@ export interface LockedState {
 export interface RatingResult {
   competition?: Competition;
   free?: boolean;
+  planned_chip?: string | null;
+  chips_available?: string[];
   id: string | null;
   rating: number;
   formation: string;
@@ -204,6 +218,9 @@ export interface BestPicksResult {
   picks: Record<Position, BestPick[]>;
   /** False while the schedule is unpublished, so the UI can say what it ranked on. */
   fixtures_known: boolean;
+  /** The round this advice is for, so the panel never says a vague "this matchday". */
+  gameweek: number | null;
+  deadline: string | null;
   credits_remaining: number | null;
 }
 
@@ -230,6 +247,8 @@ export const getBestPicks = async (
       FWD: grouped.FWD ?? [],
     },
     fixtures_known: Boolean((data as { fixtures_known?: boolean })?.fixtures_known),
+    gameweek: (data as { gameweek?: number })?.gameweek ?? null,
+    deadline: (data as { deadline?: string })?.deadline ?? null,
     credits_remaining: (data as { credits_remaining?: number })?.credits_remaining ?? null,
   };
 };
@@ -379,6 +398,7 @@ export const rateSquad = async (
     unlock?: Unlockable[];
     transferCount?: number;
     competition?: Competition;
+    chip?: string | null;
   },
 ): Promise<RatingResult> => {
   const { data, error } = await supabase.functions.invoke('ucl-rate-squad', {
@@ -389,6 +409,7 @@ export const rateSquad = async (
       unlock: opts.unlock ?? [],
       transferCount: opts.transferCount ?? 0,
       competition: opts.competition ?? 'UCL',
+      chip: opts.chip ?? null,
     },
   });
   // supabase-js surfaces a non-2xx as `error` with the body still in `data`,

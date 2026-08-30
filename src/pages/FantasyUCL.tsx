@@ -23,6 +23,7 @@ import {
   rateSquad,
   startTopUp,
   isFreeCompetition,
+  CHIPS_BY_COMPETITION,
   COMPETITION_LABEL,
   type Competition,
   type RatingResult,
@@ -58,6 +59,9 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
   // The results pitch is read-only until the manager chooses to change it, so
   // the score stays the thing on screen rather than a builder.
   const [editing, setEditing] = useState(false);
+  // The chip the manager intends to play, so the advice judges their choice
+  // instead of proposing a different one.
+  const [chip, setChip] = useState<string | null>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
   const signedIn = Boolean(user);
@@ -125,6 +129,7 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
           source: src,
           language,
           competition,
+          chip,
           // A free competition asks for everything up front; nothing is locked.
           unlock: free ? ['optimisation', 'captains', 'chips'] : unlock,
           transferCount: free ? 3 : transferCount,
@@ -150,7 +155,7 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
         setStep(src === 'screenshot' ? 'import' : 'build');
       }
     },
-    [language, t, toast, competition, free],
+    [language, t, toast, competition, free, chip],
   );
 
   const handleFile = async (file: File) => {
@@ -203,6 +208,7 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
         source,
         language,
         competition,
+        chip,
         unlock: nextUnlocks,
         transferCount: nextTransfers,
       });
@@ -248,6 +254,7 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
     setUnresolved([]);
     setShowAllTransfers(false);
     setEditing(false);
+    setChip(null);
     setPaidUnlocks([]);
     setPaidTransfers(0);
   };
@@ -399,6 +406,9 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
             <SquadBuilder
               competition={competition}
               submitting={busy}
+              chips={CHIPS_BY_COMPETITION[competition]}
+              chip={chip}
+              onChipChange={setChip}
               onSubmit={(s) => analyze(s, 'manual')}
             />
           </div>
@@ -450,6 +460,9 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
                   submitting={busy}
                   initialSquad={squad}
                   requireChange
+                  chips={CHIPS_BY_COMPETITION[competition]}
+                  chip={chip}
+                  onChipChange={setChip}
                   submitLabel={t('ucl.doneReanalyse')}
                   onSubmit={(next) => {
                     setEditing(false);

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, X, Star } from 'lucide-react';
+import { Search, X, Star, Shield, Zap } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -28,6 +28,10 @@ interface Props {
   submitLabel?: string;
   /** Only enable submit once something has actually changed. */
   requireChange?: boolean;
+  /** Chips the game offers; empty hides the picker entirely. */
+  chips?: string[];
+  chip?: string | null;
+  onChipChange?: (chip: string | null) => void;
 }
 
 const emptySlot = (position: Position): SquadSlot => ({ player_id: null, position });
@@ -46,6 +50,9 @@ const SquadBuilder = ({
   initialSquad = null,
   submitLabel,
   requireChange = false,
+  chips = [],
+  chip = null,
+  onChipChange,
 }: Props) => {
   const { t } = useLanguage();
   const seedFormation = initialSquad?.formation ?? '4-3-3';
@@ -122,7 +129,25 @@ const SquadBuilder = ({
   };
 
   const setCaptain = (index: number) => {
-    setStarters((s) => s.map((x, i) => ({ ...x, is_captain: i === index })));
+    // A player cannot be both, so taking the armband clears the vice flag.
+    setStarters((s) =>
+      s.map((x, i) => ({
+        ...x,
+        is_captain: i === index,
+        is_vice: i === index ? false : x.is_vice,
+      })),
+    );
+    setDirty(true);
+  };
+
+  const setVice = (index: number) => {
+    setStarters((s) =>
+      s.map((x, i) => ({
+        ...x,
+        is_vice: i === index,
+        is_captain: i === index ? false : x.is_captain,
+      })),
+    );
     setDirty(true);
   };
 
@@ -219,28 +244,69 @@ const SquadBuilder = ({
         }
       />
 
-      {/* Captain picker — only meaningful once there is someone to captain. */}
-      {filled > 0 && (
+      {/* Captain and vice. The vice matters: if the captain does not play, his
+          points are what the manager falls back on. */}
+      {startersFilled > 0 && (
+        <div className="space-y-3 rounded-lg border border-border bg-card/60 p-3">
+          {([
+            ['captain', t('ucl.pickCaptain'), setCaptain, (x: SquadSlot) => !!x.is_captain, Star],
+            ['vice', t('ucl.pickVice'), setVice, (x: SquadSlot) => !!x.is_vice, Shield],
+          ] as const).map(([key, label, onPick, isSet, Icon]) => (
+            <div key={key}>
+              <div className="mb-2 text-xs font-medium text-muted-foreground">{label}</div>
+              <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 py-0.5">
+                {starters.map((s, i) =>
+                  s.player_id ? (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => onPick(i)}
+                      className={`flex shrink-0 items-center gap-1 rounded-full px-3 py-1 text-xs transition-colors ${
+                        isSet(s)
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/70'
+                      }`}
+                    >
+                      {isSet(s) && <Icon className="h-3 w-3" />}
+                      {s.display_name ?? s.name}
+                    </button>
+                  ) : null,
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Chip. Selecting one changes the advice rather than just recording it. */}
+      {chips.length > 0 && onChipChange && (
         <div className="rounded-lg border border-border bg-card/60 p-3">
-          <div className="mb-2 text-xs font-medium text-muted-foreground">{t('ucl.pickCaptain')}</div>
-          <div className="flex flex-wrap gap-2">
-            {starters.map((s, i) =>
-              s.player_id ? (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setCaptain(i)}
-                  className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs transition-colors ${
-                    s.is_captain
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/70'
-                  }`}
-                >
-                  {s.is_captain && <Star className="h-3 w-3" />}
-                  {s.display_name ?? s.name}
-                </button>
-              ) : null,
-            )}
+          <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <Zap className="h-3.5 w-3.5" />
+            {t('ucl.playAChip')}
+          </div>
+          <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 py-0.5">
+            <button
+              type="button"
+              onClick={() => { onChipChange(null); setDirty(true); }}
+              className={`shrink-0 rounded-full px-3 py-1 text-xs transition-colors ${
+                !chip ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              {t('ucl.noChip')}
+            </button>
+            {chips.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => { onChipChange(c); setDirty(true); }}
+                className={`shrink-0 rounded-full px-3 py-1 text-xs transition-colors ${
+                  chip === c ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                }`}
+              >
+                {c}
+              </button>
+            ))}
           </div>
         </div>
       )}

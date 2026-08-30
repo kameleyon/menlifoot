@@ -20,6 +20,35 @@ const corsHeaders = {
 const PRICE = 2;
 const DEFAULT_PER_POSITION = 3;
 
+
+/**
+ * The round the advice applies to: the next one with a deadline still ahead,
+ * else the earliest with an unplayed fixture. Without this the panel says
+ * "this matchday" and the manager has to guess which.
+ */
+async function nextGameweek(service: ReturnType<typeof createClient>, competition: string) {
+  const nowIso = new Date().toISOString();
+  const { data: byDeadline } = await service
+    .from("ucl_matchdays")
+    .select("matchday,deadline")
+    .eq("competition", competition)
+    .gt("deadline", nowIso)
+    .order("deadline", { ascending: true })
+    .limit(1);
+  const d = (byDeadline ?? [])[0] as { matchday?: number; deadline?: string } | undefined;
+  if (d?.matchday) return { matchday: d.matchday, deadline: d.deadline ?? null };
+
+  const { data: byFixture } = await service
+    .from("ucl_fixtures")
+    .select("matchday,kickoff")
+    .eq("competition", competition)
+    .eq("status", "scheduled")
+    .order("kickoff", { ascending: true })
+    .limit(1);
+  const f = (byFixture ?? [])[0] as { matchday?: number; kickoff?: string } | undefined;
+  return f?.matchday ? { matchday: f.matchday, deadline: null } : { matchday: null, deadline: null };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -60,9 +89,12 @@ serve(async (req) => {
         const pos = String(row.position ?? "");
         if (grouped[pos]) grouped[pos].push(row);
       }
+      const gw = await nextGameweek(service0, competition);
       return json({
         picks: grouped,
         fixtures_known: ((data ?? []) as Record<string, unknown>[]).some((r) => r.next_difficulty != null),
+        gameweek: gw.matchday,
+        deadline: gw.deadline,
         credits_remaining: null,
         price: 0,
         free: true,
@@ -107,6 +139,7 @@ serve(async (req) => {
       if (grouped[pos]) grouped[pos].push(row);
     }
 
+    const gw = await nextGameweek(service, competition);
     return json({
       picks: grouped,
       // True once fixtures exist; until then the ranking leans on club form and
@@ -114,6 +147,8 @@ serve(async (req) => {
       fixtures_known: ((data ?? []) as Record<string, unknown>[]).some(
         (r) => r.next_difficulty != null,
       ),
+      gameweek: gw.matchday,
+      deadline: gw.deadline,
       credits_remaining: newBalance,
       price: PRICE,
     });

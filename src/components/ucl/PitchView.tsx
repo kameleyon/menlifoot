@@ -1,4 +1,4 @@
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Plus, Repeat2 } from 'lucide-react';
 import { formatPrice, type Position, type SquadSlot } from '@/lib/uclFantasy';
 
 interface Props {
@@ -20,6 +20,7 @@ const PlayerCard = ({
   onClick?: () => void;
   emptyLabel?: string;
 }) => {
+  const interactive = Boolean(onClick);
   const unresolved = !slot.player_id;
   // A triangle means "we read a name here and could not match it", not "this
   // slot is empty". Flagging every empty slot on a fresh squad put fourteen
@@ -44,6 +45,13 @@ const PlayerCard = ({
         >
           {slot.team_code ?? (unresolved ? '?' : name.slice(0, 3).toUpperCase())}
         </div>
+        {/* A corner badge is what tells a manager the card does something:
+            plus for an empty slot, swap arrows for one already filled. */}
+        {interactive && (
+          <span className="absolute -bottom-0.5 -left-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
+            {unresolved ? <Plus className="h-2.5 w-2.5" /> : <Repeat2 className="h-2.5 w-2.5" />}
+          </span>
+        )}
         {slot.is_captain && (
           <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
             C
