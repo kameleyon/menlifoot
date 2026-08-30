@@ -463,7 +463,10 @@ export const applyFormation = (
   formation: string,
 ): { starters: SquadSlot[]; bench: SquadSlot[] } => {
   const need = formationSlots(formation);
-  const remaining = pool.filter((s) => s.player_id);
+  // A slot holds something if a name was read into it, matched or not. Keeping
+  // only resolved players would delete exactly the ones the manager opened the
+  // builder to correct - they render as a "?" with a warning, not as a blank.
+  const remaining = pool.filter((s) => s.player_id || s.read_as);
   const take = (pos: Position): SquadSlot => {
     const i = remaining.findIndex((s) => s.position === pos);
     return i === -1 ? emptySlot(pos) : remaining.splice(i, 1)[0];
@@ -483,6 +486,9 @@ export const matchesFormation = (starters: SquadSlot[], formation: string): bool
     if (s.position) acc[s.position] = (acc[s.position] ?? 0) + 1;
     return acc;
   }, {});
+  // A slot with no position cannot satisfy a line, so a squad carrying one is
+  // never already in shape.
+  if (starters.some((s) => !s.position)) return false;
   return (['GK', 'DEF', 'MID', 'FWD'] as Position[]).every((p) => (have[p] ?? 0) === need[p]);
 };
 

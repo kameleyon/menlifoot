@@ -456,9 +456,13 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
         {step === 'build' && (
           <div className="space-y-4">
             <h2 className="font-display text-2xl uppercase">{t('ucl.buildTitle')}</h2>
+            {/* Seeded with whatever was imported, so "fix it manually" opens
+                the squad that was just read rather than an empty pitch. Null
+                after a reset, which is what "build manually" wants. */}
             <SquadBuilder
               competition={competition}
               submitting={busy}
+              initialSquad={squad}
               chips={CHIPS_BY_COMPETITION[competition]}
               chip={chip}
               onChipChange={setChip}
