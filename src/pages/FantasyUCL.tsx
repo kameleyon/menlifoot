@@ -34,7 +34,10 @@ import {
 
 type Step = 'start' | 'import' | 'build' | 'analyzing' | 'result' | 'fixtures';
 
-const STAGE_KEYS = ['ucl.stage.reading', 'ucl.stage.measuring', 'ucl.stage.finding'];
+// The request is a single round trip of unknown length, so the bar eases
+// toward 90% and only completes when the response lands. Three staged bars
+// implied three steps that were never really happening.
+const PROGRESS_CEILING = 92;
 
 interface Props {
   /** UCL is the credit-gated product; EPL is free for now. */
@@ -51,7 +54,7 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
   const [squad, setSquad] = useState<Squad | null>(null);
   const [source, setSource] = useState<'screenshot' | 'manual'>('manual');
   const [unresolved, setUnresolved] = useState<string[]>([]);
-  const [stage, setStage] = useState(0);
+  const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<RatingResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [showAllTransfers, setShowAllTransfers] = useState(false);
@@ -92,12 +95,18 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
     }
   };
 
-  // Advance the progress copy while the request is in flight. Purely cosmetic —
-  // the real work is one round trip, but a blank wait reads as a hang.
+  // Fill while the request is in flight. A blank wait reads as a hang, but the
+  // bar must never claim to be finished before the answer arrives, so it
+  // decelerates toward the ceiling instead of reaching the end.
   useEffect(() => {
-    if (step !== 'analyzing') return;
-    setStage(0);
-    const id = setInterval(() => setStage((s) => Math.min(s + 1, STAGE_KEYS.length - 1)), 1400);
+    if (step !== 'analyzing') {
+      setProgress(0);
+      return;
+    }
+    setProgress(8);
+    const id = setInterval(() => {
+      setProgress((p) => (p >= PROGRESS_CEILING ? p : p + Math.max(0.6, (PROGRESS_CEILING - p) / 12)));
+    }, 120);
     return () => clearInterval(id);
   }, [step]);
 
@@ -436,25 +445,16 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
         )}
 
         {step === 'analyzing' && (
-          <div className="space-y-6 pt-10">
-            <div className="text-center">
-              <div className="font-sans text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                {t('ucl.holdOn')}
+          <div className="space-y-5 pt-16 text-center">
+            <h2 className="font-display text-2xl uppercase">{t('ucl.analyzingTitle')}</h2>
+            <div className="mx-auto max-w-sm space-y-2">
+              <div className="h-2 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary transition-all duration-200 ease-out"
+                  style={{ width: `${progress}%` }}
+                />
               </div>
-              <h2 className="mt-2 font-display text-2xl uppercase">{t('ucl.analyzingTitle')}</h2>
-            </div>
-            <div className="space-y-3">
-              {STAGE_KEYS.map((key, i) => (
-                <div key={key} className="space-y-1">
-                  <div className="text-xs text-muted-foreground">{t(key)}</div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-primary transition-all duration-700"
-                      style={{ width: i < stage ? '100%' : i === stage ? '60%' : '0%' }}
-                    />
-                  </div>
-                </div>
-              ))}
+              <div className="text-xs text-muted-foreground">{t('ucl.analyzingSub')}</div>
             </div>
           </div>
         )}
