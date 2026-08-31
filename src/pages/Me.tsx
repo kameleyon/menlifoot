@@ -5,6 +5,40 @@ import { useLanguage, Language } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import AppShell from '@/components/mobile/AppShell';
+import { ChevronRight, Trophy, Coins } from 'lucide-react';
+import { getCreditBalance, startTopUp, COMPETITION_LABEL } from '@/lib/uclFantasy';
+
+/**
+ * One line of activity.
+ *
+ * A list, not a card: saved, liked and commented items are things a reader
+ * scans to find one they remember, and a 62px thumbnail of an article they
+ * have already read costs a row of vertical space without helping them find
+ * it. The same row serves all three sections, which were three copies of the
+ * same markup before.
+ */
+const ActivityRow = ({
+  category,
+  title,
+  onClick,
+}: {
+  category: string;
+  title: string;
+  onClick: () => void;
+}) => (
+  <button
+    onClick={onClick}
+    className="flex w-full items-center gap-3 border-b border-white/[0.05] py-2.5 text-left transition-colors last:border-b-0 hover:bg-white/[0.03]"
+  >
+    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.14em] text-primary/85">
+        {category}
+      </span>
+      <span className="truncate font-sans text-[12.5px] font-medium leading-[1.3]">{title}</span>
+    </div>
+    <ChevronRight className="h-3.5 w-3.5 flex-none text-foreground/25" />
+  </button>
+);
 
 const LANGS: { code: Language; label: string }[] = [
   { code: 'en', label: 'EN' }, { code: 'fr', label: 'FR' }, { code: 'es', label: 'ES' }, { code: 'ht', label: 'HT' },
@@ -123,6 +157,22 @@ const Me = () => {
 
   const name = email ? email.split('@')[0] : 'Guest';
   const statusMap = STATUS(t);
+  // Credits gate the Champions League tools only, so this is shown next to the
+  // fantasy links rather than as an account-wide balance.
+  const [credits, setCredits] = useState<number | null>(null);
+  const [toppingUp, setToppingUp] = useState(false);
+
+  useEffect(() => {
+    if (!user) { setCredits(null); return; }
+    let cancelled = false;
+    getCreditBalance()
+      .then((n) => { if (!cancelled) setCredits(n); })
+      // A balance that will not load must not take the page down with it; the
+      // fantasy links still work without it.
+      .catch(() => { if (!cancelled) setCredits(null); });
+    return () => { cancelled = true; };
+  }, [user]);
+
   const [tab, setTab] = useState<'activity' | 'orders' | 'preferences'>('activity');
   const TABS: { id: typeof tab; label: string }[] = [
     { id: 'activity', label: t('me.activity') },
@@ -142,6 +192,65 @@ const Me = () => {
             {memberSince && <span className="font-sans text-[11px] text-foreground/35">{t('me.memberSince')} {memberSince}</span>}
           </div>
         </div>
+
+        {/* ── Fantasy ──
+            First thing under the profile. This is the only route into the
+            squad tools: they are not in the top nav, so a signed-in reader had
+            no way to reach them at all. */}
+        {email && (
+          <div className="border-t border-white/[0.06] px-5 py-4">
+            <div className="mb-3 flex items-center gap-2">
+              <Trophy className="h-4 w-4 text-primary" />
+              <span className="font-sans text-[13.5px] font-medium">{t('me.fantasy')}</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {(['UCL', 'EPL'] as const).map((c) => (
+                <button
+                  key={c}
+                  onClick={() => navigate(c === 'UCL' ? '/fantasy' : '/epl')}
+                  className="flex flex-col gap-0.5 rounded-xl border border-white/[0.10] bg-white/[0.02] px-3 py-3 text-left transition-colors hover:border-primary/50 hover:bg-primary/[0.06]"
+                >
+                  <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.14em] text-primary/85">
+                    {COMPETITION_LABEL[c]}
+                  </span>
+                  <span className="font-sans text-[12.5px] font-medium">{t('me.checkSquad')}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Balance sits with the tools it pays for. EPL is free, so this is
+                labelled as Champions League credit rather than a wallet. */}
+            <div className="mt-3 flex items-center justify-between rounded-xl border border-primary/25 bg-primary/[0.07] px-3 py-2.5">
+              <div className="flex items-center gap-2">
+                <Coins className="h-3.5 w-3.5 text-primary" />
+                <span className="font-sans text-[12px] text-foreground/70">{t('me.creditsLeft')}</span>
+                <span className="font-display text-[15px] text-primary">
+                  {credits ?? '—'}
+                </span>
+              </div>
+              <button
+                disabled={toppingUp}
+                onClick={async () => {
+                  setToppingUp(true);
+                  try {
+                    window.location.href = await startTopUp('starter');
+                  } catch (err) {
+                    toast({
+                      title: t('ucl.error'),
+                      description: err instanceof Error ? err.message : String(err),
+                      variant: 'destructive',
+                    });
+                    setToppingUp(false);
+                  }
+                }}
+                className="rounded-full bg-primary px-3 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-[0.06em] text-primary-foreground transition-opacity disabled:opacity-50"
+              >
+                {toppingUp ? t('me.openingCheckout') : t('me.topUp')}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         {email && (
@@ -164,15 +273,14 @@ const Me = () => {
           {saved.length === 0 ? (
             <p className="mt-3 font-sans text-[12px] text-foreground/40">{t('me.noSaved')}</p>
           ) : (
-            <div className="mt-3 flex flex-col gap-2.5">
+            <div className="mt-2 flex flex-col">
               {saved.map((a) => (
-                <button key={a.id} onClick={() => navigate(`/articles/${a.id}`)} className="flex items-center gap-3 text-left transition-opacity hover:opacity-80">
-                  <div className="h-[46px] w-[62px] flex-none rounded-lg bg-cover bg-center" style={{ background: a.thumbnail_url ? `center/cover url(${a.thumbnail_url})` : 'repeating-linear-gradient(135deg,#1b1b1f 0 8px,#131316 8px 16px)' }} />
-                  <div className="flex flex-1 flex-col gap-0.5">
-                    <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.14em] text-primary/85">{a.category ?? 'Analysis'}</span>
-                    <span className="line-clamp-2 font-sans text-[12.5px] font-medium leading-[1.3]">{a.title}</span>
-                  </div>
-                </button>
+                <ActivityRow
+                  key={a.id}
+                  category={a.category ?? 'Analysis'}
+                  title={a.title}
+                  onClick={() => navigate(`/articles/${a.id}`)}
+                />
               ))}
             </div>
           )}
@@ -187,15 +295,14 @@ const Me = () => {
           {liked.length === 0 ? (
             <p className="mt-3 font-sans text-[12px] text-foreground/40">{t('me.noLiked')}</p>
           ) : (
-            <div className="mt-3 flex flex-col gap-2.5">
+            <div className="mt-2 flex flex-col">
               {liked.map((a) => (
-                <button key={a.id} onClick={() => navigate(`/articles/${a.id}`)} className="flex items-center gap-3 text-left transition-opacity hover:opacity-80">
-                  <div className="h-[46px] w-[62px] flex-none rounded-lg bg-cover bg-center" style={{ background: a.thumbnail_url ? `center/cover url(${a.thumbnail_url})` : 'repeating-linear-gradient(135deg,#1b1b1f 0 8px,#131316 8px 16px)' }} />
-                  <div className="flex flex-1 flex-col gap-0.5">
-                    <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.14em] text-primary/85">{a.category ?? 'Analysis'}</span>
-                    <span className="line-clamp-2 font-sans text-[12.5px] font-medium leading-[1.3]">{a.title}</span>
-                  </div>
-                </button>
+                <ActivityRow
+                  key={a.id}
+                  category={a.category ?? 'Analysis'}
+                  title={a.title}
+                  onClick={() => navigate(`/articles/${a.id}`)}
+                />
               ))}
             </div>
           )}
