@@ -33,17 +33,17 @@ const BottomNav = () => {
   };
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto flex max-w-[520px] border-t border-white/[0.08] bg-[#0a0a0b]/90 px-1.5 pb-7 pt-3 backdrop-blur-xl">
+    <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto flex max-w-[520px] border-t border-black/10 bg-primary px-1.5 pb-7 pt-3">
       {TABS.map((tab) => {
         const active = isActive(tab.to) || (tab.key === 'nav.me' && pathname.startsWith('/admin'));
         const Icon = tab.Icon;
         const inner = (
           <>
             <span className="relative">
-              <Icon className={`h-[22px] w-[22px] transition-colors ${active ? 'text-primary' : 'text-primary/70'}`} strokeWidth={active ? 2.4 : 2} />
-              {tab.key === 'nav.shop' && count > 0 && <span className="absolute -right-2 -top-1.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-primary px-1 font-sans text-[8.5px] font-bold text-[#070708]">{count}</span>}
+              <Icon className={`h-[22px] w-[22px] transition-colors ${active ? 'text-black' : 'text-black/55'}`} strokeWidth={active ? 2.6 : 2} />
+              {tab.key === 'nav.shop' && count > 0 && <span className="absolute -right-2 -top-1.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-black px-1 font-sans text-[8.5px] font-bold text-primary">{count}</span>}
             </span>
-            <span className={`font-sans text-[9.5px] font-semibold uppercase tracking-[0.12em] transition-colors ${active ? 'text-primary' : 'text-primary/60'}`}>
+            <span className={`font-sans text-[9.5px] font-semibold uppercase tracking-[0.12em] transition-colors ${active ? 'text-black' : 'text-black/55'}`}>
               {t(tab.key)}
             </span>
           </>

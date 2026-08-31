@@ -5,7 +5,7 @@ import { useLanguage, Language } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import AppShell from '@/components/mobile/AppShell';
-import { ChevronRight, Trophy, Coins, ShieldCheck } from 'lucide-react';
+import { ChevronRight, Trophy, Coins, ShieldCheck, Clock, Package, Settings } from 'lucide-react';
 import { getCreditBalance, startTopUp, COMPETITION_LABEL } from '@/lib/uclFantasy';
 
 /**
@@ -183,10 +183,10 @@ const Me = () => {
    */
   type Tab = 'activity' | 'orders' | 'preferences';
   const [tab, setTab] = useState<Tab | null>(null);
-  const TABS: { id: Tab; label: string }[] = [
-    { id: 'activity', label: t('me.activity') },
-    { id: 'orders', label: t('me.orders') },
-    { id: 'preferences', label: t('me.preferences') },
+  const TABS: { id: Tab; label: string; Icon: typeof Clock }[] = [
+    { id: 'activity', label: t('me.activity'), Icon: Clock },
+    { id: 'orders', label: t('me.orders'), Icon: Package },
+    { id: 'preferences', label: t('me.preferences'), Icon: Settings },
   ];
 
   return (
@@ -208,50 +208,92 @@ const Me = () => {
             no way to reach them at all. */}
         {email && (
           <div className="border-t border-white/[0.06] px-5 py-4">
-            {/* The section label and the account tabs share one line. Wraps
-                rather than overflows, because four labels in four languages do
-                not all fit beside the heading on a narrow screen. */}
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+            <div className="mb-3 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <Trophy className="h-4 w-4 text-primary" />
+                <Trophy className="h-4 w-4 flex-none text-primary" />
                 <span className="font-sans text-[13.5px] font-medium">{t('me.fantasy')}</span>
               </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                {TABS.map((tb) => (
+
+              {/* The balance is the top-up button. A separate TOP UP beside it
+                  said the same thing twice and took a whole row to do it, when
+                  the only reason to look at a balance is to decide whether to
+                  add to it. */}
+              <button
+                disabled={toppingUp}
+                onClick={async () => {
+                  setToppingUp(true);
+                  try {
+                    window.location.href = await startTopUp('starter');
+                  } catch (err) {
+                    toast({
+                      title: t('ucl.error'),
+                      description: err instanceof Error ? err.message : String(err),
+                      variant: 'destructive',
+                    });
+                    setToppingUp(false);
+                  }
+                }}
+                title={t('me.topUp')}
+                className="flex flex-none items-center gap-1.5 rounded-full border border-primary/40 bg-primary/[0.10] px-2.5 py-1 transition-colors hover:bg-primary/20 disabled:opacity-50"
+              >
+                <Coins className="h-3.5 w-3.5 text-primary" />
+                <span className="font-display text-[13px] leading-none text-primary">
+                  {toppingUp ? '...' : (credits ?? '-')}
+                </span>
+                <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[0.08em] text-primary/70">
+                  {t('me.creditsShort')}
+                </span>
+              </button>
+            </div>
+
+            {/* One line, always. Every pill carries its icon and the words drop
+                away below the small breakpoint: four labels in French or
+                Haitian Creole will not sit across a phone, and an icon that
+                stays put beats a label that wraps into a second row. */}
+            <div className="mb-3 flex items-center gap-1.5">
+              {TABS.map((tb) => {
+                const Icon = tb.Icon;
+                return (
                   <button
                     key={tb.id}
                     onClick={() => setTab((cur) => (cur === tb.id ? null : tb.id))}
-                    className={`rounded-full px-2.5 py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.06em] transition-colors ${
+                    title={tb.label}
+                    aria-label={tb.label}
+                    className={`flex items-center gap-1 rounded-full px-2.5 py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.06em] transition-colors ${
                       tab === tb.id
                         ? 'bg-primary text-primary-foreground'
                         : 'border border-white/[0.14] text-foreground/60 hover:border-primary/50 hover:text-primary'
                     }`}
                   >
-                    {tb.label}
+                    <Icon className="h-3 w-3 flex-none" />
+                    <span className="hidden sm:inline">{tb.label}</span>
                   </button>
-                ))}
-                {/* Admin rides in the same row as the tabs, because it is the
-                    same kind of thing: somewhere else to go, not the point of
-                    the page. Gold so staff can find it, small so it does not
-                    outweigh the squads. */}
-                <button
-                  onClick={() => {
-                    if (isAdmin || isEditor) {
-                      navigate('/admin');
-                      return;
-                    }
-                    toast({
-                      title: t('me.adminDenied'),
-                      description: t('me.adminDeniedBody'),
-                      variant: 'destructive',
-                    });
-                  }}
-                  className="flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.06em] text-black transition-opacity hover:opacity-90"
-                >
-                  <ShieldCheck className="h-3 w-3" />
-                  {t('me.adminPanel')}
-                </button>
-              </div>
+                );
+              })}
+
+              {/* Admin belongs in this row: it is the same kind of thing as the
+                  tabs, somewhere else to go rather than the point of the page.
+                  Gold so staff find it at a glance, small so it cannot outweigh
+                  the squads again. */}
+              <button
+                onClick={() => {
+                  if (isAdmin || isEditor) {
+                    navigate('/admin');
+                    return;
+                  }
+                  toast({
+                    title: t('me.adminDenied'),
+                    description: t('me.adminDeniedBody'),
+                    variant: 'destructive',
+                  });
+                }}
+                title={t('me.adminPanel')}
+                aria-label={t('me.adminPanel')}
+                className="flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.06em] text-black transition-opacity hover:opacity-90"
+              >
+                <ShieldCheck className="h-3 w-3 flex-none" />
+                <span className="hidden sm:inline">{t('me.adminPanel')}</span>
+              </button>
             </div>
 
             {/* Solid gold, and the biggest thing on the page. These are what
@@ -269,39 +311,15 @@ const Me = () => {
                   <span className="font-display text-[15px] uppercase leading-tight text-black">
                     {t('me.checkSquad')}
                   </span>
+                  {/* Rating and breakdown never cost anything in either
+                      competition - only the advice about a squad does - so what
+                      this opens really is free, and saying so is what gets it
+                      pressed. */}
+                  <span className="mt-0.5 inline-flex w-fit rounded-full bg-black/15 px-1.5 py-0.5 font-sans text-[9px] font-bold uppercase tracking-[0.1em] text-black/75">
+                    {t('me.forFree')}
+                  </span>
                 </button>
               ))}
-            </div>
-
-            {/* Balance sits with the tools it pays for. EPL is free, so this is
-                labelled as Champions League credit rather than a wallet. */}
-            <div className="mt-3 flex items-center justify-between rounded-xl border border-primary/25 bg-primary/[0.07] px-3 py-2.5">
-              <div className="flex items-center gap-2">
-                <Coins className="h-3.5 w-3.5 text-primary" />
-                <span className="font-sans text-[12px] text-foreground/70">{t('me.creditsLeft')}</span>
-                <span className="font-display text-[15px] text-primary">
-                  {credits ?? '—'}
-                </span>
-              </div>
-              <button
-                disabled={toppingUp}
-                onClick={async () => {
-                  setToppingUp(true);
-                  try {
-                    window.location.href = await startTopUp('starter');
-                  } catch (err) {
-                    toast({
-                      title: t('ucl.error'),
-                      description: err instanceof Error ? err.message : String(err),
-                      variant: 'destructive',
-                    });
-                    setToppingUp(false);
-                  }
-                }}
-                className="rounded-full bg-primary px-3 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-[0.06em] text-primary-foreground transition-opacity disabled:opacity-50"
-              >
-                {toppingUp ? t('me.openingCheckout') : t('me.topUp')}
-              </button>
             </div>
           </div>
         )}
@@ -478,9 +496,9 @@ const Me = () => {
         )}
 
         {/* Sign in / out */}
-        <button onClick={async () => { if (!email) { navigate('/auth'); return; } await signOut(); window.location.href = '/'; }} className="flex w-full items-center justify-between border-t border-b border-white/[0.06] px-5 py-4 text-left transition-colors hover:bg-white/[0.03]">
-          <span className="font-sans text-[13.5px] font-medium">{email ? t('me.signOut') : t('me.signIn')}</span>
-          <span className="font-sans text-[12px] text-foreground/40">→</span>
+        <button onClick={async () => { if (!email) { navigate('/auth'); return; } await signOut(); window.location.href = '/'; }} className="flex w-full items-center justify-between border-t border-b border-black/10 bg-primary px-5 py-4 text-left transition-opacity hover:opacity-90">
+          <span className="font-sans text-[13.5px] font-semibold text-black">{email ? t('me.signOut') : t('me.signIn')}</span>
+          <span className="font-sans text-[12px] text-black/70">→</span>
         </button>
       </div>
     </AppShell>

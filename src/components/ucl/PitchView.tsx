@@ -86,13 +86,23 @@ const PlayerCard = ({
             <Cross className="h-2.5 w-2.5" />
           </span>
         )}
+        {/* Armband badges, top-left.
+            Gold on gold was invisible once the filled circle became solid
+            primary - a gold C on a gold disc. Black ground with a gold letter
+            and a gold ring reads against the circle at any size and stays on
+            the two colours the rest of the pitch uses.
+
+            Top-left because the remove control took the top-right corner. The
+            only other thing that sits here is the unreadable-name warning, and
+            that appears only on an empty slot, which by definition has no
+            captain. */}
         {slot.is_captain && (
-          <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+          <span className="absolute -left-1 -top-1 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-black text-[11px] font-bold leading-none text-primary ring-2 ring-primary">
             C
           </span>
         )}
         {slot.is_vice && !slot.is_captain && (
-          <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-foreground">
+          <span className="absolute -left-1 -top-1 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-black text-[11px] font-bold leading-none text-foreground ring-2 ring-foreground/50">
             V
           </span>
         )}
