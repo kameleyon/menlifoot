@@ -191,6 +191,14 @@ const ceilingsFor = (competition: string): Ceilings =>
 // rarely worth a points hit, so it is offered without a badge.
 const STRONG_UPGRADE = 0.10;
 
+/**
+ * Points a swap must be worth before it is recommended rather than merely
+ * suggested. Below about a point the projection cannot tell the two players
+ * apart with any confidence, and a transfer that gains nothing measurable is
+ * how a manager talks themselves into a hit for no reason.
+ */
+const MIN_RECOMMENDED_POINTS = 1.0;
+
 const PLAYER_FIELDS =
   "id,name,display_name,team,position,price,total_points,form,minutes,availability," +
   "availability_note,next_opponent,next_difficulty,starts,points_per_game,ict_index";
@@ -1246,7 +1254,7 @@ serve(async (req) => {
     const anyPriced = [...starters, ...bench].some((p) => p.price != null);
     const bank = anyPriced ? Math.max(0, SQUAD_BUDGET - squadSpend) : null;
 
-    const candidates: Record<string, { player: Player; gain: number }[]> = {};
+    const candidates: Record<string, { player: Player; gain: number; pointsGain: number }[]> = {};
 
     // Squad make-up, so a suggestion cannot propose a fourth player from a club
     // that already has three. The rule applies to advice exactly as it applies
@@ -1284,11 +1292,24 @@ serve(async (req) => {
         .order("total_points", { ascending: false, nullsFirst: false })
         .limit(40);
 
+      // Two measures of the same swap. `gain` is the score-space difference
+      // the rating is calibrated on and still decides what qualifies as an
+      // upgrade at all; `pointsGain` is that difference in points, which is
+      // what a manager is deciding about and what gets shown.
+      //
+      // Ordered by points, because a shortlist ranked on one number and
+      // presented with another invites exactly the mismatch that put a
+      // Recommended badge on a transfer the write-up argued against.
+      const incumbentPoints = projectedPoints(p);
       candidates[p.id] = ((alts ?? []) as Player[])
         .filter((c) => swapKeepsClubCap(c, p))
-        .map((c) => ({ player: c, gain: expectedValue(c) - incumbentScore }))
+        .map((c) => ({
+          player: c,
+          gain: expectedValue(c) - incumbentScore,
+          pointsGain: Number((projectedPoints(c) - incumbentPoints).toFixed(1)),
+        }))
         .filter((c) => c.gain >= UPGRADE_MARGIN)
-        .sort((a, b) => b.gain - a.gain)
+        .sort((a, b) => b.pointsGain - a.pointsGain || b.gain - a.gain)
         .slice(0, 5);
     }
 
@@ -1393,13 +1414,21 @@ serve(async (req) => {
                     next: out.next_opponent, difficulty: out.next_difficulty,
                   }
                 : null,
-              options: alts.map(({ player: a, gain }) => ({
+              options: alts.map(({ player: a, gain, pointsGain }) => ({
                 name: a.name, team: a.team, price: a.price,
                 points: a.total_points, per_game: a.points_per_game,
                 starts: a.starts, next: a.next_opponent,
                 difficulty: a.next_difficulty,
                 // How much better this player is than the one being replaced.
                 upgrade: Number(gain.toFixed(3)),
+                // The same thing in points, and the only figure the write-up
+                // may quote. Left to work it out from the per-game averages,
+                // the model produced its own number and contradicted the one
+                // on the badge beside it - it said "about 4.5 points more"
+                // under a badge reading +7.2, because a difference in raw
+                // averages is not a difference in expected points once
+                // shrinkage, fixture and minutes are applied.
+                points_gain: pointsGain,
               })),
             };
           }),
@@ -1420,6 +1449,12 @@ serve(async (req) => {
               content:
                 `You are a UEFA Champions League Fantasy analyst writing in ${langName}. ` +
                 "The rating and breakdown are already final — never dispute or restate a different number. " +
+                "If you give a figure for how much a transfer gains, use the option's " +
+                "points_gain verbatim and never the upgrade score or a number you " +
+                "worked out yourself from the per-game averages: those averages are " +
+                "raw, points_gain already accounts for sample size, fixture and " +
+                "minutes, and a figure of your own will contradict the one shown " +
+                "beside your sentence. Saying nothing numeric is fine. " +
                 "Write each transfer reason as the case for it. If the honest case needs a " +
                 "concession — the incoming player returning less so far, a thinner sample — say " +
                 "so plainly and let it read as the trade-off it is, rather than arguing for and " +
@@ -1507,6 +1542,19 @@ serve(async (req) => {
       return null;
     };
 
+    /** The same match-up, in points. */
+    const pointsGainFor = (outName: string, inName: string): number | null => {
+      for (const [outId, alts] of Object.entries(candidates)) {
+        const out = byId.get(outId);
+        if (!out || !String(outName ?? "").includes(out.name.split(" ").pop() ?? "")) continue;
+        const hit = alts.find((a) =>
+          String(inName ?? "").includes(a.player.name.split(" ").pop() ?? "")
+        );
+        if (hit) return hit.pointsGain;
+      }
+      return null;
+    };
+
             const gainFor = (outName: string, inName: string): number | null => {
               for (const [outId, alts] of Object.entries(candidates)) {
                 const out = byId.get(outId);
@@ -1523,6 +1571,7 @@ serve(async (req) => {
               .map((sg: Record<string, unknown>) => ({
                 ...sg,
                 upgrade: gainFor(String(sg.out ?? ""), String(sg.in ?? "")),
+                points_gain: pointsGainFor(String(sg.out ?? ""), String(sg.in ?? "")),
               }))
               .sort((a: Record<string, unknown>, c: Record<string, unknown>) =>
                 Number(c.upgrade ?? 0) - Number(a.upgrade ?? 0)
@@ -1556,6 +1605,7 @@ serve(async (req) => {
                   recommended:
                     i < 2 &&
                     Number(sg.upgrade ?? 0) >= STRONG_UPGRADE &&
+                    Number(sg.points_gain ?? 0) >= MIN_RECOMMENDED_POINTS &&
                     (pair ? returnsSupportSwap(pair.incoming, pair.out) : false),
                 };
               });

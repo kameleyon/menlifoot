@@ -96,6 +96,8 @@ export interface Suggestion {
   priority: 'high' | 'medium' | 'low';
   /** Measured improvement over the player being replaced, 0-1. */
   upgrade?: number | null;
+  /** The same improvement in expected points, which is what gets shown. */
+  points_gain?: number | null;
   /** True only for the clearest upgrades, so the badge stays meaningful. */
   recommended?: boolean;
 }

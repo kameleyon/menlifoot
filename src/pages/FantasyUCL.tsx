@@ -843,11 +843,21 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
                         <ArrowRight className="h-3.5 w-3.5 shrink-0 text-primary" />
                         <span className="truncate">{s.in}</span>
                       </div>
-                      {s.recommended && (
-                        <span className="shrink-0 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">
-                          {t('ucl.recommended')}
-                        </span>
-                      )}
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        {/* The gain in points. An internal upgrade score of
+                            0.141 tells a manager nothing; "+2.3 pts" is the
+                            same fact in the units they think in. */}
+                        {s.points_gain != null && s.points_gain > 0 && (
+                          <span className="shrink-0 font-display text-sm text-primary">
+                            +{s.points_gain.toFixed(1)}
+                          </span>
+                        )}
+                        {s.recommended && (
+                          <span className="shrink-0 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">
+                            {t('ucl.recommended')}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">{s.reason}</p>
                   </div>
