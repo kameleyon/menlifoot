@@ -230,20 +230,45 @@ const Me = () => {
                     {tb.label}
                   </button>
                 ))}
+                {/* Admin rides in the same row as the tabs, because it is the
+                    same kind of thing: somewhere else to go, not the point of
+                    the page. Gold so staff can find it, small so it does not
+                    outweigh the squads. */}
+                <button
+                  onClick={() => {
+                    if (isAdmin || isEditor) {
+                      navigate('/admin');
+                      return;
+                    }
+                    toast({
+                      title: t('me.adminDenied'),
+                      description: t('me.adminDeniedBody'),
+                      variant: 'destructive',
+                    });
+                  }}
+                  className="flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.06em] text-black transition-opacity hover:opacity-90"
+                >
+                  <ShieldCheck className="h-3 w-3" />
+                  {t('me.adminPanel')}
+                </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            {/* Solid gold, and the biggest thing on the page. These are what
+                the page is for, and as faint outlines nobody saw them. */}
+            <div className="grid grid-cols-2 gap-2.5">
               {(['UCL', 'EPL'] as const).map((c) => (
                 <button
                   key={c}
                   onClick={() => navigate(c === 'UCL' ? '/fantasy' : '/epl')}
-                  className="flex flex-col gap-0.5 rounded-xl border border-white/[0.10] bg-white/[0.02] px-3 py-3 text-left transition-colors hover:border-primary/50 hover:bg-primary/[0.06]"
+                  className="flex flex-col gap-1 rounded-xl bg-primary px-4 py-4 text-left transition-opacity hover:opacity-90"
                 >
-                  <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.14em] text-primary/85">
+                  <span className="font-sans text-[9.5px] font-bold uppercase tracking-[0.14em] text-black/70">
                     {COMPETITION_LABEL[c]}
                   </span>
-                  <span className="font-sans text-[12.5px] font-medium">{t('me.checkSquad')}</span>
+                  <span className="font-display text-[15px] uppercase leading-tight text-black">
+                    {t('me.checkSquad')}
+                  </span>
                 </button>
               ))}
             </div>
@@ -453,49 +478,6 @@ const Me = () => {
         )}
 
         {/* Sign in / out */}
-        {/* ── Admin ──
-            Below the tab content, beside Sign out, because it is an account
-            action rather than part of any tab. Sitting above the content it
-            split the tabs from the list they control, which made the activity
-            look like it belonged to nothing.
-
-            Shown to every signed-in member; the role is checked on the click,
-            not on the render. None of this is the permission boundary: the
-            panel refuses anyone without a role, its orders and users tabs are
-            admin-only, and manage-users and list-orders both verify
-            role = admin against the caller's token server-side. */}
-        {email && (
-          <button
-            onClick={() => {
-              if (isAdmin || isEditor) {
-                navigate('/admin');
-                return;
-              }
-              toast({
-                title: t('me.adminDenied'),
-                description: t('me.adminDeniedBody'),
-                variant: 'destructive',
-              });
-            }}
-            className="flex w-full items-center gap-3 border-t border-b border-black/10 bg-primary px-5 py-4 text-left transition-opacity hover:opacity-90"
-          >
-            <ShieldCheck className="h-4 w-4 flex-none text-black" />
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="font-sans text-[13.5px] font-semibold text-black">
-                {t('me.adminPanel')}
-              </span>
-              <span className="truncate font-sans text-[11.5px] text-black/70">
-                {isAdmin
-                  ? t('me.adminScopeAdmin')
-                  : isEditor
-                  ? t('me.adminScopeEditor')
-                  : t('me.adminStaffOnly')}
-              </span>
-            </div>
-            <ChevronRight className="h-4 w-4 flex-none text-black" />
-          </button>
-        )}
-
         <button onClick={async () => { if (!email) { navigate('/auth'); return; } await signOut(); window.location.href = '/'; }} className="flex w-full items-center justify-between border-t border-b border-white/[0.06] px-5 py-4 text-left transition-colors hover:bg-white/[0.03]">
           <span className="font-sans text-[13.5px] font-medium">{email ? t('me.signOut') : t('me.signIn')}</span>
           <span className="font-sans text-[12px] text-foreground/40">→</span>
