@@ -48,6 +48,11 @@ type Player = {
   position: string;
   price: number | null;
   total_points: number;
+  /**
+   * Derived from minutes: the feed publishes a season total, not a rate.
+   * Optional because the roster fallbacks carry no per-appearance data at all.
+   */
+  points_per_game?: number | null;
   form: number | null;
   minutes: number;
   goals: number;
@@ -97,6 +102,27 @@ const num = (v: unknown, fallback = 0): number => {
 const uefaProbeLog: string[] = [];
 
 /** Probe season ids until one returns a usable player list. */
+/**
+ * Map a supplied playerList, for when this runtime cannot reach UEFA itself.
+ *
+ * Akamai accepts a browser and rejects this function: every season id fails at
+ * the connection layer from Supabase's egress, while the identical request
+ * succeeds from a browser and from Node on a laptop. The endpoint is fine and
+ * the season id is right - only the caller is refused.
+ *
+ * So the feed can be pushed in rather than pulled. The mapping, the merge and
+ * the stale-row cleanup below are the tested ones either way; only who
+ * performs the HTTP request changes.
+ */
+function playersFromPayload(payload: unknown): { players: Player[]; seasonId: number } | null {
+  const json = payload as Record<string, any>;
+  const rows: unknown[] = json?.data?.value?.playerList ?? json?.data?.value ?? json?.playerList ??
+    (Array.isArray(json) ? json : []);
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+  const players = rows.map(mapUefaPlayer).filter((p): p is Player => p !== null);
+  return players.length > 0 ? { players, seasonId: 0 } : null;
+}
+
 async function fetchFromUefa(): Promise<{ players: Player[]; seasonId: number } | null> {
   uefaProbeLog.length = 0;
   for (const season of SEASON_CANDIDATES) {
@@ -129,6 +155,49 @@ async function fetchFromUefa(): Promise<{ players: Player[]; seasonId: number } 
   return null;
 }
 
+/**
+ * UEFA's club names, mapped to the ones the fixture archive uses.
+ *
+ * UEFA writes clubs short - "Paris", "Atleti", "Man Utd" - and the archive
+ * writes them long. Twenty-five of the thirty-six disagreed, which left most
+ * of the pool unable to find its own fixture: no opponent, no difficulty, and
+ * out of the fixture dimension of the rating entirely.
+ *
+ * Written out by hand rather than matched fuzzily. Trigram similarity is happy
+ * to pair "Man City" with "Manchester United", and rating a player against a
+ * fixture somebody else is playing is far worse than leaving him unmatched.
+ *
+ * Applied here rather than as a one-off migration so a fresh push cannot
+ * reintroduce the short names.
+ */
+const UEFA_TO_FIXTURE_CLUB: Record<string, string> = {
+  "AEK Athens": "PAE AEK",
+  "Atleti": "Atletico Madrid",
+  "B. Dortmund": "Borussia Dortmund",
+  "Bayern München": "Bayern Munich",
+  "Bodø/Glimt": "FK Bodø/Glimt",
+  "Club Brugge": "Club Brugge KV",
+  "Como": "Como 1907",
+  "Fenerbahçe": "Fenerbahçe SK",
+  "Feyenoord": "Feyenoord Rotterdam",
+  "Galatasaray": "Galatasaray SK",
+  "Inter": "Inter Milan",
+  "LASK": "LASK Linz",
+  "Leipzig": "RB Leipzig",
+  "Man City": "Manchester City",
+  "Man Utd": "Manchester United",
+  "Paris": "Paris Saint-Germain",
+  "Porto": "FC Porto",
+  "Roma": "AS Roma",
+  "S. Bratislava": "ŠK Slovan Bratislava",
+  "Sabah": "Sabah FK",
+  "Shakhtar": "FK Shakhtar Donetsk",
+  "Slavia Praha": "SK Slavia Praha",
+  "Sporting CP": "Sporting Clube de Portugal",
+  "Stuttgart": "VfB Stuttgart",
+  "Viking": "Viking FK",
+};
+
 function mapUefaPlayer(raw: unknown): Player | null {
   const p = raw as Record<string, unknown>;
   const name = String(p.pFName ?? p.pDName ?? p.pLName ?? "").trim();
@@ -146,19 +215,32 @@ function mapUefaPlayer(raw: unknown): Player | null {
     name,
     normalized_name: normalize(name),
     display_name: String(p.pDName ?? p.pLName ?? name).trim(),
-    team: String(p.tName ?? p.cCode ?? "Unknown").trim(),
+    team: (() => {
+      const uefaName = String(p.tName ?? p.cCode ?? "Unknown").trim();
+      return UEFA_TO_FIXTURE_CLUB[uefaName] ?? uefaName;
+    })(),
     team_code: p.cCode ? String(p.cCode).toUpperCase().slice(0, 4) : null,
     position,
     price: p.value != null ? num(p.value, 0) : null,
     total_points: Math.round(num(p.totPts)),
     form: p.avgPlayerPts != null ? num(p.avgPlayerPts) : null,
-    minutes: Math.round(num(p.minsPlayed)),
+    minutes: Math.round(num(p.minsPlyd)),
     goals: Math.round(num(p.gS)),
-    assists: Math.round(num(p.gAst)),
+    assists: Math.round(num(p.assist)),
     clean_sheets: Math.round(num(p.cS)),
-    saves: Math.round(num(p.sv)),
+    saves: Math.round(num(p.saves)),
     yellow_cards: Math.round(num(p.yC)),
     red_cards: Math.round(num(p.rC)),
+    points_per_game: (() => {
+      const mins = num(p.minsPlyd);
+      const pts = num(p.totPts);
+      if (mins <= 0) return null;
+      // Appearances from minutes, since the feed carries no appearance count.
+      // Rounding up means a run of substitute cameos reads as the several
+      // appearances it was, not as one long game.
+      const appearances = Math.max(1, Math.round(mins / 90));
+      return Number((pts / appearances).toFixed(2));
+    })(),
     availability: suspended ? "suspended" : injured ? "injured" : active ? "available" : "unavailable",
     availability_note: null,
     jersey_number: null,
@@ -492,25 +574,58 @@ serve(async (req) => {
     // 1. UEFA first.
     if (mode === "auto" || mode === "uefa") {
       const startedAt = new Date().toISOString();
-      const uefa = await fetchFromUefa();
+      // A caller that can reach UEFA may hand the feed over directly.
+      const uefa = body?.payload
+        ? playersFromPayload(body.payload)
+        : await fetchFromUefa();
       if (uefa) {
         const { error } = await supabase
           .from("ucl_players")
-          .upsert(dedupe(uefa.players), { onConflict: "competition,normalized_name,team" });
+          // Conflict on UEFA's own id, not on name and club. A club rename
+          // changes the name key and makes an existing player look new, which
+          // then collides with the unique index on uefa_id. Identity is the
+          // thing that does not move.
+          .upsert(dedupe(uefa.players), { onConflict: "uefa_id" });
         if (error) throw new Error(`upsert failed: ${error.message}`);
-        // UEFA is authoritative. Drop Perplexity stopgap rows it did not claim
-        // (usually a team-name spelling the fallback got slightly different),
-        // so the pool converges instead of accumulating near-duplicates.
+        // UEFA is authoritative, so every stopgap row it did not claim is a
+        // near-duplicate of a player it did - usually a team-name spelling the
+        // fallback got slightly different. Both fallbacks are cleared, not just
+        // Perplexity: the roster source carries no prices, so leaving it in
+        // place put an unpriced twin of half the pool in the player picker.
         await supabase
           .from("ucl_players")
           .delete()
           .eq("competition", "UCL")
-          .eq("source", "perplexity")
+          .neq("source", "uefa")
           .lt("updated_at", startedAt);
         return await finish("success", `uefa:${uefa.seasonId}`, uefa.players.length, null);
       }
       if (mode === "uefa") {
         return await finish("failed", "uefa", 0, `UEFA feed unreachable — ${uefaProbeLog.join(" | ")}`);
+      }
+    }
+
+    // A fallback must never downgrade a pool that already has better data.
+    //
+    // UEFA is unreachable from this runtime - Akamai refuses the connection
+    // from Supabase's egress while accepting the identical request from a
+    // browser - so the feed is pushed in from elsewhere. Without this guard the
+    // nightly job would then "succeed" by writing roster rows with no prices
+    // back over a pool that had them, undoing the push every night.
+    {
+      const { count: uefaRows } = await supabase
+        .from("ucl_players")
+        .select("id", { count: "exact", head: true })
+        .eq("competition", "UCL")
+        .eq("source", "uefa")
+        .gt("updated_at", new Date(Date.now() - 21 * 86400_000).toISOString());
+      if ((uefaRows ?? 0) > 0) {
+        return await finish(
+          "success",
+          "uefa:kept",
+          uefaRows ?? 0,
+          null,
+        );
       }
     }
 
