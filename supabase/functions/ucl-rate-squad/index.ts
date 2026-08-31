@@ -133,6 +133,32 @@ const CHEAPEST_PLAYER_PRIOR = 0.35;
  * ratios back. A ceiling that has drifted low only means more squads reach
  * 100, never that a bad squad does.
  */
+/**
+ * Headroom above the best squad the optimiser can build.
+ *
+ * Nothing scores 100, including the squad this function proposes itself. A
+ * perfect score would say there is no move left to make, which is never true:
+ * form moves, someone gets injured, a fixture turns. The optimiser's own squad
+ * lands in the mid nineties and the last few points stay unclaimed.
+ */
+const PERFECTION_HEADROOM = 0.93;
+
+/**
+ * How steeply marks fall away from the ceiling.
+ *
+ * Linear normalisation was too generous near the top: a squad at nine tenths
+ * of the ceiling kept nine tenths of the marks, so a keen but ordinary side
+ * scored 86 and 90 was a short step from average. Above one, each point closer
+ * to the ceiling costs more than the last, which is how the difficulty of
+ * actually improving a squad behaves - swapping a weak pick for a good one is
+ * easy, swapping a good one for the right one is not.
+ *
+ * Measured on four reference squads rather than chosen: the optimiser's own,
+ * a keen manager's (best regular starters, sane captain, no optimiser), one
+ * built from pool-median players, and the cheapest legal fifteen.
+ */
+const RATING_CURVE = 1.35;
+
 const ACHIEVABLE: Partial<Record<keyof typeof WEIGHTS, number>> = {
   captain: 0.97,
   form: 0.71,
@@ -438,7 +464,9 @@ function scoreSquad(starters: Player[], bench: Player[], captain: Player | null)
   // alone.
   for (const key of Object.keys(sub) as (keyof typeof WEIGHTS)[]) {
     const ceiling = ACHIEVABLE[key];
-    if (ceiling) sub[key] = clamp01(sub[key] / ceiling);
+    if (ceiling) {
+      sub[key] = Math.pow(clamp01((sub[key] / ceiling) * PERFECTION_HEADROOM), RATING_CURVE);
+    }
   }
 
   const squadAll = [...starters, ...bench];
