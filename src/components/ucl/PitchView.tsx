@@ -117,9 +117,17 @@ const PlayerCard = ({
       >
         {name}
       </span>
-      {/* Price is null until the UEFA game opens; show the club instead. */}
-      <span className="text-[10px] text-muted-foreground">
-        {formatPrice(slot.price) ?? slot.team ?? ''}
+      {/* Expected points lead, price follows. The projection is the thing a
+          manager is deciding on; the price is what they already paid. */}
+      <span className="flex items-baseline gap-1 text-[10px] leading-tight">
+        {slot.projected_points != null && (
+          <span className="font-semibold text-primary">
+            {slot.projected_points.toFixed(1)}
+          </span>
+        )}
+        <span className="truncate text-muted-foreground">
+          {formatPrice(slot.price) ?? slot.team ?? ''}
+        </span>
       </span>
       </button>
 

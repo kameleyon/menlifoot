@@ -355,6 +355,28 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
     );
   }
 
+  /**
+   * The squad with expected points attached.
+   *
+   * The projections are keyed by player_id server-side rather than returned
+   * inside the squad, because the squad on screen is client state the server
+   * never sees - it is the manager's, and rewriting it from a response would
+   * discard edits they have not submitted yet.
+   */
+  const projectedSquad = squad && result?.projections
+    ? {
+        ...squad,
+        starters: squad.starters.map((s) => ({
+          ...s,
+          projected_points: s.player_id ? result.projections?.[s.player_id] ?? null : null,
+        })),
+        bench: squad.bench.map((s) => ({
+          ...s,
+          projected_points: s.player_id ? result.projections?.[s.player_id] ?? null : null,
+        })),
+      }
+    : squad;
+
   return (
     <AppShell>
       <div className="mx-auto w-full max-w-lg px-4 pb-24 pt-6">
@@ -549,6 +571,20 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
             <div className="text-center">
               <RatingRing value={result.rating} />
               <h2 className="mt-3 font-display text-2xl uppercase">{t('ucl.teamRated')}</h2>
+              {/* What the XI is expected to score, captain counted twice. No
+                  provider publishes this for either competition, so it comes
+                  from the same signals as the rating - stated in points, which
+                  is the language the question was asked in. */}
+              {result.projected_points != null && (
+                <div className="mt-2 inline-flex items-baseline gap-1.5 rounded-full border border-primary/40 bg-primary/[0.10] px-3 py-1">
+                  <span className="font-display text-lg leading-none text-primary">
+                    {result.projected_points.toFixed(1)}
+                  </span>
+                  <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.08em] text-primary/70">
+                    {t('ucl.predictedPoints')}
+                  </span>
+                </div>
+              )}
               {result.target_gameweek != null && (
                 <div className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
                   {competition === 'EPL' ? t('ucl.gameweek') : t('ucl.matchday')}{' '}
@@ -606,8 +642,8 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
             ) : (
               <div className="space-y-2">
                 <PitchView
-                  starters={squad.starters}
-                  bench={squad.bench}
+                  starters={projectedSquad?.starters ?? squad.starters}
+                  bench={projectedSquad?.bench ?? squad.bench}
                   benchLabel={t('ucl.bench')}
                   emptyLabel={t('ucl.unknown')}
                   onSlotClick={() => setEditing(true)}

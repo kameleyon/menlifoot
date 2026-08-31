@@ -62,6 +62,8 @@ export interface SquadSlot {
   price?: number | null;
   is_captain?: boolean;
   is_vice?: boolean;
+  /** Points this player is expected to return in his next match. */
+  projected_points?: number | null;
   on_bench?: boolean;
 }
 
@@ -146,6 +148,10 @@ export interface LockedState {
 }
 
 export interface RatingResult {
+  /** Expected points per player, keyed by player_id. */
+  projections?: Record<string, number>;
+  /** Expected points for the XI, counting the captain twice. */
+  projected_points?: number | null;
   competition?: Competition;
   free?: boolean;
   planned_chip?: string | null;

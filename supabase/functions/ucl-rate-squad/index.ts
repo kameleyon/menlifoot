@@ -425,6 +425,69 @@ const optimiseXi = (squadPlayers: Player[], value: (p: Player) => number = expec
 };
 
 /**
+ * What the cheapest and dearest players in the game are expected to return per
+ * appearance, before any evidence.
+ *
+ * The rating works in a 0-1 space, which is right for comparing squads and
+ * useless for telling a manager what to expect. These two numbers put the
+ * projection back into points, where the question was asked.
+ */
+const FLOOR_PLAYER_PPG = 2.0;
+const ELITE_PLAYER_PPG = 7.5;
+
+/** How much one step of fixture difficulty moves a projection. */
+const FIXTURE_SWING_PER_STEP = 0.125;
+
+/**
+ * Points this player is expected to return in his next match.
+ *
+ * Built from the same three signals the rating uses, kept in points rather
+ * than normalised: a scoring rate shrunk toward what the price implies, scaled
+ * by the fixture, and cut by anything that stops him playing.
+ *
+ * The shrinkage is the important part and the reason this is not simply the
+ * player's average. Three games in, a 4.0m defender with one clean sheet has a
+ * per-game average as high as a 12.0m midfielder, and reporting that as a
+ * forecast would be reporting noise with a decimal point on it. Early on the
+ * price carries most of the answer, and by five appearances the player's own
+ * returns do.
+ *
+ * No provider sells this number for either competition - UEFA publishes
+ * nothing forward-looking at all, and FPL's expected-points field is currently
+ * a copy of its own per-game average - so it is derived here or not at all.
+ */
+const projectedPoints = (p: Player): number => {
+  const priceImplied = p.price == null
+    ? (FLOOR_PLAYER_PPG + ELITE_PLAYER_PPG) / 2
+    : FLOOR_PLAYER_PPG +
+      clamp01((p.price - 4) / 11) * (ELITE_PLAYER_PPG - FLOOR_PLAYER_PPG);
+
+  const observed = p.points_per_game;
+  const weight = sampleWeight(p);
+  let expected = observed == null
+    ? priceImplied
+    : weight * observed + (1 - weight) * priceImplied;
+
+  // Difficulty runs 1 (easiest) to 5 (hardest); 3 is neutral.
+  if (p.next_difficulty != null) {
+    expected *= 1 + (3 - p.next_difficulty) * FIXTURE_SWING_PER_STEP;
+  }
+
+  // A player who is not starting cannot return what a starter returns, however
+  // good his rate looks over the minutes he has had.
+  if (p.starts != null && p.minutes != null && p.minutes > 0) {
+    const appearances = Math.max(1, Math.round(p.minutes / 90));
+    const startRate = clamp01(p.starts / appearances);
+    if (startRate < 0.5) expected *= 0.55 + startRate * 0.9;
+  }
+
+  // Availability last, because it multiplies everything else to nothing.
+  expected *= availabilityScore(p);
+
+  return Math.max(0, Number(expected.toFixed(1)));
+};
+
+/**
  * Score a squad, 0-100.
  *
  * Pulled out of the request handler so a hypothetical squad can be run through
@@ -1264,6 +1327,18 @@ serve(async (req) => {
       competition,
     );
 
+    // -------------------------------------------------- projected points ---
+    const projections: Record<string, number> = {};
+    for (const pl of [...starters, ...bench]) projections[pl.id] = projectedPoints(pl);
+
+    // The captain scores twice, so the squad total has to say so - a projection
+    // that ignored the armband would understate every squad by a player.
+    const projectedTotal = Number(
+      starters
+        .reduce((t, pl) => t + projections[pl.id] * (pl.id === captain?.id ? 2 : 1), 0)
+        .toFixed(1),
+    );
+
     // ----------------------------------------------------------- narrative ---
     // The model call is six of the seven seconds a request takes. Unlocking a
     // panel re-runs the whole analysis, so a manager who has already read the
@@ -1295,6 +1370,7 @@ serve(async (req) => {
         dimensions_without_data: breakdown.filter((x) => !x.applicable).map((x) => x.key),
         formation: shape,
         club_concentration: { max_from_one_club: maxPerClub, by_club: perClub },
+        projected_points: projectedTotal,
         chip_advice: chipAdvice,
         best_captain_options: captainRanking,
         captain: captain ? { name: captain.name, team: captain.team, form: captain.form } : null,
@@ -1567,6 +1643,10 @@ serve(async (req) => {
       JSON.stringify({
         id: saved?.id ?? null,
         rating,
+        // Per player, so the pitch can label each card, plus the XI total with
+        // the armband counted twice - which is what a manager actually scores.
+        projections,
+        projected_points: projectedTotal,
         target_rating: TARGET_RATING,
         // Where the score lands if the optimised XI and the transfers are taken.
         projected_rating: projected.rating,
