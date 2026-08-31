@@ -325,48 +325,45 @@ const SquadBuilder = ({
         )}
       </div>
 
-      {/* Budget. Prices only exist once UEFA opens the game, so before then this
-          says so rather than implying a full EUR 100m is still available. */}
+      {/* Budget. Always the full 100m against what is spent - the bar and the
+          figure show unconditionally rather than hiding behind a "prices not
+          published yet" notice. The budget is a rule of the game, true before
+          any price is published, and a manager wants to see it either way. */}
       <div className="rounded-lg border border-border bg-card/60 p-3">
         <div className="flex items-baseline justify-between">
           <span className="text-xs font-medium text-muted-foreground">{t('ucl.budget')}</span>
-          {budget.priced === 0 ? (
-            <span className="text-xs text-muted-foreground">{t('ucl.pricesPending')}</span>
-          ) : (
-            <span
-              className={`font-display text-sm tabular-nums ${
-                budget.overBudget ? 'text-destructive' : 'text-foreground'
-              }`}
-            >
-              {formatPrice(budget.spent)} / {formatPrice(SQUAD_BUDGET)}
+          <span
+            className={`font-display text-sm tabular-nums ${
+              budget.overBudget ? 'text-destructive' : 'text-foreground'
+            }`}
+          >
+            {formatPrice(budget.spent)} / {formatPrice(SQUAD_BUDGET)}
+          </span>
+        </div>
+
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+          <div
+            className={`h-full rounded-full transition-all ${
+              budget.overBudget ? 'bg-destructive' : 'bg-primary'
+            }`}
+            style={{ width: `${Math.min(100, (budget.spent / SQUAD_BUDGET) * 100)}%` }}
+          />
+        </div>
+        <div className="mt-1.5 flex items-center justify-between text-[11px]">
+          <span className={budget.overBudget ? 'text-destructive' : 'text-muted-foreground'}>
+            {budget.overBudget
+              ? `${t('ucl.overBudget')} ${formatPrice(Math.abs(budget.remaining))}`
+              : `${t('ucl.remaining')} ${formatPrice(budget.remaining)}`}
+          </span>
+          {/* Only when SOME players carry a price and others do not, which is a
+              real inconsistency in the figure above. Silent when none are
+              priced, since the total is then plainly zero spent. */}
+          {budget.priced > 0 && budget.priced < budget.picked && (
+            <span className="text-muted-foreground">
+              {t('ucl.partialPrices')} ({budget.priced}/{budget.picked})
             </span>
           )}
         </div>
-
-        {budget.priced > 0 && (
-          <>
-            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  budget.overBudget ? 'bg-destructive' : 'bg-primary'
-                }`}
-                style={{ width: `${Math.min(100, (budget.spent / SQUAD_BUDGET) * 100)}%` }}
-              />
-            </div>
-            <div className="mt-1.5 flex items-center justify-between text-[11px]">
-              <span className={budget.overBudget ? 'text-destructive' : 'text-muted-foreground'}>
-                {budget.overBudget
-                  ? `${t('ucl.overBudget')} ${formatPrice(Math.abs(budget.remaining))}`
-                  : `${t('ucl.remaining')} ${formatPrice(budget.remaining)}`}
-              </span>
-              {budget.priced < budget.picked && (
-                <span className="text-muted-foreground">
-                  {t('ucl.partialPrices')} ({budget.priced}/{budget.picked})
-                </span>
-              )}
-            </div>
-          </>
-        )}
       </div>
 
       {/* One line, scrolled horizontally rather than wrapped: seven chips plus a
