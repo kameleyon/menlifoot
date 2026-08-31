@@ -5,7 +5,7 @@ import { useLanguage, Language } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import AppShell from '@/components/mobile/AppShell';
-import { ChevronRight, Trophy, Coins, ShieldCheck, Clock, Package, Settings } from 'lucide-react';
+import { ChevronRight, Trophy, Coins, ShieldCheck, Clock, ShoppingBag, Settings, LogOut } from 'lucide-react';
 import { getCreditBalance, startTopUp, COMPETITION_LABEL } from '@/lib/uclFantasy';
 
 /**
@@ -185,7 +185,7 @@ const Me = () => {
   const [tab, setTab] = useState<Tab | null>(null);
   const TABS: { id: Tab; label: string; Icon: typeof Clock }[] = [
     { id: 'activity', label: t('me.activity'), Icon: Clock },
-    { id: 'orders', label: t('me.orders'), Icon: Package },
+    { id: 'orders', label: t('me.orders'), Icon: ShoppingBag },
     { id: 'preferences', label: t('me.preferences'), Icon: Settings },
   ];
 
@@ -293,6 +293,22 @@ const Me = () => {
               >
                 <ShieldCheck className="h-3 w-3 flex-none" />
                 <span className="hidden sm:inline">{t('me.adminPanel')}</span>
+              </button>
+
+              {/* Sign out sits with admin because both are ways out of this
+                  page rather than things on it. Same pill, same rule about the
+                  label collapsing on a phone. */}
+              <button
+                onClick={async () => {
+                  await signOut();
+                  window.location.href = '/';
+                }}
+                title={t('me.signOut')}
+                aria-label={t('me.signOut')}
+                className="flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.06em] text-black transition-opacity hover:opacity-90"
+              >
+                <LogOut className="h-3 w-3 flex-none" />
+                <span className="hidden sm:inline">{t('me.signOut')}</span>
               </button>
             </div>
 
@@ -496,10 +512,17 @@ const Me = () => {
         )}
 
         {/* Sign in / out */}
-        <button onClick={async () => { if (!email) { navigate('/auth'); return; } await signOut(); window.location.href = '/'; }} className="flex w-full items-center justify-between border-t border-b border-black/10 bg-primary px-5 py-4 text-left transition-opacity hover:opacity-90">
-          <span className="font-sans text-[13.5px] font-semibold text-black">{email ? t('me.signOut') : t('me.signIn')}</span>
-          <span className="font-sans text-[12px] text-black/70">→</span>
-        </button>
+        {/* Signed out, this is the only way in, so it keeps the full width.
+            Signed in, leaving is a pill up in the row with admin. */}
+        {!email && (
+          <button
+            onClick={() => navigate('/auth')}
+            className="flex w-full items-center justify-between border-t border-b border-black/10 bg-primary px-5 py-4 text-left transition-opacity hover:opacity-90"
+          >
+            <span className="font-sans text-[13.5px] font-semibold text-black">{t('me.signIn')}</span>
+            <span className="font-sans text-[12px] text-black/70">→</span>
+          </button>
+        )}
       </div>
     </AppShell>
   );
