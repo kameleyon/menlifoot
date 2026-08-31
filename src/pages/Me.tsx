@@ -253,20 +253,39 @@ const Me = () => {
         )}
 
         {/* ── Admin ──
-            Only rendered for staff, but the panel does not rely on that: it
-            gates its own tabs, and manage-users and list-orders both verify
-            role = admin against the caller's token server-side. Hiding a
-            button is a convenience, never the permission boundary. */}
-        {email && (isAdmin || isEditor) && (
+            Shown to every signed-in member, and the check happens on the click
+            rather than on the render. Hiding it made the panel invisible to the
+            staff who needed it and unexplained to everyone else; a member who
+            wonders what it is now gets an answer instead of nothing.
+            
+            Safe to show, because none of this is the permission boundary: the
+            panel refuses anyone without a role, its orders and users tabs are
+            admin-only, and manage-users and list-orders both verify
+            role = admin against the caller's token server-side. */}
+        {email && (
           <button
-            onClick={() => navigate('/admin')}
+            onClick={() => {
+              if (isAdmin || isEditor) {
+                navigate('/admin');
+                return;
+              }
+              toast({
+                title: t('me.adminDenied'),
+                description: t('me.adminDeniedBody'),
+                variant: 'destructive',
+              });
+            }}
             className="flex w-full items-center gap-3 border-t border-white/[0.06] px-5 py-4 text-left transition-colors hover:bg-white/[0.03]"
           >
             <ShieldCheck className="h-4 w-4 flex-none text-primary" />
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="font-sans text-[13.5px] font-medium">{t('me.adminPanel')}</span>
               <span className="truncate font-sans text-[11.5px] text-foreground/45">
-                {isAdmin ? t('me.adminScopeAdmin') : t('me.adminScopeEditor')}
+                {isAdmin
+                  ? t('me.adminScopeAdmin')
+                  : isEditor
+                  ? t('me.adminScopeEditor')
+                  : t('me.adminStaffOnly')}
               </span>
             </div>
             <ChevronRight className="h-4 w-4 flex-none text-foreground/30" />
