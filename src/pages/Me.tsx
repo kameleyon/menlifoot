@@ -199,9 +199,29 @@ const Me = () => {
             no way to reach them at all. */}
         {email && (
           <div className="border-t border-white/[0.06] px-5 py-4">
-            <div className="mb-3 flex items-center gap-2">
-              <Trophy className="h-4 w-4 text-primary" />
-              <span className="font-sans text-[13.5px] font-medium">{t('me.fantasy')}</span>
+            {/* The section label and the account tabs share one line. Wraps
+                rather than overflows, because four labels in four languages do
+                not all fit beside the heading on a narrow screen. */}
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+              <div className="flex items-center gap-2">
+                <Trophy className="h-4 w-4 text-primary" />
+                <span className="font-sans text-[13.5px] font-medium">{t('me.fantasy')}</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {TABS.map((tb) => (
+                  <button
+                    key={tb.id}
+                    onClick={() => setTab(tb.id)}
+                    className={`rounded-full px-2.5 py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.06em] transition-colors ${
+                      tab === tb.id
+                        ? 'bg-primary text-primary-foreground'
+                        : 'border border-white/[0.14] text-foreground/60 hover:border-primary/50 hover:text-primary'
+                    }`}
+                  >
+                    {tb.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
@@ -275,11 +295,11 @@ const Me = () => {
                 variant: 'destructive',
               });
             }}
-            className="flex w-full items-center gap-3 border-t border-white/[0.06] px-5 py-4 text-left transition-colors hover:bg-white/[0.03]"
+            className="flex w-full items-center gap-3 border-t border-white/[0.06] bg-primary/[0.05] px-5 py-4 text-left transition-colors hover:bg-primary/[0.11]"
           >
             <ShieldCheck className="h-4 w-4 flex-none text-primary" />
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="font-sans text-[13.5px] font-medium">{t('me.adminPanel')}</span>
+              <span className="font-sans text-[13.5px] font-medium text-primary">{t('me.adminPanel')}</span>
               <span className="truncate font-sans text-[11.5px] text-foreground/45">
                 {isAdmin
                   ? t('me.adminScopeAdmin')
@@ -288,18 +308,8 @@ const Me = () => {
                   : t('me.adminStaffOnly')}
               </span>
             </div>
-            <ChevronRight className="h-4 w-4 flex-none text-foreground/30" />
+            <ChevronRight className="h-4 w-4 flex-none text-primary/60" />
           </button>
-        )}
-
-        {/* Tabs */}
-        {email && (
-          <div className="flex gap-2 px-5 pb-1">
-            {TABS.map((tb) => (
-              <button key={tb.id} onClick={() => setTab(tb.id)} className="rounded-full px-3.5 py-2 font-sans text-[11px] font-semibold uppercase tracking-[0.06em] transition-colors"
-                style={tab === tb.id ? { background: '#f4f2ee', color: '#070708' } : { border: '1px solid rgba(255,255,255,.14)', color: 'rgba(244,242,238,.7)' }}>{tb.label}</button>
-            ))}
-          </div>
         )}
 
         {/* ── Activity tab ── */}
