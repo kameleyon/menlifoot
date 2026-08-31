@@ -1085,6 +1085,9 @@ serve(async (req) => {
     const captainId: string | null = (squad?.starters ?? []).find(
       (s: { is_captain?: boolean }) => s?.is_captain,
     )?.player_id ?? null;
+    const viceId: string | null = (squad?.starters ?? []).find(
+      (s: { is_vice?: boolean }) => s?.is_vice,
+    )?.player_id ?? null;
 
     if (starterIds.length === 0) throw new Error("squad.starters must contain resolved player_ids");
 
@@ -1101,6 +1104,7 @@ serve(async (req) => {
     if (starters.length === 0) throw new Error("none of the starter ids matched a known player");
 
     const captain = captainId ? byId.get(captainId) ?? null : null;
+    const vice = viceId ? byId.get(viceId) ?? null : null;
 
     // ------------------------------------------------------------ scoring ---
     const scored = scoreSquad(starters, bench, captain, competition);
@@ -1365,12 +1369,54 @@ serve(async (req) => {
     const projections: Record<string, number> = {};
     for (const pl of [...starters, ...bench]) projections[pl.id] = projectedPoints(pl);
 
-    // The captain scores twice, so the squad total has to say so - a projection
-    // that ignored the armband would understate every squad by a player.
+    /**
+     * The armband, as an expectation rather than a doubling.
+     *
+     * The captain scores twice - but only if he plays. When he does not, the
+     * armband falls to the vice, which is the entire reason a vice exists and
+     * the reason a projection that ignores him is wrong for exactly the squads
+     * where it matters most.
+     *
+     * Each player's projection already carries his own chance of playing, so
+     * the captain's extra copy is simply his projection again. What has to be
+     * added on top is the vice's, weighted by the chance the armband reaches
+     * him:
+     *
+     *     bonus = projected(captain) + P(captain does not play) x projected(vice)
+     *
+     * A fit captain leaves that second term at zero, which is correct: the
+     * vice is worth nothing while the captain is playing. A doubtful captain
+     * gives the vice half his value, and an injured one hands it over
+     * entirely - which is when a manager most needs the number to be honest.
+     */
+    // Two chips change what a squad scores, so the projection has to know
+    // which one is being played. The others - Wildcard, Free Hit, Limitless -
+    // change what a manager may buy, not what the eleven return, so they leave
+    // this number alone. A chip already spent cannot be played, and
+    // plannedChip is filtered against the remaining ones above, so a chip
+    // named in the request but already used inflates nothing.
+    const triplingCaptain = plannedChip === "Triple Captain";
+    const boostingBench = plannedChip === "Bench Boost";
+
+    // Triple Captain buys a second extra copy, not a third one on top.
+    const extraCopies = triplingCaptain ? 2 : 1;
+
+    const armband = captain
+      ? extraCopies *
+        (projections[captain.id] +
+          (vice && vice.id !== captain.id
+            ? (1 - availabilityScore(captain)) * projections[vice.id]
+            : 0))
+      : 0;
+
+    // Bench Boost is the only time the bench scores, which is why a squad
+    // playing it should be judged on all fifteen rather than eleven.
+    const benchPoints = boostingBench
+      ? bench.reduce((t, pl) => t + (projections[pl.id] ?? 0), 0)
+      : 0;
+
     const projectedTotal = Number(
-      starters
-        .reduce((t, pl) => t + projections[pl.id] * (pl.id === captain?.id ? 2 : 1), 0)
-        .toFixed(1),
+      (starters.reduce((t, pl) => t + projections[pl.id], 0) + armband + benchPoints).toFixed(1),
     );
 
     // ----------------------------------------------------------- narrative ---
