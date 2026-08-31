@@ -1184,6 +1184,23 @@ serve(async (req) => {
     const bank = anyPriced ? Math.max(0, SQUAD_BUDGET - squadSpend) : null;
 
     const candidates: Record<string, { player: Player; gain: number }[]> = {};
+
+    // Squad make-up, so a suggestion cannot propose a fourth player from a club
+    // that already has three. The rule applies to advice exactly as it applies
+    // to the builder - recommending a transfer the game will refuse is worse
+    // than recommending nothing.
+    const squadPerClub = [...starters, ...bench].reduce<Record<string, number>>((acc, pl) => {
+      acc[pl.team] = (acc[pl.team] ?? 0) + 1;
+      return acc;
+    }, {});
+
+    /** Whether bringing `incoming` in for `outgoing` keeps the club cap. */
+    const swapKeepsClubCap = (incoming: Player, outgoing: Player) => {
+      // Selling from the same club frees the slot the purchase would take.
+      const freed = incoming.team === outgoing.team ? 1 : 0;
+      return (squadPerClub[incoming.team] ?? 0) - freed < MAX_PER_CLUB;
+    };
+
     for (const { p, s: incumbentScore } of weakest) {
       let q = supabase
         .from("ucl_players")
@@ -1205,6 +1222,7 @@ serve(async (req) => {
         .limit(40);
 
       candidates[p.id] = ((alts ?? []) as Player[])
+        .filter((c) => swapKeepsClubCap(c, p))
         .map((c) => ({ player: c, gain: expectedValue(c) - incumbentScore }))
         .filter((c) => c.gain >= UPGRADE_MARGIN)
         .sort((a, b) => b.gain - a.gain)
@@ -1326,6 +1344,11 @@ serve(async (req) => {
               content:
                 `You are a UEFA Champions League Fantasy analyst writing in ${langName}. ` +
                 "The rating and breakdown are already final — never dispute or restate a different number. " +
+                "Write each transfer reason as the case for it. If the honest case needs a " +
+                "concession — the incoming player returning less so far, a thinner sample — say " +
+                "so plainly and let it read as the trade-off it is, rather than arguing for and " +
+                "against in one sentence. Whether a suggestion is labelled recommended is " +
+                "decided from the numbers after you write, not by you. " +
                 `The goal is to get this squad above ${TARGET_RATING} out of 100. Use biggest_losses ` +
                 "to say plainly where the points are going and what would recover them, and " +
                 "projected_rating_if_followed as the honest outcome of taking this advice - do " +
@@ -1368,6 +1391,46 @@ serve(async (req) => {
             // suggestion is matched back to the candidate it names so the
             // measured upgrade travels with it, rather than trusting a
             // priority label the model assigned itself.
+    /**
+     * Whether the plain numbers back the swap.
+     *
+     * expectedValue blends availability, form and fixture, so a modest player
+     * with an easy draw can clear the upgrade threshold while returning less
+     * than the player he replaces. The model then writes an honest sentence
+     * that argues against its own suggestion - "although his 9 points and 4.5
+     * per game are well below the other's 20 and 10" - under a Recommended
+     * badge.
+     *
+     * A recommendation is a statement of confidence. When the returns say the
+     * opposite it is still a legitimate suggestion, driven by the fixture, and
+     * it is still shown - it just is not recommended.
+     */
+    const returnsSupportSwap = (incoming: Player, outgoing: Player): boolean => {
+      const inRate = incoming.points_per_game;
+      const outRate = outgoing.points_per_game;
+      // Per appearance where both have played, since a total rewards whoever
+      // has had more rounds rather than whoever is better.
+      if (inRate != null && outRate != null) return inRate >= outRate;
+      return incoming.total_points >= outgoing.total_points;
+    };
+
+    // Squad make-up as the suggestion list is walked, so the set stays legal
+    // taken together and not merely one at a time.
+    const runningPerClub: Record<string, number> = { ...squadPerClub };
+
+    /** Look up the two players behind a suggestion the model phrased itself. */
+    const playersFor = (outName: string, inName: string) => {
+      for (const [outId, alts] of Object.entries(candidates)) {
+        const out = byId.get(outId);
+        if (!out || !String(outName ?? "").includes(out.name.split(" ").pop() ?? "")) continue;
+        const hit = alts.find((a) =>
+          String(inName ?? "").includes(a.player.name.split(" ").pop() ?? "")
+        );
+        if (hit) return { out, incoming: hit.player };
+      }
+      return null;
+    };
+
             const gainFor = (outName: string, inName: string): number | null => {
               for (const [outId, alts] of Object.entries(candidates)) {
                 const out = byId.get(outId);
@@ -1388,13 +1451,38 @@ serve(async (req) => {
               .sort((a: Record<string, unknown>, c: Record<string, unknown>) =>
                 Number(c.upgrade ?? 0) - Number(a.upgrade ?? 0)
               )
-              .map((sg: Record<string, unknown>, i: number) => ({
-                ...sg,
-                // Top two, and only when the gain is clear enough to be worth
-                // acting on. A marginal upgrade badged "recommended" is how a
-                // manager gets talked into a pointless hit.
-                recommended: i < 2 && Number(sg.upgrade ?? 0) >= STRONG_UPGRADE,
-              }));
+              // Each suggestion is checked against the squad, but a manager
+              // reads the list top down and may take several. Three separately
+              // legal moves can still be three players from one club, so the
+              // list is walked in order against a running tally and anything
+              // that would break the cap by then is dropped. Advice that is
+              // only legal if you stop halfway is not advice.
+              .filter((sg: Record<string, unknown>) => {
+                const pair = playersFor(String(sg.out ?? ""), String(sg.in ?? ""));
+                if (!pair) return true;
+                const { incoming, out } = pair;
+                const freed = incoming.team === out.team ? 1 : 0;
+                if ((runningPerClub[incoming.team] ?? 0) - freed >= MAX_PER_CLUB) return false;
+                runningPerClub[out.team] = (runningPerClub[out.team] ?? 1) - 1;
+                runningPerClub[incoming.team] = (runningPerClub[incoming.team] ?? 0) + 1;
+                return true;
+              })
+              .map((sg: Record<string, unknown>, i: number) => {
+                const pair = playersFor(String(sg.out ?? ""), String(sg.in ?? ""));
+                return {
+                  ...sg,
+                  // Top two, a gain clear enough to be worth acting on, and the
+                  // plain numbers not pointing the other way. A marginal
+                  // upgrade badged "recommended" is how a manager gets talked
+                  // into a pointless hit; one the write-up itself argues
+                  // against is worse, because it teaches them not to trust the
+                  // badge at all.
+                  recommended:
+                    i < 2 &&
+                    Number(sg.upgrade ?? 0) >= STRONG_UPGRADE &&
+                    (pair ? returnsSupportSwap(pair.incoming, pair.out) : false),
+                };
+              });
           } catch {
             console.error("narrative JSON parse failed");
           }
