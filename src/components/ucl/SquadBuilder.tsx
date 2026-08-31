@@ -691,30 +691,39 @@ const SquadBuilder = ({
                         type="button"
                         disabled={taken || clubFull}
                         onClick={() => assign(p)}
-                        className="flex w-full items-center justify-between gap-2 border-b border-border/50 p-3 text-left disabled:opacity-40"
+                        className="flex w-full items-center justify-between gap-2 border-b border-border/50 p-3 text-left"
                       >
-                        <div className="min-w-0">
+                        {/* The dimming is applied to the player, never to the
+                            reason he cannot be picked. Fading the whole row
+                            faded the one line that explains it, so the only
+                            useful thing on a blocked row was the hardest thing
+                            on it to read. */}
+                        <div className={`min-w-0 ${taken || clubFull ? 'opacity-40' : ''}`}>
                           <div className="truncate text-sm font-medium">{p.display_name || p.name}</div>
                           <div className="truncate text-xs text-muted-foreground">
                             {p.team} · {p.position}
                             {p.availability !== 'available' && ` · ${p.availability}`}
                           </div>
-                          {/* Say why it is greyed out. A disabled row with no
-                              reason reads as a broken list. */}
-                          {clubFull && (
-                            <div className="truncate text-[11px] text-destructive">
-                              {t('ucl.clubFull')}
-                            </div>
-                          )}
                         </div>
-                        {/* Show the stat that put this player above the next one,
-                            so the ranking can be checked rather than trusted. */}
-                        <div className="shrink-0 text-right">
-                          <div className="text-xs font-medium text-primary">
-                            {stat != null ? `${stat.toFixed(1)} ${t('ucl.perGame')}` : '—'}
-                          </div>
-                          <div className="text-[11px] text-muted-foreground">
-                            {p.total_points} {t('ucl.ptsShort')}
+
+                        <div className="flex shrink-0 items-center gap-2">
+                          {/* Full strength, and worded as the rule rather than
+                              as an error - the squad is fine, this player just
+                              will not fit in it. */}
+                          {(clubFull || taken) && (
+                            <span className="rounded-full border border-primary/50 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-primary">
+                              {clubFull ? t('ucl.clubFull') : t('ucl.alreadyPicked')}
+                            </span>
+                          )}
+                          {/* The stat that put this player above the next one,
+                              so the ranking can be checked rather than trusted. */}
+                          <div className={`text-right ${taken || clubFull ? 'opacity-40' : ''}`}>
+                            <div className="text-xs font-medium text-primary">
+                              {stat != null ? `${stat.toFixed(1)} ${t('ucl.perGame')}` : '—'}
+                            </div>
+                            <div className="text-[11px] text-muted-foreground">
+                              {p.total_points} {t('ucl.ptsShort')}
+                            </div>
                           </div>
                         </div>
                       </button>
