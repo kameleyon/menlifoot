@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Upload, PenLine, ArrowLeft, AlertTriangle, ArrowRight,
-  Clipboard, Wand2, Star, Zap, CalendarDays, ChevronDown, Coins,
+  Clipboard, Wand2, Star, Zap, CalendarDays, ChevronDown, Coins, Lock,
 } from 'lucide-react';
 import AppShell from '@/components/mobile/AppShell';
 import { Button } from '@/components/ui/button';
@@ -74,7 +74,7 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
   // Chips already spent this season. They narrow what can still be advised.
   const [usedChips, setUsedChips] = useState<string[]>([]);
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const signedIn = Boolean(user);
 
   // Everything already paid for on this squad, so re-rating after an optimise
@@ -313,6 +313,47 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
     setPaidUnlocks([]);
     setPaidTransfers(0);
   };
+
+  // ------------------------------------------------------------- sign-in ---
+  // Both competitions need an account. The squad is saved against a user and
+  // the Champions League side spends credits, so there is no useful anonymous
+  // version of this page - and letting someone build a full fifteen before
+  // telling them wastes the only work they did.
+  //
+  // Waits for the auth check to finish. Rendering the gate while it is still
+  // running would flash "sign in" at a member on every refresh.
+  if (authLoading) {
+    return (
+      <AppShell>
+        <div className="mx-auto w-full max-w-lg px-4 pt-24 text-center text-sm text-muted-foreground">
+          {t('ucl.loading')}
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (!user) {
+    return (
+      <AppShell>
+        <div className="mx-auto w-full max-w-lg px-4 pb-24 pt-16 text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary">
+            <Lock className="h-5 w-5 text-black" />
+          </div>
+          <h1 className="font-display text-2xl uppercase">{t('ucl.signInRequired')}</h1>
+          <p className="mx-auto mt-2 max-w-xs text-sm text-muted-foreground">
+            {t('ucl.signInRequiredBody')}
+          </p>
+          <button
+            type="button"
+            onClick={goSignIn}
+            className="mt-6 w-full rounded-full bg-primary px-5 py-3 font-sans text-sm font-semibold uppercase tracking-[0.06em] text-black transition-opacity hover:opacity-90"
+          >
+            {t('ucl.signIn')}
+          </button>
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell>
