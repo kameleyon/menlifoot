@@ -70,6 +70,72 @@ const UNLOCK_PRICES = {
 
 const MAX_TRANSFERS = 5;
 
+/**
+ * Calibration.
+ *
+ * These decide what a full mark means, and they were set against a season-long
+ * ideal that nothing in the game reaches. The best squad the optimiser could
+ * build - every pound spent perfectly, inside the club cap - scored 78, losing
+ * ten points on form and seven on value. A ceiling no squad can touch is not a
+ * demanding scale, it is a broken one: it compresses every real squad into a
+ * narrow band and makes the difference between a good and a great team smaller
+ * than it should be.
+ *
+ * Measured against the live pool rather than picked by feel. Across Premier
+ * League players with minutes, points per game runs p50 2.0, p90 6.0, and
+ * points per game per million runs p50 0.36, p90 1.09.
+ */
+
+/**
+ * Per-appearance return worth full marks. p90 of the pool is 6.0, and this
+ * sits below it deliberately: the score averages eleven starters, and an XI
+ * cannot be eleven p90 players inside the budget. The benchmark has to be what
+ * a great SQUAD averages, not what a great player scores.
+ */
+const ELITE_POINTS_PER_GAME = 4.2;
+
+/** Return per million per appearance worth full marks. p90 is 1.09. */
+const ELITE_VALUE_PER_MILLION = 1.1;
+
+/**
+ * What the cheapest player in the game is assumed to be worth before any
+ * evidence arrives.
+ *
+ * Price expectation used to run to zero at the 4.0m floor, which punished the
+ * enabler every budget squad is forced to own: the optimal side starts three
+ * 4.0m defenders precisely so it can afford a 15.5m striker, and each of them
+ * scored nothing on form. The floor of the market is not the floor of ability
+ * - a 4.0m player is a professional starting footballer, not a zero.
+ */
+const CHEAPEST_PLAYER_PRIOR = 0.35;
+
+/**
+ * What a perfect squad actually reaches in each dimension.
+ *
+ * Full marks used to mean a theoretical ideal that no squad could approach.
+ * Some of those ceilings are unreachable by construction rather than by
+ * accident: form shrinks each player toward what their price implies, so a
+ * 4.0m defender playing out of his skin still blends to about 0.72 on three
+ * games of evidence. That shrinkage is right - it is what stops one lucky haul
+ * from outranking a genuinely better player - so the fix is not to weaken it.
+ * Nor can eleven starters all draw the easiest fixture in the same round.
+ *
+ * So the top of the scale is the best squad the competition permits, measured
+ * by running the optimiser and reading what it attains. A squad matching it
+ * scores 100, and every real squad falls below on its own merits.
+ *
+ * Measured, not chosen. They drift as a season accumulates minutes and the
+ * shrinkage loosens; re-measure by rating the autofill squad and reading the
+ * ratios back. A ceiling that has drifted low only means more squads reach
+ * 100, never that a bad squad does.
+ */
+const ACHIEVABLE: Partial<Record<keyof typeof WEIGHTS, number>> = {
+  captain: 0.98,
+  form: 0.72,
+  fixtures: 0.91,
+  value: 0.78,
+};
+
 // A suggestion is flagged as recommended when the replacement is clearly
 // better, not merely better. Below this the upgrade is real but marginal and
 // rarely worth a points hit, so it is offered without a badge.
@@ -137,14 +203,17 @@ const sampleWeight = (p: Player) => clamp01((p.minutes ?? 0) / 450);
  * this season has barely started. Roughly 4.0m floor to 15.0m ceiling.
  */
 const priceExpectation = (p: Player) =>
-  p.price == null ? 0.45 : clamp01((p.price - 4) / 11);
+  p.price == null
+    ? 0.45
+    : CHEAPEST_PLAYER_PRIOR +
+      (1 - CHEAPEST_PLAYER_PRIOR) * clamp01((p.price - 4) / 11);
 
 /**
  * Scoring rate per appearance, which is steadier than a 30-day form window
  * because it is not distorted by a single blank or a single haul.
  */
 const perGameScore = (p: Player) =>
-  p.points_per_game == null ? null : clamp01(p.points_per_game / 8);
+  p.points_per_game == null ? null : clamp01(p.points_per_game / ELITE_POINTS_PER_GAME);
 
 /**
  * Form, regressed toward what the player's price implies.
@@ -157,7 +226,7 @@ const perGameScore = (p: Player) =>
  */
 const formScore = (p: Player) => {
   const w = sampleWeight(p);
-  const observed = perGameScore(p) ?? clamp01((p.form ?? 0) / 8);
+  const observed = perGameScore(p) ?? clamp01((p.form ?? 0) / ELITE_POINTS_PER_GAME);
   const prior = priceExpectation(p);
   const blended = w * observed + (1 - w) * prior;
 
@@ -171,9 +240,20 @@ const formScore = (p: Player) => {
   return blended;
 };
 
-/** next_difficulty is 1 (easiest) to 5 (hardest). */
+/**
+ * next_difficulty is 1 (easiest) to 5 (hardest).
+ *
+ * Divided by less than the full range for the same reason as the form
+ * benchmark: a manager picks players, not fixtures, and no legal squad has all
+ * eleven starters facing the weakest opposition in the same round. An average
+ * difficulty around 2 is as good as a real squad gets, so that earns full
+ * marks rather than the unreachable 1.
+ */
+const EASY_ENOUGH_DIFFICULTY = 3.2;
 const fixtureScore = (p: Player) =>
-  p.next_difficulty == null ? 0.5 : clamp01((5 - p.next_difficulty) / 4);
+  p.next_difficulty == null
+    ? 0.5
+    : clamp01((5 - p.next_difficulty) / EASY_ENOUGH_DIFFICULTY);
 
 const availabilityScore = (p: Player) => {
   switch (p.availability) {
@@ -186,10 +266,21 @@ const availabilityScore = (p: Player) => {
   }
 };
 
-/** Points per million, normalised against a strong benchmark of 8 pts/£m. */
+/**
+ * Return per million, per appearance.
+ *
+ * The old version divided total points by price, which measured the calendar
+ * rather than the squad: points accumulate all season, so the same player
+ * scored 0.26 in August and saturated at 1.0 by midwinter. Every squad rated
+ * before Christmas lost most of this dimension no matter who was in it.
+ *
+ * Per game instead, so a squad is judged on what its players return whenever
+ * they play rather than on how many rounds have been played.
+ */
 const valueScore = (p: Player) => {
   if (!p.price || p.price <= 0) return 0.5;
-  return clamp01(p.total_points / p.price / 8);
+  if (p.points_per_game == null) return 0.5;
+  return clamp01(p.points_per_game / p.price / ELITE_VALUE_PER_MILLION);
 };
 
 
@@ -310,6 +401,16 @@ function scoreSquad(starters: Player[], bench: Player[], captain: Player | null)
     value: avg([...starters, ...bench].map(valueScore)),
   };
 
+  // Rescale each dimension against what a perfect squad reaches, so full marks
+  // means "as good as this competition allows" rather than "as good as
+  // arithmetic allows". Dimensions a real squad can already max out -
+  // availability, structure, diversity - have no ceiling entry and are left
+  // alone.
+  for (const key of Object.keys(sub) as (keyof typeof WEIGHTS)[]) {
+    const ceiling = ACHIEVABLE[key];
+    if (ceiling) sub[key] = clamp01(sub[key] / ceiling);
+  }
+
   const squadAll = [...starters, ...bench];
   const applicable: Record<keyof typeof WEIGHTS, boolean> = {
     captain: true,
@@ -318,7 +419,7 @@ function scoreSquad(starters: Player[], bench: Player[], captain: Player | null)
     diversity: true,
     form: starters.some((p) => p.form != null || p.points_per_game != null),
     fixtures: starters.some((p) => p.next_difficulty != null),
-    value: squadAll.some((p) => p.price != null && p.total_points > 0),
+    value: squadAll.some((p) => p.price != null && p.points_per_game != null),
   };
 
   const liveKeys = (Object.keys(WEIGHTS) as (keyof typeof WEIGHTS)[]).filter((k) => applicable[k]);
