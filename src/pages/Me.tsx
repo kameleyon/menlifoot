@@ -173,8 +173,17 @@ const Me = () => {
     return () => { cancelled = true; };
   }, [user]);
 
-  const [tab, setTab] = useState<'activity' | 'orders' | 'preferences'>('activity');
-  const TABS: { id: typeof tab; label: string }[] = [
+  /**
+   * Which panel is open, or none.
+   *
+   * Nothing is open on arrival. Defaulting to Activity meant a member landed
+   * on a wall of their own saved and liked articles before reaching anything
+   * they came for, and the tab looked pre-pressed for no reason they chose.
+   * Clicking the open tab again closes it.
+   */
+  type Tab = 'activity' | 'orders' | 'preferences';
+  const [tab, setTab] = useState<Tab | null>(null);
+  const TABS: { id: Tab; label: string }[] = [
     { id: 'activity', label: t('me.activity') },
     { id: 'orders', label: t('me.orders') },
     { id: 'preferences', label: t('me.preferences') },
@@ -211,7 +220,7 @@ const Me = () => {
                 {TABS.map((tb) => (
                   <button
                     key={tb.id}
-                    onClick={() => setTab(tb.id)}
+                    onClick={() => setTab((cur) => (cur === tb.id ? null : tb.id))}
                     className={`rounded-full px-2.5 py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.06em] transition-colors ${
                       tab === tb.id
                         ? 'bg-primary text-primary-foreground'
