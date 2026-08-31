@@ -463,7 +463,7 @@ export const emptySlot = (position: Position): SquadSlot => ({ player_id: null, 
 export const applyFormation = (
   pool: SquadSlot[],
   formation: string,
-): { starters: SquadSlot[]; bench: SquadSlot[] } => {
+): { starters: SquadSlot[]; bench: SquadSlot[]; overflow: SquadSlot[] } => {
   const need = formationSlots(formation);
   // A slot holds something if a name was read into it, matched or not. Keeping
   // only resolved players would delete exactly the ones the manager opened the
@@ -477,7 +477,14 @@ export const applyFormation = (
     Array.from({ length: need[pos] }, () => take(pos)),
   );
   const bench = benchShape(formation).map(take);
-  return { starters, bench: [...bench, ...remaining] };
+
+  // Whatever is still in hand has no seat under the 2/5/5/3 rule, because the
+  // XI and the bench together are exactly that. It means a position was
+  // over-read - a screenshot scanned as six defenders - not that the manager
+  // owns sixteen players. Returned rather than benched: a fifteen-man squad
+  // with five substitutes is not a squad, and silently deleting a name the
+  // reader can see on their own screenshot is worse than saying so.
+  return { starters, bench, overflow: remaining };
 };
 
 /** True when a squad already matches its own formation, line for line. */
@@ -516,6 +523,8 @@ export const rateSquad = async (
     competition?: Competition;
     chip?: string | null;
     usedChips?: string[];
+    /** Keep the narrative already on screen instead of paying to regenerate it. */
+    skipNarrative?: boolean;
   },
 ): Promise<RatingResult> => {
   const { data, error } = await supabase.functions.invoke('ucl-rate-squad', {
@@ -528,6 +537,7 @@ export const rateSquad = async (
       competition: opts.competition ?? 'UCL',
       chip: opts.chip ?? null,
       usedChips: opts.usedChips ?? [],
+      skipNarrative: opts.skipNarrative ?? false,
     },
   });
   // supabase-js surfaces a non-2xx as `error` with the body still in `data`,

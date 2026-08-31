@@ -594,6 +594,7 @@ serve(async (req) => {
       chip: rawChip = null,
       usedChips: rawUsedChips = [],
       mode: rawMode = "rate",
+      skipNarrative: rawSkipNarrative = false,
     } = await req.json();
 
     // Credits gate the Champions League product only. The Premier League
@@ -961,11 +962,21 @@ serve(async (req) => {
     const projected = scoreSquad(projectedStarters, projectedBench, projectedCaptain);
 
     // ----------------------------------------------------------- narrative ---
+    // The model call is six of the seven seconds a request takes. Unlocking a
+    // panel re-runs the whole analysis, so a manager who has already read the
+    // write-up waits six seconds to be handed the same prose about the same
+    // squad - nothing changed but how much of it they have paid to see.
+    //
+    // Only skippable when no transfers are wanted, because the same call
+    // produces the transfer shortlist: skipping it after paying for transfers
+    // would return nothing for them.
+    const reuseNarrative = rawSkipNarrative === true && transferCount === 0;
+
     const apiKey = Deno.env.get("OPENROUTER_API_KEY");
     let narrative: Record<string, unknown> | null = null;
     let suggestions: unknown[] = [];
 
-    if (apiKey) {
+    if (apiKey && !reuseNarrative) {
       const brief = {
         rating,
         target_rating: TARGET_RATING,

@@ -28,6 +28,7 @@ import {
   DEFAULT_FORMATION,
   applyFormation,
   matchesFormation,
+  type SquadSlot,
   FORMATIONS,
   COMPETITION_LABEL,
   type Competition,
@@ -181,7 +182,6 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
     try {
       const b64 = await fileToBase64(file);
       const parsed = await parseScreenshot(b64, competition);
-      setUnresolved(parsed.unresolved ?? []);
       // Trust the shape the screenshot showed, but only if the resolved
       // positions actually support it: the vision model reads rows off a
       // picture, while positions come from the game, and the game wins.
@@ -205,9 +205,20 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
       // label on the squad and never a constraint on it.
       const pool = [...resolved, ...(parsed.bench ?? [])];
       const dealt = matchesFormation(resolved, shape)
-        ? { starters: resolved, bench: parsed.bench ?? [] }
+        ? { starters: resolved, bench: parsed.bench ?? [], overflow: [] as SquadSlot[] }
         : applyFormation(pool, shape);
-      const next: Squad = { formation: shape, ...dealt };
+      const next: Squad = { formation: shape, starters: dealt.starters, bench: dealt.bench };
+
+      // A squad is fifteen: eleven and four, never eleven and five. Anything
+      // left over means a position was over-read - a screenshot scanned as six
+      // defenders - so it is reported rather than benched, because a
+      // sixteen-man squad cannot be entered in the game and silently deleting
+      // a name the manager can see on their own screenshot is worse than
+      // saying which one did not fit.
+      const overflowNames = dealt.overflow.map(
+        (o) => o.display_name || o.name || o.read_as || '?',
+      );
+      setUnresolved([...(parsed.unresolved ?? []), ...overflowNames]);
       // Anything the OCR could not resolve goes to the builder for correction
       // rather than being scored with holes in it.
       if (parsed.needs_review) {
@@ -250,8 +261,12 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
         usedChips,
         unlock: nextUnlocks,
         transferCount: nextTransfers,
+        // The squad has not changed, so neither has the write-up. Asking for it
+        // again costs six seconds to redisplay what is already on screen.
+        skipNarrative: nextTransfers === 0,
       });
-      setResult(r);
+      // Keep the narrative we already have when the server was told to skip it.
+      setResult((prev) => ({ ...r, narrative: r.narrative ?? prev?.narrative ?? null }));
       setPaidUnlocks(nextUnlocks);
       setPaidTransfers(nextTransfers);
       if (r.credits_remaining != null) setBalance(r.credits_remaining);

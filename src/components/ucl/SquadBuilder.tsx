@@ -149,7 +149,10 @@ const SquadBuilder = ({
     setFormation(next);
     markEdited();
     setStarters(dealt.starters);
-    setBench(dealt.bench);
+    // Overflow here means the squad was already over quota before the reshape,
+    // so it keeps riding the bench. Dropping a player because the manager tried
+    // a different shape would throw away work they did by hand.
+    setBench([...dealt.bench, ...dealt.overflow]);
   };
 
   useEffect(() => {
