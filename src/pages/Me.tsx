@@ -272,46 +272,6 @@ const Me = () => {
           </div>
         )}
 
-        {/* ── Admin ──
-            Shown to every signed-in member, and the check happens on the click
-            rather than on the render. Hiding it made the panel invisible to the
-            staff who needed it and unexplained to everyone else; a member who
-            wonders what it is now gets an answer instead of nothing.
-            
-            Safe to show, because none of this is the permission boundary: the
-            panel refuses anyone without a role, its orders and users tabs are
-            admin-only, and manage-users and list-orders both verify
-            role = admin against the caller's token server-side. */}
-        {email && (
-          <button
-            onClick={() => {
-              if (isAdmin || isEditor) {
-                navigate('/admin');
-                return;
-              }
-              toast({
-                title: t('me.adminDenied'),
-                description: t('me.adminDeniedBody'),
-                variant: 'destructive',
-              });
-            }}
-            className="flex w-full items-center gap-3 border-t border-white/[0.06] bg-primary/[0.05] px-5 py-4 text-left transition-colors hover:bg-primary/[0.11]"
-          >
-            <ShieldCheck className="h-4 w-4 flex-none text-primary" />
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="font-sans text-[13.5px] font-medium text-primary">{t('me.adminPanel')}</span>
-              <span className="truncate font-sans text-[11.5px] text-foreground/45">
-                {isAdmin
-                  ? t('me.adminScopeAdmin')
-                  : isEditor
-                  ? t('me.adminScopeEditor')
-                  : t('me.adminStaffOnly')}
-              </span>
-            </div>
-            <ChevronRight className="h-4 w-4 flex-none text-primary/60" />
-          </button>
-        )}
-
         {/* ── Activity tab ── */}
         {email && tab === 'activity' && (<>
         {/* Saved articles */}
@@ -484,6 +444,49 @@ const Me = () => {
         )}
 
         {/* Sign in / out */}
+        {/* ── Admin ──
+            Below the tab content, beside Sign out, because it is an account
+            action rather than part of any tab. Sitting above the content it
+            split the tabs from the list they control, which made the activity
+            look like it belonged to nothing.
+
+            Shown to every signed-in member; the role is checked on the click,
+            not on the render. None of this is the permission boundary: the
+            panel refuses anyone without a role, its orders and users tabs are
+            admin-only, and manage-users and list-orders both verify
+            role = admin against the caller's token server-side. */}
+        {email && (
+          <button
+            onClick={() => {
+              if (isAdmin || isEditor) {
+                navigate('/admin');
+                return;
+              }
+              toast({
+                title: t('me.adminDenied'),
+                description: t('me.adminDeniedBody'),
+                variant: 'destructive',
+              });
+            }}
+            className="flex w-full items-center gap-3 border-t border-b border-black/10 bg-primary px-5 py-4 text-left transition-opacity hover:opacity-90"
+          >
+            <ShieldCheck className="h-4 w-4 flex-none text-black" />
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="font-sans text-[13.5px] font-semibold text-black">
+                {t('me.adminPanel')}
+              </span>
+              <span className="truncate font-sans text-[11.5px] text-black/70">
+                {isAdmin
+                  ? t('me.adminScopeAdmin')
+                  : isEditor
+                  ? t('me.adminScopeEditor')
+                  : t('me.adminStaffOnly')}
+              </span>
+            </div>
+            <ChevronRight className="h-4 w-4 flex-none text-black" />
+          </button>
+        )}
+
         <button onClick={async () => { if (!email) { navigate('/auth'); return; } await signOut(); window.location.href = '/'; }} className="flex w-full items-center justify-between border-t border-b border-white/[0.06] px-5 py-4 text-left transition-colors hover:bg-white/[0.03]">
           <span className="font-sans text-[13.5px] font-medium">{email ? t('me.signOut') : t('me.signIn')}</span>
           <span className="font-sans text-[12px] text-foreground/40">→</span>
