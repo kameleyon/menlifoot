@@ -34,14 +34,24 @@ const FIELDS = [
   'isActive', 'pStatus', 'qStatus', 'rating',
 ];
 
-const env = fs.readFileSync('.env', 'utf8');
-const read = (key) =>
-  (env.match(new RegExp(`^${key}\\s*=\\s*(.+)$`, 'm')) || [])[1]?.trim().replace(/^["']|["']$/g, '');
+// Environment first so CI can supply secrets, falling back to .env for a local
+// run. The .env read is optional: a CI runner has no such file.
+let dotenv = '';
+try {
+  dotenv = fs.readFileSync('.env', 'utf8');
+} catch {
+  dotenv = '';
+}
+const read = (key) => {
+  if (process.env[key]) return process.env[key];
+  const m = dotenv.match(new RegExp(`^${key}\\s*=\\s*(.+)$`, 'm'));
+  return m ? m[1].trim().replace(/^["']|["']$/g, '') : undefined;
+};
 
 const supabaseUrl = read('VITE_SUPABASE_URL');
 const supabaseKey = read('VITE_SUPABASE_PUBLISHABLE_KEY') || read('VITE_SUPABASE_ANON_KEY');
 if (!supabaseUrl || !supabaseKey) {
-  console.error('VITE_SUPABASE_URL and a publishable/anon key must be set in .env');
+  console.error('Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY (environment or .env)');
   process.exit(1);
 }
 

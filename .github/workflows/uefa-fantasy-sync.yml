@@ -1,0 +1,53 @@
+# Refresh the Champions League player pool from UEFA's fantasy feed.
+#
+# This runs here rather than in the nightly Supabase cron because Akamai
+# refuses that runtime: every season id fails at the connection layer from
+# Supabase's egress, while the identical request returns 200 from a browser,
+# from Node on a laptop, and from a GitHub runner. The edge function still does
+# all the mapping and merging - this job only performs the HTTP request it
+# cannot.
+#
+# Setup, once:
+#   Settings -> Secrets and variables -> Actions -> New repository secret
+#     VITE_SUPABASE_URL              https://<ref>.supabase.co
+#     VITE_SUPABASE_PUBLISHABLE_KEY  the publishable/anon key
+#
+# Both are public values that already ship in the built frontend, so this adds
+# no exposure. The sync function does its own writing with the service role key
+# it holds server-side; nothing privileged is stored here.
+name: UEFA fantasy sync
+
+on:
+  schedule:
+    # 06:00 UTC daily. Matchdays finish around 21:00 UTC, so this lands after
+    # UEFA has settled points and repriced, and before anyone in Europe or the
+    # Americas is picking a team.
+    - cron: '0 6 * * *'
+  # So a matchday can be picked up straight away without waiting for the clock.
+  workflow_dispatch:
+
+# One at a time: two overlapping pushes would race on the same rows.
+concurrency:
+  group: uefa-fantasy-sync
+  cancel-in-progress: false
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Push UEFA player feed
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        # The script exits non-zero on a bad feed, an empty player list or a
+        # failed sync, so a silent failure shows up as a failed run rather than
+        # as a pool that quietly stops updating - which is exactly how the old
+        # feed rotted unnoticed for days.
+        run: node scripts/push-uefa-players.mjs
