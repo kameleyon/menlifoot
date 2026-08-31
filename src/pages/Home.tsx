@@ -101,7 +101,7 @@ const Home = () => {
               <MessageCircle className="h-[19px] w-[19px]" strokeWidth={2} />
             </button>
             <MobileLangMenu />
-            <button onClick={() => (user ? navigate(isAdmin || isEditor ? '/admin' : '/me') : openAuth('signin'))} aria-label={t('auth.signin')} className="flex h-[38px] w-[38px] items-center justify-center rounded-full border border-white/[0.12] text-foreground/70 transition-colors hover:border-primary/60 hover:text-primary">
+            <button onClick={() => (user ? navigate('/me') : openAuth('signin'))} aria-label={t('auth.signin')} className="flex h-[38px] w-[38px] items-center justify-center rounded-full border border-white/[0.12] text-foreground/70 transition-colors hover:border-primary/60 hover:text-primary">
               <User className="h-[19px] w-[19px]" strokeWidth={2} />
             </button>
           </div>

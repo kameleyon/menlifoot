@@ -16,22 +16,26 @@ const TABS = [
 const BottomNav = () => {
   const { pathname } = useLocation();
   const { t } = useLanguage();
-  const { user, isAdmin, isEditor } = useAuth();
+  const { user } = useAuth();
   const { open: openAuth } = useAuthModal();
   const { count } = useStoreCart();
   const navigate = useNavigate();
   const isActive = (to: string) => (to === '/' ? pathname === '/' : pathname.startsWith(to));
 
-  // "Me" opens the auth modal when logged out; otherwise goes to the profile (or admin panel).
+  // "Me" opens the auth modal when logged out, and the account page otherwise -
+  // for staff too. It used to send admins and editors straight to the control
+  // panel, which meant they could not reach their own account at all: their
+  // fantasy squads, credits and saved articles were behind a button that
+  // skipped past them. The panel is one tap further on, from /me or the navbar.
   const onMe = () => {
     if (!user) return openAuth('signin');
-    navigate(isAdmin || isEditor ? '/admin' : '/me');
+    navigate('/me');
   };
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto flex max-w-[520px] border-t border-white/[0.08] bg-[#0a0a0b]/90 px-1.5 pb-7 pt-3 backdrop-blur-xl">
       {TABS.map((tab) => {
-        const active = isActive(tab.to) || (tab.key === 'nav.me' && (pathname.startsWith('/admin') || pathname.startsWith('/me')));
+        const active = isActive(tab.to) || (tab.key === 'nav.me' && pathname.startsWith('/admin'));
         const Icon = tab.Icon;
         const inner = (
           <>

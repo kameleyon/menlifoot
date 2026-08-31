@@ -73,7 +73,7 @@ const DesktopNav = () => {
             <ShoppingBag className="h-[18px] w-[18px]" />
             {count > 0 && <span className="absolute -right-2 -top-2 flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-primary px-1 font-sans text-[9px] font-bold text-[#070708]">{count}</span>}
           </Link>
-          <button onClick={() => (user ? navigate(isAdmin || isEditor ? '/admin' : '/me') : openAuth('signin'))} aria-label={t('auth.signin')} className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 text-foreground/70 hover:border-primary/60 hover:text-primary"><User className="h-[17px] w-[17px]" /></button>
+          <button onClick={() => (user ? navigate('/me') : openAuth('signin'))} aria-label={t('auth.signin')} className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 text-foreground/70 hover:border-primary/60 hover:text-primary"><User className="h-[17px] w-[17px]" /></button>
         </div>
       </div>
     </header>

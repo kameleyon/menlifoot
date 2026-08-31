@@ -71,13 +71,15 @@ const AuthModal = ({ isOpen, setOpen, mode, setMode }: Props) => {
       return;
     }
     // Signed in — send admins/editors to the panel, everyone else to their profile.
-    const { data: { user } } = await supabase.auth.getUser();
-    let isStaff = false;
-    if (user) {
-      const { data: roles } = await supabase.from('user_roles').select('role').eq('user_id', user.id);
-      isStaff = (roles ?? []).some((r) => r.role === 'admin' || r.role === 'editor');
-    }
-    navigate(isStaff ? '/admin' : '/me');
+    // Everyone lands on their own account page, staff included. Signing in used
+    // to drop admins and editors straight into the control panel, which skipped
+    // past their fantasy squads, credits and saved articles entirely - the panel
+    // is a tool they open, not the thing they log in to be. It is one tap away
+    // from here and from the navbar.
+    //
+    // This also drops a user_roles query that ran on every single sign-in for
+    // no purpose other than choosing between two routes.
+    navigate('/me');
   };
 
   const tabCls = (active: boolean) =>
