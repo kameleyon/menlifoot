@@ -66,6 +66,10 @@ const UNLOCK_PRICES = {
   chips: 1,
   // Charged per suggestion actually requested, capped at MAX_TRANSFERS.
   transfers: 1,
+  // Building a squad from nothing is the optimiser applied to an empty pitch,
+  // so it is priced like the optimiser. Free on the Premier League side along
+  // with everything else there.
+  autofill: 1,
 } as const;
 
 const MAX_TRANSFERS = 5;
@@ -130,10 +134,10 @@ const CHEAPEST_PLAYER_PRIOR = 0.35;
  * 100, never that a bad squad does.
  */
 const ACHIEVABLE: Partial<Record<keyof typeof WEIGHTS, number>> = {
-  captain: 0.98,
-  form: 0.72,
-  fixtures: 0.91,
-  value: 0.78,
+  captain: 0.97,
+  form: 0.71,
+  fixtures: 0.90,
+  value: 0.71,
 };
 
 // A suggestion is flagged as recommended when the replacement is clearly
@@ -449,10 +453,34 @@ const MAX_PER_CLUB = 3;
 const BENCH_WEIGHT = 0.25;
 
 /** Per position, how deep into the ranking a swap will look. */
-const CANDIDATES_PER_POSITION = 60;
+const CANDIDATES_PER_POSITION = 40;
 
 /** Safety stop. The climb converges well inside this. */
 const MAX_CLIMB_STEPS = 60;
+
+/**
+ * How many cheap options per position a paired move may sell down to.
+ *
+ * Only the cheapest handful matter: the point of the sale is to free money,
+ * and a player who frees fifty pence does not unlock anything the single-swap
+ * pass had not already found.
+ */
+const DOWNGRADE_DEPTH = 4;
+
+/** How deep the paid-for half of a paired move looks. */
+const PAIRED_UPGRADE_DEPTH = 12;
+
+/**
+ * Paired passes to attempt before giving up on further gains.
+ *
+ * These four numbers multiply: a pass costs squad x DOWNGRADE_DEPTH x squad x
+ * PAIRED_UPGRADE_DEPTH full evaluations, and the first version of this ran
+ * 168,000 of them and was killed by the worker's CPU limit. Kept deliberately
+ * small - the paired pass exists to escape a local optimum the single swaps
+ * cannot leave, and the first move out is worth far more than an exhaustive
+ * search for the last one.
+ */
+const MAX_PAIRED_PASSES = 2;
 
 /**
  * Build the strongest legal squad a budget allows.
@@ -532,6 +560,32 @@ function autofillSquad(pool: Player[], budget: number) {
   // broken - better to say so than to hand back something over budget.
   if (spend > budget) return null;
 
+  /**
+   * The real rating of a squad, as the manager will see it.
+   *
+   * The climb steers by `objective`, a cheap proxy summing expected value -
+   * fast enough for the tens of thousands of trials below, but not the same
+   * function as the rating. The paired pass proved the gap matters: it found a
+   * squad the proxy preferred and the rating scored a point lower. So every
+   * squad the search settles on is checked against the actual scorer, and the
+   * best of those is what gets returned. Cheap, because it runs once per
+   * accepted move rather than once per trial.
+   */
+  const ratingOf = (sq: Player[]) => {
+    const xi = optimiseXi(sq);
+    return xi ? scoreSquad(xi.xi, xi.benchOut, xi.captain).rating : -1;
+  };
+
+  let bestSquad = squad.slice();
+  let bestRating = ratingOf(squad);
+  const remember = () => {
+    const r = ratingOf(squad);
+    if (r > bestRating) {
+      bestRating = r;
+      bestSquad = squad.slice();
+    }
+  };
+
   // --- climb ----------------------------------------------------------------
   let score = objective(squad);
   for (let step = 0; step < MAX_CLIMB_STEPS; step++) {
@@ -563,16 +617,95 @@ function autofillSquad(pool: Player[], budget: number) {
     owned.add(move.incoming.id);
     spend = spend - (gone.price ?? 0) + (move.incoming.price ?? 0);
     score += move.gain;
+    remember();
   }
 
-  const best = optimiseXi(squad);
+  // --- paired moves ------------------------------------------------------
+  //
+  // Single swaps stall as soon as the budget binds, which it always does: the
+  // squad above finishes on exactly the budget, so every remaining upgrade is
+  // one pound out of reach. The way out is to sell one player down and spend
+  // what that frees on another, which no single swap can express - each half
+  // is a loss on its own, and only the pair is an improvement.
+  //
+  // Bounded on both sides. The sold half only looks at the cheapest few in a
+  // position, because freeing money is the entire point of it; the bought half
+  // looks deeper, because that is where the gain comes from.
+  const priceOf = (p: Player) => p.price ?? 0;
+  const cheapestByPos: Record<string, Player[]> = {};
+  for (const pos of POSITIONS) {
+    cheapestByPos[pos] = [...byPos[pos]]
+      .sort((a, b) => priceOf(a) - priceOf(b))
+      .slice(0, DOWNGRADE_DEPTH);
+  }
+
+  for (let pass = 0; pass < MAX_PAIRED_PASSES; pass++) {
+    let move: { sell: number; sellFor: Player; buy: number; buyFor: Player; gain: number } | null =
+      null;
+
+    for (let i = 0; i < squad.length; i++) {
+      const out = squad[i];
+      for (const down of cheapestByPos[out.position]) {
+        if (down.id === out.id || owned.has(down.id)) continue;
+        const freed = priceOf(out) - priceOf(down);
+        // A sale that frees nothing cannot unlock a purchase the single-swap
+        // pass had not already reached.
+        if (freed <= 0) continue;
+
+        for (let j = 0; j < squad.length; j++) {
+          if (j === i) continue;
+          const sold = squad[j];
+          for (const up of byPos[sold.position].slice(0, PAIRED_UPGRADE_DEPTH)) {
+            if (up.id === down.id || owned.has(up.id)) continue;
+            const spendAfter = spend - priceOf(out) + priceOf(down) - priceOf(sold) + priceOf(up);
+            if (spendAfter > budget) continue;
+
+            // Club cap across both halves at once: the sale can itself free a
+            // slot the purchase needs.
+            const after: Record<string, number> = { ...perClub };
+            after[out.team] -= 1;
+            after[down.team] = (after[down.team] ?? 0) + 1;
+            after[sold.team] -= 1;
+            after[up.team] = (after[up.team] ?? 0) + 1;
+            if (Object.values(after).some((n) => n > MAX_PER_CLUB)) continue;
+
+            const trial = squad.slice();
+            trial[i] = down;
+            trial[j] = up;
+            const gain = objective(trial) - score;
+            if (gain > 1e-9 && (!move || gain > move.gain)) {
+              move = { sell: i, sellFor: down, buy: j, buyFor: up, gain };
+            }
+          }
+        }
+      }
+    }
+
+    if (!move) break;
+    for (const [at, incoming] of [
+      [move.sell, move.sellFor],
+      [move.buy, move.buyFor],
+    ] as [number, Player][]) {
+      const gone = squad[at];
+      perClub[gone.team] -= 1;
+      owned.delete(gone.id);
+      squad[at] = incoming;
+      perClub[incoming.team] = (perClub[incoming.team] ?? 0) + 1;
+      owned.add(incoming.id);
+      spend = spend - priceOf(gone) + priceOf(incoming);
+    }
+    score += move.gain;
+    remember();
+  }
+
+  const best = optimiseXi(bestSquad);
   if (!best) return null;
   return {
     xi: best.xi,
     bench: best.benchOut,
     captain: best.captain,
     formation: best.shape,
-    spend: Number(spend.toFixed(1)),
+    spend: Number(bestSquad.reduce((t, p) => t + (p.price ?? 0), 0).toFixed(1)),
   };
 }
 
@@ -641,13 +774,30 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
+    // Anonymous ratings are allowed (verify_jwt = false). If the caller happens
+    // to be signed in, attribute the rating to them — but only after the token
+    // is verified server-side.
+    let userId: string | null = null;
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const token = authHeader.toLowerCase().startsWith("bearer ")
+      ? authHeader.slice(7).trim()
+      : null;
+    if (token && token !== Deno.env.get("SUPABASE_ANON_KEY")) {
+      const { data: userData } = await supabase.auth.getUser(token);
+      userId = userData?.user?.id ?? null;
+    }
+
     // ------------------------------------------------------------ autofill ---
     // Build a squad from nothing. Answered before the squad parsing below,
     // which exists to validate a squad this request does not have.
     //
-    // Free, like the rating itself: this hands back a squad and a score, which
-    // is what an unpaid rating already gives. The paid panels are the advice
-    // about a squad - optimiser, captain ranking, chips and transfers.
+    // Priced like the optimiser on the Champions League side, free on the
+    // Premier League side, matching everything else in this function.
+    //
+    // Charged after the squad is built, never before. Paying for something the
+    // server then fails to produce is the one billing mistake worth designing
+    // against: if the pool cannot yield a legal squad the caller is told so and
+    // keeps their credit.
     if (rawMode === "autofill") {
       const { data: poolRows, error: poolError } = await supabase
         .from("ucl_players")
@@ -664,6 +814,36 @@ serve(async (req) => {
           JSON.stringify({ error: "not enough priced players to build a squad yet" }),
           { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
+      }
+
+      let autofillCredits: number | null = null;
+      if (!isFree) {
+        if (!userId || !token) {
+          return new Response(
+            JSON.stringify({ error: "sign_in_required", cost: UNLOCK_PRICES.autofill }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        // Spent as the caller, so spend_credits' own auth.uid() guard applies
+        // and this cannot be aimed at somebody else's wallet.
+        const asUser = createClient(
+          Deno.env.get("SUPABASE_URL") ?? "",
+          Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+          { global: { headers: { Authorization: `Bearer ${token}` } } },
+        );
+        const { data: newBalance, error: spendError } = await asUser.rpc("spend_credits", {
+          p_amount: UNLOCK_PRICES.autofill,
+          p_reason: "ucl_autofill",
+          p_metadata: { competition },
+        });
+        if (spendError) throw new Error(`credit spend failed: ${spendError.message}`);
+        if (typeof newBalance !== "number" || newBalance < 0) {
+          return new Response(
+            JSON.stringify({ error: "insufficient_credits", cost: UNLOCK_PRICES.autofill }),
+            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        autofillCredits = newBalance;
       }
 
       const scored = scoreSquad(filled.xi, filled.bench, filled.captain);
@@ -696,6 +876,8 @@ serve(async (req) => {
           breakdown: scored.breakdown,
           spend: filled.spend,
           budget: SQUAD_BUDGET,
+          cost: isFree ? 0 : UNLOCK_PRICES.autofill,
+          credits_remaining: autofillCredits,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
@@ -722,19 +904,6 @@ serve(async (req) => {
     )?.player_id ?? null;
 
     if (starterIds.length === 0) throw new Error("squad.starters must contain resolved player_ids");
-
-    // Anonymous ratings are allowed (verify_jwt = false). If the caller happens
-    // to be signed in, attribute the rating to them — but only after the token
-    // is verified server-side.
-    let userId: string | null = null;
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const token = authHeader.toLowerCase().startsWith("bearer ")
-      ? authHeader.slice(7).trim()
-      : null;
-    if (token && token !== Deno.env.get("SUPABASE_ANON_KEY")) {
-      const { data: userData } = await supabase.auth.getUser(token);
-      userId = userData?.user?.id ?? null;
-    }
 
     const { data: rows, error } = await supabase
       .from("ucl_players")
