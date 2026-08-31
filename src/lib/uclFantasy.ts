@@ -402,6 +402,22 @@ export const SQUAD_COMPOSITION: Record<Position, number> = { GK: 2, DEF: 5, MID:
 /** UCL Fantasy gives EUR 100m for the 15-man squad. Note euros, not pounds. */
 export const SQUAD_BUDGET = 100;
 
+/**
+ * Most players a squad may hold from one club.
+ *
+ * A hard rule in both competitions, not a preference. UEFA publishes it in
+ * their own constraints feed as maxTeamPlayers: 3, alongside maxTeamValue 100,
+ * and the Premier League game enforces the same three.
+ */
+export const MAX_PER_CLUB = 3;
+
+/** How many players each club contributes to a squad. */
+export const clubCounts = (slots: SquadSlot[]): Record<string, number> =>
+  slots.reduce<Record<string, number>>((acc, s) => {
+    if (s.player_id && s.team) acc[s.team] = (acc[s.team] ?? 0) + 1;
+    return acc;
+  }, {});
+
 /** Money formatter. Returns null when there is no price to show. */
 export const formatPrice = (price: number | null | undefined): string | null =>
   price == null ? null : `€${price.toFixed(1)}m`;

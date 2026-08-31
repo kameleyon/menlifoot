@@ -20,6 +20,8 @@ import {
   searchPlayers,
   squadCost,
   SQUAD_BUDGET,
+  MAX_PER_CLUB,
+  clubCounts,
   type Competition,
   type Position,
   type Squad,
@@ -174,8 +176,37 @@ const SquadBuilder = ({
     [starters, bench],
   );
 
+  /** Players held per club, for the three-per-club rule. */
+  const perClub = useMemo(() => clubCounts([...starters, ...bench]), [starters, bench]);
+
+  /**
+   * Whether a club still has room, given which slot is being filled.
+   *
+   * The slot being replaced is discounted when it already holds someone from
+   * that club, because swapping one Arsenal player for another leaves the
+   * count where it was. Without that a manager could not change their mind
+   * about which three they wanted.
+   */
+  const clubHasRoom = (team: string | null | undefined) => {
+    if (!team) return true;
+    const outgoing = picking
+      ? (picking.onBench ? bench : starters)[picking.index]
+      : null;
+    const replacingSameClub = outgoing?.player_id && outgoing.team === team ? 1 : 0;
+    return (perClub[team] ?? 0) - replacingSameClub < MAX_PER_CLUB;
+  };
+
+  /** Clubs already at the limit in the current squad, for the warning line. */
+  const clubsOverCap = useMemo(
+    () => Object.entries(perClub).filter(([, n]) => n > MAX_PER_CLUB).map(([team]) => team),
+    [perClub],
+  );
+
   const assign = (player: UclPlayer) => {
     if (!picking) return;
+    // Guarded here as well as on the button: the rule belongs to the action,
+    // not to how the row happens to be rendered.
+    if (!clubHasRoom(player.team)) return;
     const slot: SquadSlot = {
       player_id: player.id,
       name: player.name,
@@ -365,6 +396,12 @@ const SquadBuilder = ({
           )}
         </div>
       </div>
+
+      {clubsOverCap.length > 0 && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
+          {t('ucl.clubCapBroken')} {clubsOverCap.map((c) => `${c} (${perClub[c]})`).join(', ')}
+        </div>
+      )}
 
       {/* One line, scrolled horizontally rather than wrapped: seven chips plus a
           label will not fit a phone width, and a second row pushed the pitch
@@ -567,12 +604,15 @@ const SquadBuilder = ({
                   </div>
                   {band.players.map((p) => {
                     const taken = chosenIds.has(p.id);
+                    // Three per club is a rule of both games, so a fourth is
+                    // not offered rather than offered and then rejected.
+                    const clubFull = !taken && !clubHasRoom(p.team);
                     const stat = rankStat(p);
                     return (
                       <button
                         key={p.id}
                         type="button"
-                        disabled={taken}
+                        disabled={taken || clubFull}
                         onClick={() => assign(p)}
                         className="flex w-full items-center justify-between gap-2 border-b border-border/50 p-3 text-left disabled:opacity-40"
                       >
@@ -582,6 +622,13 @@ const SquadBuilder = ({
                             {p.team} · {p.position}
                             {p.availability !== 'available' && ` · ${p.availability}`}
                           </div>
+                          {/* Say why it is greyed out. A disabled row with no
+                              reason reads as a broken list. */}
+                          {clubFull && (
+                            <div className="truncate text-[11px] text-destructive">
+                              {t('ucl.clubFull')}
+                            </div>
+                          )}
                         </div>
                         {/* Show the stat that put this player above the next one,
                             so the ranking can be checked rather than trusted. */}
