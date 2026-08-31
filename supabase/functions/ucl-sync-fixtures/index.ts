@@ -71,9 +71,12 @@ const sanePrice = (v: unknown): number | null => {
 const BBS_BASE = "https://api.bigballsdata.com/v1";
 // The league phase opens in September; anything earlier belongs to last season.
 const SEASON_START = "2026-08-01";
-// A new matchday starts when the gap to the previous kick-off exceeds this.
-// League-phase rounds run Tue-Thu, then weeks pass before the next round.
-const MATCHDAY_GAP_DAYS = 6;
+// The league phase: 36 clubs, 8 rounds, each club once per round.
+const LEAGUE_PHASE_MATCHDAYS = 8;
+const FIXTURES_PER_MATCHDAY = 18;
+// A league-phase day carries six matches. A qualifying leg sits alone on its
+// own date, which is what separates the two without needing a hardcoded date.
+const MIN_FIXTURES_PER_LEAGUE_DAY = 3;
 
 type RawFixture = {
   id: string;
@@ -128,18 +131,56 @@ async function fetchFixturesFromBigBalls(apiKey: string): Promise<RawFixture[] |
   return current.length > 0 ? current : null;
 }
 
-/** Cluster kick-offs into matchdays - the archive carries no matchday field. */
+/**
+ * Number the league-phase rounds.
+ *
+ * The archive carries a `round` field but leaves it null for every Champions
+ * League fixture, so the number has to be derived. It is derived from the
+ * format rather than from the calendar, because the calendar lies twice:
+ *
+ *   - A two-legged qualifier in August took rounds 1 and 2 and pushed every
+ *     real matchday up by two, so the opening round showed as Matchday 3.
+ *   - October's two rounds chained into one, because no single gap inside
+ *     13-21 October exceeded the old six-day threshold. The overflow then hit
+ *     a clamp that dumped every later round into Matchday 8.
+ *
+ * Two facts about the league phase replace the guesswork. A round is eighteen
+ * fixtures with each of the thirty-six clubs appearing exactly once, so a club
+ * appearing twice or an eighteenth fixture ends the round. And a league-phase
+ * day carries six matches, where a qualifying leg is alone on its date.
+ */
 function assignMatchdays(fixtures: RawFixture[]): (RawFixture & { matchday: number })[] {
   const sorted = [...fixtures].sort((a, b) => a.kickoff.localeCompare(b.kickoff));
+
+  const perDay = new Map<string, number>();
+  for (const f of sorted) {
+    const day = f.kickoff.slice(0, 10);
+    perDay.set(day, (perDay.get(day) ?? 0) + 1);
+  }
+  const leaguePhase = sorted.filter(
+    (f) => (perDay.get(f.kickoff.slice(0, 10)) ?? 0) >= MIN_FIXTURES_PER_LEAGUE_DAY,
+  );
+
   const out: (RawFixture & { matchday: number })[] = [];
   let matchday = 1;
-  let anchor: number | null = null;
-  for (const f of sorted) {
-    const t = Date.parse(f.kickoff);
-    if (anchor !== null && (t - anchor) / 86400000 > MATCHDAY_GAP_DAYS) matchday += 1;
-    anchor = t;
-    out.push({ ...f, matchday: Math.min(matchday, 8) });
+  let clubs = new Set<string>();
+  let count = 0;
+
+  for (const f of leaguePhase) {
+    if (count === FIXTURES_PER_MATCHDAY || clubs.has(f.home) || clubs.has(f.away)) {
+      matchday += 1;
+      clubs = new Set();
+      count = 0;
+    }
+    // Past the eighth round the competition is knockout, which has no matchday
+    // number and must not be folded into one.
+    if (matchday > LEAGUE_PHASE_MATCHDAYS) break;
+    clubs.add(f.home);
+    clubs.add(f.away);
+    count += 1;
+    out.push({ ...f, matchday });
   }
+
   return out;
 }
 
@@ -254,6 +295,10 @@ const normalize = (s: string): string =>
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  // Captured before anything is written, so rows this run rewrote are strictly
+  // newer than it and everything older is provably stale.
+  const runStartedAt = new Date().toISOString();
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
@@ -376,9 +421,16 @@ serve(async (req) => {
       // daily, so the genuine calendar lands here on its own once UEFA
       // publishes it after the draw.
       const bbsKey = Deno.env.get("BIGBALLS_API_KEY");
+      // Declared out here because the response that reports it is outside the
+      // key check.
+      let bigballsReason: string | null = null;
       if (bbsKey) {
+        // Why the archive was not used, so a failure cannot be reported as
+        // "nothing published yet" - which sent me chasing a publishing delay
+        // that was really a code path throwing.
+        let real: RawFixture[] | null = null;
         try {
-          const real = await fetchFixturesFromBigBalls(bbsKey);
+          real = await fetchFixturesFromBigBalls(bbsKey);
           if (real) {
             const known = new Map(teams.map((t) => [normalize(t), t]));
             const payload = assignMatchdays(real)
@@ -403,23 +455,48 @@ serve(async (req) => {
               .filter(Boolean) as Record<string, unknown>[];
 
             const seen = new Map<string, Record<string, unknown>>();
-            for (const f of payload) seen.set(`${f.matchday}|${f.home_team}|${f.away_team}`, f);
+            for (const f of payload) seen.set(String(f.external_id), f);
             const deduped = [...seen.values()];
 
             if (deduped.length > 0) {
+              // Clear each fixture's previous row before writing it back.
+              //
+              // The upsert conflicts on (competition, matchday, home, away),
+              // which changes when a round is renumbered - so a corrected
+              // fixture reads as brand new and collides with the unique index
+              // on external_id. That index is partial, so it cannot be the
+              // conflict target either. Deleting by the archive's own id first
+              // sidesteps both: identity is what does not change here.
+              const ids = deduped.map((f) => String(f.external_id)).filter(Boolean);
+              if (ids.length > 0) {
+                await supabase.from("ucl_fixtures").delete().eq("competition", "UCL").in("external_id", ids);
+              }
               const { error } = await supabase
                 .from("ucl_fixtures")
                 .upsert(deduped, { onConflict: "competition,matchday,home_team,away_team" });
               if (error) throw new Error(`fixtures upsert: ${error.message}`);
+              // Renumbering a round leaves the old row behind under its old
+              // number, so anything this run did not rewrite is stale and has
+              // to go - otherwise a corrected calendar sits alongside the wrong
+              // one it replaced.
+              await supabase
+                .from("ucl_fixtures")
+                .delete()
+                .eq("competition", "UCL")
+                .lt("updated_at", runStartedAt);
               const { data: touched } = await supabase.rpc("refresh_player_fixtures", {
         p_competition: "UCL",
       });
               return json({ mode, source: "bigballs", fixtures: deduped.length, players_touched: touched ?? 0 });
             }
           }
-          console.log("bigballs archive has no fixtures for this season yet");
+          bigballsReason = real
+            ? `archive returned ${real.length} fixtures but none survived matchday assignment`
+            : "archive holds no fixtures dated after the season start";
+          console.log(`bigballs archive unusable: ${bigballsReason}`);
         } catch (err) {
-          console.log(`bigballs fixtures failed: ${err instanceof Error ? err.message : String(err)}`);
+          bigballsReason = err instanceof Error ? err.message : String(err);
+          console.log(`bigballs fixtures failed: ${bigballsReason}`);
         }
       }
 
@@ -432,7 +509,8 @@ serve(async (req) => {
           mode,
           source: "bigballs",
           fixtures: 0,
-          note: "no real fixtures published for this season yet; pass {\"allow_llm\":true} to fall back to search-derived fixtures",
+          reason: bigballsReason ?? "no BIGBALLS_API_KEY configured",
+          note: "no real fixtures stored; pass {\"allow_llm\":true} to fall back to search-derived fixtures",
         });
       }
 

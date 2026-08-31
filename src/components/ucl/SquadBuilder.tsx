@@ -505,8 +505,14 @@ const SquadBuilder = ({
 
       {picking && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center">
-          <div className="max-h-[75vh] w-full max-w-md overflow-hidden rounded-t-2xl bg-card sm:rounded-2xl">
-            <div className="flex items-center gap-2 border-b border-border p-3">
+          {/* Flex column with the list as the only growing child. Two
+              independent height caps - 75vh here and 60vh on the list - meant
+              the search bar's height pushed the bottom of the list past the
+              clipped edge, so the last players could not be reached. dvh
+              rather than vh because a phone's vh ignores the collapsing URL
+              bar and puts the end of the list under it. */}
+          <div className="flex max-h-[85dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-card sm:max-h-[80dvh] sm:rounded-2xl">
+            <div className="flex shrink-0 items-center gap-2 border-b border-border p-3">
               <Search className="h-4 w-4 text-muted-foreground" />
               <Input
                 autoFocus
@@ -519,7 +525,7 @@ const SquadBuilder = ({
                 <X className="h-4 w-4 text-muted-foreground" />
               </button>
             </div>
-            <div className="max-h-[60vh] overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-2">
               {loading && <div className="p-4 text-sm text-muted-foreground">{t('ucl.loading')}</div>}
               {!loading && results.length === 0 && (
                 <div className="p-4 text-sm text-muted-foreground">{t('ucl.noPlayers')}</div>
