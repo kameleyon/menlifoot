@@ -294,13 +294,39 @@ const valueScore = (p: Player) => {
  * "good" was how the optimiser and the suggestions ended up contradicting each
  * other on the same screen.
  */
-const expectedValue = (p: Player): number => {
-  const parts: [number, number][] = [[0.4, availabilityScore(p)]];
-  parts.push([0.4, formScore(p)]);
-  if (p.next_difficulty != null) parts.push([0.2, fixtureScore(p)]);
-  const w = parts.reduce((t, [x]) => t + x, 0);
-  return w ? parts.reduce((t, [x, sc]) => t + x * sc, 0) / w : 0.5;
+/**
+ * How much each signal counts, depending on how far ahead the manager is
+ * picking for.
+ *
+ * Over a season the opponent barely matters: every club plays everyone, the
+ * draws even out, and what survives is how good a player is and whether he is
+ * fit. For a single round the opponent is a third of the answer, because there
+ * is no evening out - one fixture is the whole of it.
+ *
+ * Availability stays heavy in both. A player who cannot play returns nothing
+ * on any horizon, and that is the one thing no fixture can compensate for.
+ */
+const HORIZON_WEIGHTS = {
+  season: { availability: 0.4, form: 0.4, fixtures: 0.2 },
+  gameweek: { availability: 0.35, form: 0.3, fixtures: 0.35 },
+} as const;
+
+type Horizon = keyof typeof HORIZON_WEIGHTS;
+
+const valueForHorizon = (p: Player, horizon: Horizon): number => {
+  const w = HORIZON_WEIGHTS[horizon];
+  const parts: [number, number][] = [
+    [w.availability, availabilityScore(p)],
+    [w.form, formScore(p)],
+  ];
+  // Fixture difficulty is only weighted when it is known, so a player with no
+  // published opponent is not scored as though he had a hard one.
+  if (p.next_difficulty != null) parts.push([w.fixtures, fixtureScore(p)]);
+  const total = parts.reduce((t, [x]) => t + x, 0);
+  return total ? parts.reduce((t, [x, sc]) => t + x * sc, 0) / total : 0.5;
 };
+
+const expectedValue = (p: Player): number => valueForHorizon(p, "season");
 
 /**
  * A captain is only as good as their form, fixture and fitness combined, but
@@ -323,9 +349,9 @@ const CAPTAIN_POSITION_PRIOR: Record<string, number> = { FWD: 1, MID: 0.95, DEF:
 const captaincyValue = (p: Player): number =>
   expectedValue(p) * (CAPTAIN_POSITION_PRIOR[p.position] ?? 0.8);
 
-const optimiseXi = (squadPlayers: Player[]) => {
+const optimiseXi = (squadPlayers: Player[], value: (p: Player) => number = expectedValue) => {
   const byPos = (pos: string) =>
-    squadPlayers.filter((p) => p.position === pos).sort((a, c) => expectedValue(c) - expectedValue(a));
+    squadPlayers.filter((p) => p.position === pos).sort((a, c) => value(c) - value(a));
   const pools = { GK: byPos("GK"), DEF: byPos("DEF"), MID: byPos("MID"), FWD: byPos("FWD") };
 
   let best: { xi: Player[]; benchOut: Player[]; shape: string; total: number } | null = null;
@@ -340,7 +366,7 @@ const optimiseXi = (squadPlayers: Player[]) => {
       ...pools.MID.slice(0, m),
       ...pools.FWD.slice(0, fw),
     ];
-    const total = xi.reduce((t, p) => t + expectedValue(p), 0);
+    const total = xi.reduce((t, p) => t + value(p), 0);
     if (!best || total > best.total) {
       const picked = new Set(xi.map((p) => p.id));
       best = { xi, benchOut: squadPlayers.filter((p) => !picked.has(p.id)), shape: f, total };
@@ -502,7 +528,8 @@ const MAX_PAIRED_PASSES = 2;
  * fourth - so three is the rating-optimal cap either way and does not depend
  * on getting the rulebook right.
  */
-function autofillSquad(pool: Player[], budget: number) {
+function autofillSquad(pool: Player[], budget: number, horizon: Horizon = "season") {
+  const ev0 = (p: Player) => valueForHorizon(p, horizon);
   // No price means the player cannot be budgeted for, and someone who cannot
   // play is not worth a slot however good he is.
   const priced = pool.filter(
@@ -514,12 +541,12 @@ function autofillSquad(pool: Player[], budget: number) {
   for (const pos of POSITIONS) {
     byPos[pos] = priced
       .filter((p) => p.position === pos)
-      .sort((a, b) => expectedValue(b) - expectedValue(a));
+      .sort((a, b) => ev0(b) - ev0(a));
     if (byPos[pos].length < SQUAD_COMPOSITION[pos]) return null;
   }
 
   // expectedValue is called thousands of times below; compute each once.
-  const cache = new Map(priced.map((p) => [p.id, expectedValue(p)] as const));
+  const cache = new Map(priced.map((p) => [p.id, ev0(p)] as const));
   const ev = (p: Player) => cache.get(p.id) ?? 0;
 
   /**
@@ -530,7 +557,7 @@ function autofillSquad(pool: Player[], budget: number) {
    * spends the budget on substitutes who never play.
    */
   const objective = (sq: Player[]) => {
-    const best = optimiseXi(sq);
+    const best = optimiseXi(sq, ev);
     if (!best) return -Infinity;
     const starting = best.xi.reduce((t, p) => t + ev(p), 0);
     const benched = best.benchOut.reduce((t, p) => t + ev(p), 0);
@@ -572,7 +599,7 @@ function autofillSquad(pool: Player[], budget: number) {
    * accepted move rather than once per trial.
    */
   const ratingOf = (sq: Player[]) => {
-    const xi = optimiseXi(sq);
+    const xi = optimiseXi(sq, ev);
     return xi ? scoreSquad(xi.xi, xi.benchOut, xi.captain).rating : -1;
   };
 
@@ -698,7 +725,7 @@ function autofillSquad(pool: Player[], budget: number) {
     remember();
   }
 
-  const best = optimiseXi(bestSquad);
+  const best = optimiseXi(bestSquad, ev);
   if (!best) return null;
   return {
     xi: best.xi,
@@ -727,6 +754,7 @@ serve(async (req) => {
       chip: rawChip = null,
       usedChips: rawUsedChips = [],
       mode: rawMode = "rate",
+      horizon: rawHorizon = "season",
       skipNarrative: rawSkipNarrative = false,
     } = await req.json();
 
@@ -808,7 +836,15 @@ serve(async (req) => {
 
       // supabase-js widens a string select to GenericStringError[]; the same
       // double cast the other player reads in this file use.
-      const filled = autofillSquad((poolRows ?? []) as unknown as Player[], SQUAD_BUDGET);
+      // "season" builds the squad to hold; "gameweek" builds the one that scores
+      // most in the round about to be played, which is a different squad - it
+      // will happily buy a modest player with the easiest fixture of the week.
+      const horizon: Horizon = rawHorizon === "gameweek" ? "gameweek" : "season";
+      const filled = autofillSquad(
+        (poolRows ?? []) as unknown as Player[],
+        SQUAD_BUDGET,
+        horizon,
+      );
       if (!filled) {
         return new Response(
           JSON.stringify({ error: "not enough priced players to build a squad yet" }),
@@ -846,6 +882,12 @@ serve(async (req) => {
         autofillCredits = newBalance;
       }
 
+      // Which round this squad is aimed at, so the UI can name it rather than
+      // saying "the upcoming week" and leaving the manager to guess.
+      const { data: autofillGw } = await supabase.rpc("target_gameweek", {
+        p_competition: competition,
+      });
+
       const scored = scoreSquad(filled.xi, filled.bench, filled.captain);
       // The vice is the next best captain in the XI, so a late withdrawal does
       // not fall to whoever happens to sort first.
@@ -876,6 +918,8 @@ serve(async (req) => {
           breakdown: scored.breakdown,
           spend: filled.spend,
           budget: SQUAD_BUDGET,
+          horizon,
+          target_gameweek: autofillGw ?? null,
           cost: isFree ? 0 : UNLOCK_PRICES.autofill,
           credits_remaining: autofillCredits,
         }),

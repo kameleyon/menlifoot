@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, X, Star, Shield, Zap, CheckCircle2, Wand2, Loader2 } from 'lucide-react';
+import { Search, X, Star, Shield, Zap, CheckCircle2, Wand2, Loader2, CalendarDays } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -16,6 +16,7 @@ import {
   formationSlots,
   rankStat,
   autofillSquad,
+  type Horizon,
   searchPlayers,
   squadCost,
   SQUAD_BUDGET,
@@ -96,13 +97,13 @@ const SquadBuilder = ({
   const [dirty, setDirty] = useState(false);
   const [starters, setStarters] = useState<SquadSlot[]>(seed.starters);
   const [bench, setBench] = useState<SquadSlot[]>(seed.bench);
-  const [autofilling, setAutofilling] = useState(false);
+  const [autofilling, setAutofilling] = useState<Horizon | null>(null);
   const [autofillError, setAutofillError] = useState<string | null>(null);
   // Cleared by any edit: the score describes the squad that was built, and the
   // moment a player changes it is describing something that is no longer on
   // the pitch.
   const [autofilled, setAutofilled] = useState<
-    { rating: number; spend: number; budget: number } | null
+    { rating: number; spend: number; budget: number; horizon: Horizon; gameweek: number | null } | null
   >(null);
   const [picking, setPicking] = useState<{ index: number; onBench: boolean; position: Position } | null>(
     null,
@@ -203,23 +204,29 @@ const SquadBuilder = ({
    * editable state as anything picked by hand, so a manager can take the
    * shape and change the two players they disagree about.
    */
-  const runAutofill = async () => {
-    setAutofilling(true);
+  const runAutofill = async (horizon: Horizon) => {
+    setAutofilling(horizon);
     setAutofillError(null);
     try {
-      const filled = await autofillSquad(competition);
+      const filled = await autofillSquad(competition, horizon);
       setFormation(filled.squad.formation);
       setStarters(filled.squad.starters);
       setBench(filled.squad.bench);
       setDirty(true);
-      setAutofilled({ rating: filled.rating, spend: filled.spend, budget: filled.budget });
+      setAutofilled({
+        rating: filled.rating,
+        spend: filled.spend,
+        budget: filled.budget,
+        horizon,
+        gameweek: filled.target_gameweek,
+      });
     } catch (err) {
       // The one failure that is expected rather than broken: UEFA publishes
       // prices late, and nothing can be costed against a budget until it does.
       const raw = err instanceof Error ? err.message : String(err);
       setAutofillError(raw.includes('not enough priced players') ? t('ucl.autofillNoPrices') : raw);
     } finally {
-      setAutofilling(false);
+      setAutofilling(null);
     }
   };
 
@@ -273,20 +280,34 @@ const SquadBuilder = ({
           on an empty pitch it is the fastest thing a manager can do, and the
           budget it has to respect is the next thing they will look at. */}
       <div className="space-y-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={runAutofill}
-          disabled={autofilling || submitting}
-          className="h-11 w-full gap-2"
-        >
-          {autofilling ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Wand2 className="h-4 w-4" />
-          )}
-          {autofilling ? t('ucl.autofilling') : t('ucl.autofill')}
-        </Button>
+        {/* Two different questions, so two buttons rather than a hidden setting.
+            "Best squad" is the side to hold; "best this round" will happily buy
+            a modest player with the easiest fixture of the week and is a
+            different squad - roughly half the picks change. */}
+        <div className="grid grid-cols-2 gap-2">
+          {([
+            { horizon: 'season' as Horizon, icon: Wand2, label: t('ucl.autofillSeason') },
+            { horizon: 'gameweek' as Horizon, icon: CalendarDays, label: t('ucl.autofillWeek') },
+          ]).map(({ horizon, icon: Icon, label }) => (
+            <Button
+              key={horizon}
+              type="button"
+              variant="outline"
+              onClick={() => runAutofill(horizon)}
+              disabled={autofilling !== null || submitting}
+              className="h-11 w-full gap-2 px-2"
+            >
+              {autofilling === horizon ? (
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+              ) : (
+                <Icon className="h-4 w-4 shrink-0" />
+              )}
+              <span className="truncate text-xs">
+                {autofilling === horizon ? t('ucl.autofilling') : label}
+              </span>
+            </Button>
+          ))}
+        </div>
         {autofillError && <p className="text-xs text-destructive">{autofillError}</p>}
         {autofilled && (
           <div className="rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-center">
@@ -294,7 +315,11 @@ const SquadBuilder = ({
               {t('ucl.autofillRates')} {autofilled.rating}/100
             </div>
             <div className="text-[11px] text-muted-foreground">
-              {formatPrice(autofilled.spend)} / {formatPrice(autofilled.budget)} · {t('ucl.autofillEditable')}
+              {formatPrice(autofilled.spend)} / {formatPrice(autofilled.budget)}
+              {autofilled.horizon === 'gameweek' && autofilled.gameweek != null && (
+                <> · {t('ucl.builtFor')} {autofilled.gameweek}</>
+              )}
+              {' · '}{t('ucl.autofillEditable')}
             </div>
           </div>
         )}

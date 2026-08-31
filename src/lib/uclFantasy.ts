@@ -572,10 +572,18 @@ const PICKER_LIMIT = 120;
  */
 export const rankStat = (p: UclPlayer): number | null => p.points_per_game;
 
+/** Season builds the squad to hold; gameweek builds the one for the next round. */
+export type Horizon = 'season' | 'gameweek';
+
 export interface AutofillResult {
   squad: Squad;
   rating: number;
   breakdown: SubScore[];
+  horizon: Horizon;
+  target_gameweek: number | null;
+  /** Credits this cost, and what is left. Zero and null on the free side. */
+  cost: number;
+  credits_remaining: number | null;
   /** What the squad costs, and what it was allowed to cost. */
   spend: number;
   budget: number;
@@ -591,13 +599,17 @@ export interface AutofillResult {
  */
 export const autofillSquad = async (
   competition: Competition = 'UCL',
+  horizon: Horizon = 'season',
 ): Promise<AutofillResult> => {
   const { data, error } = await supabase.functions.invoke('ucl-rate-squad', {
-    body: { mode: 'autofill', competition },
+    body: { mode: 'autofill', competition, horizon },
   });
   // supabase-js reports a non-2xx as `error` with the body still in `data`, so
   // the real reason - no prices published yet - has to be read from there.
-  const reason = (data as { error?: string } | null)?.error;
+  const reason = (data as { error?: string; cost?: number } | null)?.error;
+  if (reason === 'sign_in_required' || reason === 'insufficient_credits') {
+    throw new CreditError(reason, (data as { cost?: number })?.cost ?? 0);
+  }
   if (reason) throw new Error(reason);
   if (error) throw new Error(error.message);
   return data as AutofillResult;
