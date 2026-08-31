@@ -8,6 +8,10 @@ interface Props {
   onSlotClick?: (slot: SquadSlot, index: number, onBench: boolean) => void;
   /** Empty a slot without having to pick a replacement first. */
   onRemove?: (index: number, onBench: boolean) => void;
+  /** Start or complete a swap between two slots. */
+  onSwap?: (index: number, onBench: boolean) => void;
+  /** The slot waiting for a partner, if a swap is half-made. */
+  swapping?: { index: number; onBench: boolean } | null;
   emptyLabel?: string;
 }
 
@@ -17,11 +21,16 @@ const PlayerCard = ({
   slot,
   onClick,
   onRemove,
+  onSwap,
+  armed,
   emptyLabel,
 }: {
   slot: SquadSlot;
   onClick?: () => void;
   onRemove?: () => void;
+  onSwap?: () => void;
+  /** This card is the one waiting for a partner. */
+  armed?: boolean;
   emptyLabel?: string;
 }) => {
   const interactive = Boolean(onClick);
@@ -38,7 +47,11 @@ const PlayerCard = ({
   const name = slot.display_name || slot.name || slot.read_as || emptyLabel || '—';
 
   return (
-    <div className="relative flex w-[92px] flex-col items-center gap-1">
+    <div
+      className={`relative flex w-[92px] flex-col items-center gap-1 rounded-lg ${
+        armed ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''
+      }`}
+    >
       <button
         type="button"
         onClick={onClick}
@@ -65,13 +78,36 @@ const PlayerCard = ({
         </span>
         {/* A corner badge is what tells a manager the card does something:
             plus for an empty slot, swap arrows for one already filled. */}
-        {interactive && (
+        {/* The arrows used to be decoration saying "this card is tappable".
+            They are the swap control now: press one, press another, the two
+            change places. Tapping the card itself still opens the picker, so
+            replacing a player and moving one are separate gestures rather than
+            two meanings for the same tap. */}
+        {interactive && unresolved && (
+          <span className="absolute -bottom-0.5 -left-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
+            <Plus className="h-2.5 w-2.5" />
+          </span>
+        )}
+        {onSwap && !unresolved && (
           <span
-            className={`absolute -bottom-0.5 -left-1 flex h-4 w-4 items-center justify-center rounded-full ${
-              unresolved ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'
+            role="button"
+            tabIndex={0}
+            aria-label="Swap player"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSwap();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.stopPropagation();
+                onSwap();
+              }
+            }}
+            className={`absolute -bottom-0.5 -left-1 flex h-[18px] w-[18px] cursor-pointer items-center justify-center rounded-full transition-colors ${
+              armed ? 'bg-primary text-black ring-2 ring-primary' : 'bg-black text-primary ring-1 ring-primary/60'
             }`}
           >
-            {unresolved ? <Plus className="h-2.5 w-2.5" /> : <Repeat2 className="h-2.5 w-2.5" />}
+            <Repeat2 className="h-3 w-3" />
           </span>
         )}
         {(out || doubtful) && (
@@ -154,6 +190,8 @@ const PitchView = ({
   benchLabel,
   onSlotClick,
   onRemove,
+  onSwap,
+  swapping,
   emptyLabel,
 }: Props) => {
   const lines = LINES.map((pos) => ({
@@ -182,6 +220,8 @@ const PitchView = ({
                   emptyLabel={emptyLabel}
                   onClick={onSlotClick ? () => onSlotClick(s, i, false) : undefined}
                   onRemove={onRemove ? () => onRemove(i, false) : undefined}
+                  onSwap={onSwap ? () => onSwap(i, false) : undefined}
+                  armed={swapping?.onBench === false && swapping?.index === i}
                 />
               ))}
             </div>
@@ -202,6 +242,8 @@ const PitchView = ({
                 emptyLabel={emptyLabel}
                 onClick={onSlotClick ? () => onSlotClick(s, i, true) : undefined}
                 onRemove={onRemove ? () => onRemove(i, true) : undefined}
+                onSwap={onSwap ? () => onSwap(i, true) : undefined}
+                armed={swapping?.onBench === true && swapping?.index === i}
               />
             ))}
           </div>

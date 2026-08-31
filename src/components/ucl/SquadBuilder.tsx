@@ -3,6 +3,7 @@ import { Search, X, Star, Shield, Zap, CheckCircle2, Wand2, Loader2, CalendarDay
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useToast } from '@/hooks/use-toast';
 import PitchView from './PitchView';
 import ScrollRow from './ScrollRow';
 import {
@@ -69,6 +70,7 @@ const SquadBuilder = ({
   onUsedChipsChange,
 }: Props) => {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const seedFormation = initialSquad?.formation ?? DEFAULT_FORMATION;
   // Deal the incoming squad into its own formation before showing it. A caller
   // can hand over a shape and a player list that disagree - a screenshot read
@@ -99,6 +101,8 @@ const SquadBuilder = ({
   const [dirty, setDirty] = useState(false);
   const [starters, setStarters] = useState<SquadSlot[]>(seed.starters);
   const [bench, setBench] = useState<SquadSlot[]>(seed.bench);
+  /** The slot waiting for a partner, when a swap is half-made. */
+  const [swapping, setSwapping] = useState<{ index: number; onBench: boolean } | null>(null);
   const [autofilling, setAutofilling] = useState<Horizon | null>(null);
   const [autofillError, setAutofillError] = useState<string | null>(null);
   // Cleared by any edit: the score describes the squad that was built, and the
@@ -259,6 +263,77 @@ const SquadBuilder = ({
     } finally {
       setAutofilling(null);
     }
+  };
+
+  /**
+   * Move a player between the XI and the bench, or reorder within either.
+   *
+   * Press the arrows on one card, then on another, and the two change places.
+   * Two presses rather than a drag because this has to work with a thumb on a
+   * phone, and because tapping the card itself already means "replace this
+   * player" - one gesture per intention.
+   */
+  const handleSwap = (index: number, onBench: boolean) => {
+    if (!swapping) {
+      setSwapping({ index, onBench });
+      return;
+    }
+    // Pressing the armed card again is how you change your mind.
+    if (swapping.index === index && swapping.onBench === onBench) {
+      setSwapping(null);
+      return;
+    }
+
+    const a = swapping;
+    const b = { index, onBench };
+    const from = (x: typeof a) => (x.onBench ? bench : starters)[x.index];
+    const slotA = from(a);
+    const slotB = from(b);
+    setSwapping(null);
+    if (!slotA?.player_id || !slotB?.player_id) return;
+
+    const nextStarters = [...starters];
+    const nextBench = [...bench];
+    const put = (x: typeof a, slot: SquadSlot) => {
+      if (x.onBench) nextBench[x.index] = slot;
+      else nextStarters[x.index] = slot;
+    };
+
+    // The armband belongs to the pitch. A captain sent to the bench would be
+    // captaining nobody, so it is dropped and the manager is told - quietly
+    // keeping a flag on a substitute would be worse than losing it.
+    const benched = (slot: SquadSlot, goingToBench: boolean) =>
+      goingToBench ? { ...slot, is_captain: false, is_vice: false } : slot;
+
+    put(a, benched(slotB, a.onBench));
+    put(b, benched(slotA, b.onBench));
+
+    // A swap across the line changes the shape, and not every shape is legal.
+    if (a.onBench !== b.onBench) {
+      const counts = nextStarters.reduce<Record<string, number>>((acc, sl) => {
+        if (sl.player_id && sl.position) acc[sl.position] = (acc[sl.position] ?? 0) + 1;
+        return acc;
+      }, {});
+      const shape = `${counts.DEF ?? 0}-${counts.MID ?? 0}-${counts.FWD ?? 0}`;
+      if ((counts.GK ?? 0) !== 1 || !(FORMATIONS as readonly string[]).includes(shape)) {
+        toast({
+          title: t('ucl.swapIllegal'),
+          description: `${t('ucl.swapIllegalBody')} ${shape}`,
+          variant: 'destructive',
+        });
+        return;
+      }
+      setFormation(shape);
+    }
+
+    const lostArmband =
+      (slotA.is_captain || slotA.is_vice) && b.onBench ||
+      (slotB.is_captain || slotB.is_vice) && a.onBench;
+
+    setStarters(nextStarters);
+    setBench(nextBench);
+    markEdited();
+    if (lostArmband) toast({ title: t('ucl.armbandCleared') });
   };
 
   /** Empty a slot, keeping its position so the shape is unchanged. */
@@ -437,6 +512,8 @@ const SquadBuilder = ({
           setPicking({ index, onBench, position: (slot.position ?? 'MID') as Position })
         }
         onRemove={removeAt}
+        onSwap={handleSwap}
+        swapping={swapping}
       />
 
       {/* Captain and vice. The vice matters: if the captain does not play, his
