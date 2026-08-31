@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, X, Star, Shield, Zap, CheckCircle2 } from 'lucide-react';
+import { Search, X, Star, Shield, Zap, CheckCircle2, Wand2, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -15,6 +15,7 @@ import {
   FORMATIONS,
   formationSlots,
   rankStat,
+  autofillSquad,
   searchPlayers,
   squadCost,
   SQUAD_BUDGET,
@@ -95,6 +96,14 @@ const SquadBuilder = ({
   const [dirty, setDirty] = useState(false);
   const [starters, setStarters] = useState<SquadSlot[]>(seed.starters);
   const [bench, setBench] = useState<SquadSlot[]>(seed.bench);
+  const [autofilling, setAutofilling] = useState(false);
+  const [autofillError, setAutofillError] = useState<string | null>(null);
+  // Cleared by any edit: the score describes the squad that was built, and the
+  // moment a player changes it is describing something that is no longer on
+  // the pitch.
+  const [autofilled, setAutofilled] = useState<
+    { rating: number; spend: number; budget: number } | null
+  >(null);
   const [picking, setPicking] = useState<{ index: number; onBench: boolean; position: Position } | null>(
     null,
   );
@@ -122,6 +131,15 @@ const SquadBuilder = ({
 
   // Changing formation rebuilds the pitch. Players already picked are carried
   // over per position so a manager doesn't lose their whole XI to a reshape.
+  /**
+   * Record a hand edit. Also drops the autofill score, which described the
+   * squad as built and stops being true the moment a player changes.
+   */
+  const markEdited = () => {
+    setDirty(true);
+    setAutofilled(null);
+  };
+
   const changeFormation = (next: string) => {
     // Pool every player currently held and re-deal them into the new shape.
     // Anything the new shape has no room for stays on the bench rather than
@@ -129,7 +147,7 @@ const SquadBuilder = ({
     // any squad that was not exactly 2/5/5/3 lost players to a reshape.
     const dealt = applyFormation([...starters, ...bench], next);
     setFormation(next);
-    setDirty(true);
+    markEdited();
     setStarters(dealt.starters);
     setBench(dealt.bench);
   };
@@ -172,7 +190,34 @@ const SquadBuilder = ({
     }
     setPicking(null);
     setQuery('');
-    setDirty(true);
+    markEdited();
+  };
+
+  /**
+   * Fill the whole squad with the best the budget allows.
+   *
+   * The result is a starting point, not a verdict: it lands in the same
+   * editable state as anything picked by hand, so a manager can take the
+   * shape and change the two players they disagree about.
+   */
+  const runAutofill = async () => {
+    setAutofilling(true);
+    setAutofillError(null);
+    try {
+      const filled = await autofillSquad(competition);
+      setFormation(filled.squad.formation);
+      setStarters(filled.squad.starters);
+      setBench(filled.squad.bench);
+      setDirty(true);
+      setAutofilled({ rating: filled.rating, spend: filled.spend, budget: filled.budget });
+    } catch (err) {
+      // The one failure that is expected rather than broken: UEFA publishes
+      // prices late, and nothing can be costed against a budget until it does.
+      const raw = err instanceof Error ? err.message : String(err);
+      setAutofillError(raw.includes('not enough priced players') ? t('ucl.autofillNoPrices') : raw);
+    } finally {
+      setAutofilling(false);
+    }
   };
 
   /** Empty a slot, keeping its position so the shape is unchanged. */
@@ -181,7 +226,7 @@ const SquadBuilder = ({
       list.map((s, i) => (i === index ? emptySlot((s.position ?? 'MID') as Position) : s));
     if (onBench) setBench(clear);
     else setStarters(clear);
-    setDirty(true);
+    markEdited();
   };
 
   const setCaptain = (index: number) => {
@@ -193,7 +238,7 @@ const SquadBuilder = ({
         is_vice: i === index ? false : x.is_vice,
       })),
     );
-    setDirty(true);
+    markEdited();
   };
 
   const setVice = (index: number) => {
@@ -204,7 +249,7 @@ const SquadBuilder = ({
         is_captain: i === index ? false : x.is_captain,
       })),
     );
-    setDirty(true);
+    markEdited();
   };
 
   const filled = [...starters, ...bench].filter((s) => s.player_id).length;
@@ -221,6 +266,37 @@ const SquadBuilder = ({
 
   return (
     <div className="space-y-4">
+      {/* Build the whole squad in one go. Offered before the budget bar because
+          on an empty pitch it is the fastest thing a manager can do, and the
+          budget it has to respect is the next thing they will look at. */}
+      <div className="space-y-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={runAutofill}
+          disabled={autofilling || submitting}
+          className="h-11 w-full gap-2"
+        >
+          {autofilling ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Wand2 className="h-4 w-4" />
+          )}
+          {autofilling ? t('ucl.autofilling') : t('ucl.autofill')}
+        </Button>
+        {autofillError && <p className="text-xs text-destructive">{autofillError}</p>}
+        {autofilled && (
+          <div className="rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-center">
+            <div className="font-display text-sm text-primary">
+              {t('ucl.autofillRates')} {autofilled.rating}/100
+            </div>
+            <div className="text-[11px] text-muted-foreground">
+              {formatPrice(autofilled.spend)} / {formatPrice(autofilled.budget)} · {t('ucl.autofillEditable')}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Budget. Prices only exist once UEFA opens the game, so before then this
           says so rather than implying a full EUR 100m is still available. */}
       <div className="rounded-lg border border-border bg-card/60 p-3">
@@ -358,7 +434,7 @@ const SquadBuilder = ({
                         onUsedChipsChange(next);
                         // A chip cannot be spent and planned at once.
                         if (!on && chip === c) onChipChange(null);
-                        setDirty(true);
+                        markEdited();
                       }}
                       className={`shrink-0 rounded-full px-3 py-1 text-xs transition-colors ${
                         on
@@ -382,7 +458,7 @@ const SquadBuilder = ({
             <ScrollRow>
               <button
                 type="button"
-                onClick={() => { onChipChange(null); setDirty(true); }}
+                onClick={() => { onChipChange(null); markEdited(); }}
                 className={`shrink-0 rounded-full px-3 py-1 text-xs transition-colors ${
                   !chip ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
                 }`}
@@ -395,7 +471,7 @@ const SquadBuilder = ({
                   <button
                     key={c}
                     type="button"
-                    onClick={() => { onChipChange(c); setDirty(true); }}
+                    onClick={() => { onChipChange(c); markEdited(); }}
                     className={`shrink-0 rounded-full px-3 py-1 text-xs transition-colors ${
                       chip === c ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
                     }`}

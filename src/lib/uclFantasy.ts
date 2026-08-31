@@ -562,6 +562,37 @@ const PICKER_LIMIT = 120;
  */
 export const rankStat = (p: UclPlayer): number | null => p.points_per_game;
 
+export interface AutofillResult {
+  squad: Squad;
+  rating: number;
+  breakdown: SubScore[];
+  /** What the squad costs, and what it was allowed to cost. */
+  spend: number;
+  budget: number;
+}
+
+/**
+ * Ask the server to build the best squad the budget allows.
+ *
+ * Server-side because the selection has to be scored by the same model that
+ * rates a squad. A picker built in the browser would need its own copy of the
+ * scoring rules, and the moment the two disagreed the tool would be
+ * recommending a squad it then marks down.
+ */
+export const autofillSquad = async (
+  competition: Competition = 'UCL',
+): Promise<AutofillResult> => {
+  const { data, error } = await supabase.functions.invoke('ucl-rate-squad', {
+    body: { mode: 'autofill', competition },
+  });
+  // supabase-js reports a non-2xx as `error` with the body still in `data`, so
+  // the real reason - no prices published yet - has to be read from there.
+  const reason = (data as { error?: string } | null)?.error;
+  if (reason) throw new Error(reason);
+  if (error) throw new Error(error.message);
+  return data as AutofillResult;
+};
+
 /** Player search for the manual builder. Reads ucl_players directly (public). */
 export const searchPlayers = async (
   query: string,

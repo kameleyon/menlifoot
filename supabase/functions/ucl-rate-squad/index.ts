@@ -220,6 +220,43 @@ const captainScore = (p: Player): number => {
   return w ? clamp01(parts.reduce((t, [x, sc]) => t + x * sc, 0) / w) : 0.5;
 };
 
+// Attacking returns dominate fantasy captaincy: a keeper's ceiling is a
+// clean sheet and some saves, a forward's is a hat-trick. Without this the
+// optimiser captains whoever sorts first when everyone ties on availability
+// pre-season — which was a goalkeeper.
+const CAPTAIN_POSITION_PRIOR: Record<string, number> = { FWD: 1, MID: 0.95, DEF: 0.7, GK: 0.45 };
+const captaincyValue = (p: Player): number =>
+  expectedValue(p) * (CAPTAIN_POSITION_PRIOR[p.position] ?? 0.8);
+
+const optimiseXi = (squadPlayers: Player[]) => {
+  const byPos = (pos: string) =>
+    squadPlayers.filter((p) => p.position === pos).sort((a, c) => expectedValue(c) - expectedValue(a));
+  const pools = { GK: byPos("GK"), DEF: byPos("DEF"), MID: byPos("MID"), FWD: byPos("FWD") };
+
+  let best: { xi: Player[]; benchOut: Player[]; shape: string; total: number } | null = null;
+  for (const f of VALID_FORMATIONS) {
+    const [d, m, fw] = f.split("-").map(Number);
+    if (pools.GK.length < 1 || pools.DEF.length < d || pools.MID.length < m || pools.FWD.length < fw) {
+      continue;
+    }
+    const xi = [
+      ...pools.GK.slice(0, 1),
+      ...pools.DEF.slice(0, d),
+      ...pools.MID.slice(0, m),
+      ...pools.FWD.slice(0, fw),
+    ];
+    const total = xi.reduce((t, p) => t + expectedValue(p), 0);
+    if (!best || total > best.total) {
+      const picked = new Set(xi.map((p) => p.id));
+      best = { xi, benchOut: squadPlayers.filter((p) => !picked.has(p.id)), shape: f, total };
+    }
+  }
+  if (!best) return null;
+  // Captain the highest captaincy value in the chosen XI.
+  const cap = [...best.xi].sort((a, c) => captaincyValue(c) - captaincyValue(a))[0] ?? null;
+  return { ...best, captain: cap };
+};
+
 /**
  * Score a squad, 0-100.
  *
@@ -304,6 +341,140 @@ function scoreSquad(starters: Player[], bench: Player[], captain: Player | null)
   return { rating, breakdown, sub, shape, maxPerClub, perClub };
 }
 
+/** Hard cap on players from one club. See autofillSquad for why 3. */
+const MAX_PER_CLUB = 3;
+
+/** How much a bench place is worth against a starting one, for the search. */
+const BENCH_WEIGHT = 0.25;
+
+/** Per position, how deep into the ranking a swap will look. */
+const CANDIDATES_PER_POSITION = 60;
+
+/** Safety stop. The climb converges well inside this. */
+const MAX_CLIMB_STEPS = 60;
+
+/**
+ * Build the strongest legal squad a budget allows.
+ *
+ * Not a knapsack solve, because the rating is not linear in the players picked
+ * - captaincy, club spread and the bench all interact - so an exact solver
+ * would be optimising a different function from the one that scores the
+ * result. This is a cheapest-feasible start followed by hill climbing:
+ * repeatedly make the single swap that gains the most and still fits.
+ *
+ * Starting cheap rather than starting with the best players is deliberate.
+ * Beginning with the best fifteen puts the squad far over budget, and every
+ * early move is then a downgrade forced by money rather than a real choice;
+ * from the cheapest legal squad every move is an upgrade the budget allows,
+ * and the squad is affordable at every step including the first.
+ *
+ * Three per club is applied as a hard rule. FPL enforces it, and even where a
+ * competition does not, the diversity dimension of the rating penalises a
+ * fourth - so three is the rating-optimal cap either way and does not depend
+ * on getting the rulebook right.
+ */
+function autofillSquad(pool: Player[], budget: number) {
+  // No price means the player cannot be budgeted for, and someone who cannot
+  // play is not worth a slot however good he is.
+  const priced = pool.filter(
+    (p) => p.price != null && p.price > 0 && availabilityScore(p) > 0,
+  );
+
+  const POSITIONS = ["GK", "DEF", "MID", "FWD"];
+  const byPos: Record<string, Player[]> = {};
+  for (const pos of POSITIONS) {
+    byPos[pos] = priced
+      .filter((p) => p.position === pos)
+      .sort((a, b) => expectedValue(b) - expectedValue(a));
+    if (byPos[pos].length < SQUAD_COMPOSITION[pos]) return null;
+  }
+
+  // expectedValue is called thousands of times below; compute each once.
+  const cache = new Map(priced.map((p) => [p.id, expectedValue(p)] as const));
+  const ev = (p: Player) => cache.get(p.id) ?? 0;
+
+  /**
+   * What the climb maximises.
+   *
+   * The XI carries almost all of the rating, so a bench place is worth having
+   * but worth much less than a starting one. Weighting the fifteen equally
+   * spends the budget on substitutes who never play.
+   */
+  const objective = (sq: Player[]) => {
+    const best = optimiseXi(sq);
+    if (!best) return -Infinity;
+    const starting = best.xi.reduce((t, p) => t + ev(p), 0);
+    const benched = best.benchOut.reduce((t, p) => t + ev(p), 0);
+    const cap = best.captain ? captaincyValue(best.captain) : 0;
+    return starting + BENCH_WEIGHT * benched + 0.5 * cap;
+  };
+
+  // --- cheapest legal squad -------------------------------------------------
+  const squad: Player[] = [];
+  const owned = new Set<string>();
+  const perClub: Record<string, number> = {};
+  for (const pos of POSITIONS) {
+    const cheapest = [...byPos[pos]].sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
+    let need = SQUAD_COMPOSITION[pos];
+    for (const p of cheapest) {
+      if (need === 0) break;
+      if ((perClub[p.team] ?? 0) >= MAX_PER_CLUB) continue;
+      squad.push(p);
+      owned.add(p.id);
+      perClub[p.team] = (perClub[p.team] ?? 0) + 1;
+      need--;
+    }
+    if (need > 0) return null;
+  }
+  let spend = squad.reduce((t, p) => t + (p.price ?? 0), 0);
+  // Every squad in the game is affordable, so this only trips if the pool is
+  // broken - better to say so than to hand back something over budget.
+  if (spend > budget) return null;
+
+  // --- climb ----------------------------------------------------------------
+  let score = objective(squad);
+  for (let step = 0; step < MAX_CLIMB_STEPS; step++) {
+    let move: { at: number; incoming: Player; gain: number } | null = null;
+
+    for (let i = 0; i < squad.length; i++) {
+      const outgoing = squad[i];
+      for (const cand of byPos[outgoing.position].slice(0, CANDIDATES_PER_POSITION)) {
+        if (owned.has(cand.id)) continue;
+        if (spend - (outgoing.price ?? 0) + (cand.price ?? 0) > budget) continue;
+        // Only a move to a different club can breach the cap.
+        if (cand.team !== outgoing.team && (perClub[cand.team] ?? 0) >= MAX_PER_CLUB) continue;
+
+        const trial = squad.slice();
+        trial[i] = cand;
+        const gain = objective(trial) - score;
+        if (gain > 1e-9 && (!move || gain > move.gain)) {
+          move = { at: i, incoming: cand, gain };
+        }
+      }
+    }
+
+    if (!move) break;
+    const gone = squad[move.at];
+    perClub[gone.team] -= 1;
+    owned.delete(gone.id);
+    squad[move.at] = move.incoming;
+    perClub[move.incoming.team] = (perClub[move.incoming.team] ?? 0) + 1;
+    owned.add(move.incoming.id);
+    spend = spend - (gone.price ?? 0) + (move.incoming.price ?? 0);
+    score += move.gain;
+  }
+
+  const best = optimiseXi(squad);
+  if (!best) return null;
+  return {
+    xi: best.xi,
+    bench: best.benchOut,
+    captain: best.captain,
+    formation: best.shape,
+    spend: Number(spend.toFixed(1)),
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -321,6 +492,7 @@ serve(async (req) => {
       competition: rawCompetition = "UCL",
       chip: rawChip = null,
       usedChips: rawUsedChips = [],
+      mode: rawMode = "rate",
     } = await req.json();
 
     // Credits gate the Champions League product only. The Premier League
@@ -362,6 +534,71 @@ serve(async (req) => {
         (requested.has("chips") ? UNLOCK_PRICES.chips : 0) +
         transferCount * UNLOCK_PRICES.transfers;
 
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    );
+
+    // ------------------------------------------------------------ autofill ---
+    // Build a squad from nothing. Answered before the squad parsing below,
+    // which exists to validate a squad this request does not have.
+    //
+    // Free, like the rating itself: this hands back a squad and a score, which
+    // is what an unpaid rating already gives. The paid panels are the advice
+    // about a squad - optimiser, captain ranking, chips and transfers.
+    if (rawMode === "autofill") {
+      const { data: poolRows, error: poolError } = await supabase
+        .from("ucl_players")
+        .select(PLAYER_FIELDS)
+        .eq("competition", competition)
+        .not("price", "is", null);
+      if (poolError) throw new Error(`player pool lookup failed: ${poolError.message}`);
+
+      // supabase-js widens a string select to GenericStringError[]; the same
+      // double cast the other player reads in this file use.
+      const filled = autofillSquad((poolRows ?? []) as unknown as Player[], SQUAD_BUDGET);
+      if (!filled) {
+        return new Response(
+          JSON.stringify({ error: "not enough priced players to build a squad yet" }),
+          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const scored = scoreSquad(filled.xi, filled.bench, filled.captain);
+      // The vice is the next best captain in the XI, so a late withdrawal does
+      // not fall to whoever happens to sort first.
+      const vice = [...filled.xi]
+        .filter((p) => p.id !== filled.captain?.id)
+        .sort((a, b) => captaincyValue(b) - captaincyValue(a))[0] ?? null;
+      const toSlot = (p: Player) => ({
+        player_id: p.id,
+        name: p.name,
+        display_name: p.display_name,
+        team: p.team,
+        position: p.position,
+        price: p.price,
+        availability: p.availability,
+        availability_note: p.availability_note,
+        is_captain: p.id === filled.captain?.id,
+        is_vice: p.id === vice?.id,
+      });
+
+      return new Response(
+        JSON.stringify({
+          squad: {
+            formation: filled.formation,
+            starters: filled.xi.map(toSlot),
+            bench: filled.bench.map(toSlot),
+          },
+          rating: scored.rating,
+          breakdown: scored.breakdown,
+          spend: filled.spend,
+          budget: SQUAD_BUDGET,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const rawStarterIds: unknown[] = (squad?.starters ?? []).map(
       (s: { player_id?: unknown }) => s?.player_id,
     ).filter(Boolean);
@@ -383,11 +620,6 @@ serve(async (req) => {
     )?.player_id ?? null;
 
     if (starterIds.length === 0) throw new Error("squad.starters must contain resolved player_ids");
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    );
 
     // Anonymous ratings are allowed (verify_jwt = false). If the caller happens
     // to be signed in, attribute the rating to them — but only after the token
@@ -424,43 +656,6 @@ serve(async (req) => {
     // Pure re-arrangement of the 15 players already owned: no transfers, no
     // budget, so it works today even with zero price data. Deterministic — the
     // same squad always yields the same optimal XI.
-    // Attacking returns dominate fantasy captaincy: a keeper's ceiling is a
-    // clean sheet and some saves, a forward's is a hat-trick. Without this the
-    // optimiser captains whoever sorts first when everyone ties on availability
-    // pre-season — which was a goalkeeper.
-    const CAPTAIN_POSITION_PRIOR: Record<string, number> = { FWD: 1, MID: 0.95, DEF: 0.7, GK: 0.45 };
-    const captaincyValue = (p: Player): number =>
-      expectedValue(p) * (CAPTAIN_POSITION_PRIOR[p.position] ?? 0.8);
-
-    const optimiseXi = (squadPlayers: Player[]) => {
-      const byPos = (pos: string) =>
-        squadPlayers.filter((p) => p.position === pos).sort((a, c) => expectedValue(c) - expectedValue(a));
-      const pools = { GK: byPos("GK"), DEF: byPos("DEF"), MID: byPos("MID"), FWD: byPos("FWD") };
-
-      let best: { xi: Player[]; benchOut: Player[]; shape: string; total: number } | null = null;
-      for (const f of VALID_FORMATIONS) {
-        const [d, m, fw] = f.split("-").map(Number);
-        if (pools.GK.length < 1 || pools.DEF.length < d || pools.MID.length < m || pools.FWD.length < fw) {
-          continue;
-        }
-        const xi = [
-          ...pools.GK.slice(0, 1),
-          ...pools.DEF.slice(0, d),
-          ...pools.MID.slice(0, m),
-          ...pools.FWD.slice(0, fw),
-        ];
-        const total = xi.reduce((t, p) => t + expectedValue(p), 0);
-        if (!best || total > best.total) {
-          const picked = new Set(xi.map((p) => p.id));
-          best = { xi, benchOut: squadPlayers.filter((p) => !picked.has(p.id)), shape: f, total };
-        }
-      }
-      if (!best) return null;
-      // Captain the highest captaincy value in the chosen XI.
-      const cap = [...best.xi].sort((a, c) => captaincyValue(c) - captaincyValue(a))[0] ?? null;
-      return { ...best, captain: cap };
-    };
-
     const optimised = optimiseXi([...starters, ...bench]);
     const currentXiValue = starters.reduce((t, p) => t + expectedValue(p), 0);
     const optimisation = optimised
