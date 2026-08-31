@@ -5,7 +5,7 @@ import { useLanguage, Language } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import AppShell from '@/components/mobile/AppShell';
-import { ChevronRight, Trophy, Coins } from 'lucide-react';
+import { ChevronRight, Trophy, Coins, ShieldCheck } from 'lucide-react';
 import { getCreditBalance, startTopUp, COMPETITION_LABEL } from '@/lib/uclFantasy';
 
 /**
@@ -76,7 +76,7 @@ const trackUrl = (carrier: string | null, num: string | null) => {
 const Me = () => {
   const navigate = useNavigate();
   const { t, language, setLanguage } = useLanguage();
-  const { user, signOut } = useAuth();
+  const { user, signOut, isAdmin, isEditor } = useAuth();
   const { toast } = useToast();
   const email = user?.email ?? null;
   const [newEmail, setNewEmail] = useState('');
@@ -250,6 +250,27 @@ const Me = () => {
               </button>
             </div>
           </div>
+        )}
+
+        {/* ── Admin ──
+            Only rendered for staff, but the panel does not rely on that: it
+            gates its own tabs, and manage-users and list-orders both verify
+            role = admin against the caller's token server-side. Hiding a
+            button is a convenience, never the permission boundary. */}
+        {email && (isAdmin || isEditor) && (
+          <button
+            onClick={() => navigate('/admin')}
+            className="flex w-full items-center gap-3 border-t border-white/[0.06] px-5 py-4 text-left transition-colors hover:bg-white/[0.03]"
+          >
+            <ShieldCheck className="h-4 w-4 flex-none text-primary" />
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="font-sans text-[13.5px] font-medium">{t('me.adminPanel')}</span>
+              <span className="truncate font-sans text-[11.5px] text-foreground/45">
+                {isAdmin ? t('me.adminScopeAdmin') : t('me.adminScopeEditor')}
+              </span>
+            </div>
+            <ChevronRight className="h-4 w-4 flex-none text-foreground/30" />
+          </button>
         )}
 
         {/* Tabs */}
