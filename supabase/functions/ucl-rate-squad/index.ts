@@ -159,12 +159,32 @@ const PERFECTION_HEADROOM = 0.93;
  */
 const RATING_CURVE = 1.35;
 
-const ACHIEVABLE: Partial<Record<keyof typeof WEIGHTS, number>> = {
-  captain: 0.97,
-  form: 0.71,
-  fixtures: 0.90,
-  value: 0.71,
+type Ceilings = Partial<Record<keyof typeof WEIGHTS, number>>;
+
+/**
+ * Measured per competition, because the two do not sit on the same
+ * distribution.
+ *
+ * The Champions League pool is 36 elite squads, so its best fifteen return
+ * more per appearance and per million than the Premier League's best fifteen,
+ * which must include cheap enablers from the bottom of the table. Scoring
+ * Champions League squads against Premier League ceilings saturated form and
+ * value at full marks for any decent side, which stopped those two dimensions
+ * discriminating between a good squad and a great one at all.
+ */
+const ACHIEVABLE_BY_COMPETITION: Record<string, Ceilings> = {
+  EPL: { captain: 0.97, form: 0.71, fixtures: 0.90, value: 0.71 },
+  // Measured on the optimiser's own Champions League squad. Form and value sit
+  // far above the Premier League's, which is why scoring against those
+  // saturated both at full marks for any decent side; captain and fixtures sit
+  // below, so those were being marked down against a bar this competition
+  // cannot reach - 36 elite clubs means no easy fixture and no weak captain
+  // pick to stand out against.
+  UCL: { captain: 0.89, form: 0.96, fixtures: 0.81, value: 0.88 },
 };
+
+const ceilingsFor = (competition: string): Ceilings =>
+  ACHIEVABLE_BY_COMPETITION[competition] ?? ACHIEVABLE_BY_COMPETITION.EPL;
 
 // A suggestion is flagged as recommended when the replacement is clearly
 // better, not merely better. Below this the upgrade is real but marginal and
@@ -412,7 +432,13 @@ const optimiseXi = (squadPlayers: Player[], value: (p: Player) => number = expec
  * different formula would be worse than not projecting one at all - the two
  * numbers have to be comparable to mean anything.
  */
-function scoreSquad(starters: Player[], bench: Player[], captain: Player | null) {
+function scoreSquad(
+  starters: Player[],
+  bench: Player[],
+  captain: Player | null,
+  competition = "EPL",
+) {
+  const ACHIEVABLE = ceilingsFor(competition);
   const perClub = [...starters, ...bench].reduce<Record<string, number>>((acc, p) => {
     acc[p.team] = (acc[p.team] ?? 0) + 1;
     return acc;
@@ -457,6 +483,10 @@ function scoreSquad(starters: Player[], bench: Player[], captain: Player | null)
     value: avg([...starters, ...bench].map(valueScore)),
   };
 
+  // Snapshot before rescaling, so the breakdown can report both what the squad
+  // actually scored and what that became on the curve.
+  const rawSub = { ...sub };
+
   // Rescale each dimension against what a perfect squad reaches, so full marks
   // means "as good as this competition allows" rather than "as good as
   // arithmetic allows". Dimensions a real squad can already max out -
@@ -491,6 +521,9 @@ function scoreSquad(starters: Player[], bench: Player[], captain: Player | null)
     earned: Math.round(sub[k] * WEIGHTS[k]),
     max: WEIGHTS[k],
     ratio: Number(sub[k].toFixed(3)),
+    // Pre-ceiling, pre-curve. Kept so the ceilings above can be re-measured
+    // from a live response instead of being reverse-engineered from one.
+    raw: Number(rawSub[k].toFixed(4)),
     applicable: applicable[k],
     // Points still on the table here, which is what closing the gap to the
     // target actually means in practice.
@@ -556,7 +589,12 @@ const MAX_PAIRED_PASSES = 2;
  * fourth - so three is the rating-optimal cap either way and does not depend
  * on getting the rulebook right.
  */
-function autofillSquad(pool: Player[], budget: number, horizon: Horizon = "season") {
+function autofillSquad(
+  pool: Player[],
+  budget: number,
+  horizon: Horizon = "season",
+  competition = "EPL",
+) {
   const ev0 = (p: Player) => valueForHorizon(p, horizon);
   // No price means the player cannot be budgeted for, and someone who cannot
   // play is not worth a slot however good he is.
@@ -628,7 +666,7 @@ function autofillSquad(pool: Player[], budget: number, horizon: Horizon = "seaso
    */
   const ratingOf = (sq: Player[]) => {
     const xi = optimiseXi(sq, ev);
-    return xi ? scoreSquad(xi.xi, xi.benchOut, xi.captain).rating : -1;
+    return xi ? scoreSquad(xi.xi, xi.benchOut, xi.captain, competition).rating : -1;
   };
 
   let bestSquad = squad.slice();
@@ -872,6 +910,7 @@ serve(async (req) => {
         (poolRows ?? []) as unknown as Player[],
         SQUAD_BUDGET,
         horizon,
+        competition,
       );
       if (!filled) {
         return new Response(
@@ -916,7 +955,7 @@ serve(async (req) => {
         p_competition: competition,
       });
 
-      const scored = scoreSquad(filled.xi, filled.bench, filled.captain);
+      const scored = scoreSquad(filled.xi, filled.bench, filled.captain, competition);
       // The vice is the next best captain in the XI, so a late withdrawal does
       // not fall to whoever happens to sort first.
       const vice = [...filled.xi]
@@ -992,7 +1031,7 @@ serve(async (req) => {
     const captain = captainId ? byId.get(captainId) ?? null : null;
 
     // ------------------------------------------------------------ scoring ---
-    const scored = scoreSquad(starters, bench, captain);
+    const scored = scoreSquad(starters, bench, captain, competition);
     const { rating, breakdown, shape, maxPerClub, perClub } = scored;
 
     // ---------------------------------------------------- optimise the XI ---
@@ -1200,7 +1239,12 @@ serve(async (req) => {
       projectedStarters.find((p) => p.id === optimisedCaptain?.id) ??
       [...projectedStarters].sort((a, b) => captaincyValue(b) - captaincyValue(a))[0] ?? null;
 
-    const projected = scoreSquad(projectedStarters, projectedBench, projectedCaptain);
+    const projected = scoreSquad(
+      projectedStarters,
+      projectedBench,
+      projectedCaptain,
+      competition,
+    );
 
     // ----------------------------------------------------------- narrative ---
     // The model call is six of the seven seconds a request takes. Unlocking a
