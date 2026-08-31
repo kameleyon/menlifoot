@@ -154,6 +154,8 @@ export interface RatingResult {
   projections?: Record<string, number>;
   /** Expected points for the XI, counting the captain twice. */
   projected_points?: number | null;
+  /** When the player data behind this rating was last synced. */
+  data_as_of?: string | null;
   competition?: Competition;
   free?: boolean;
   planned_chip?: string | null;

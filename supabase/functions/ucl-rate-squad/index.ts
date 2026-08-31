@@ -201,7 +201,7 @@ const MIN_RECOMMENDED_POINTS = 1.0;
 
 const PLAYER_FIELDS =
   "id,name,display_name,team,position,price,total_points,form,minutes,availability," +
-  "availability_note,next_opponent,next_difficulty,starts,points_per_game,ict_index";
+  "availability_note,next_opponent,next_difficulty,starts,points_per_game,ict_index,updated_at";
 
 const VALID_FORMATIONS = new Set([
   "3-4-3", "3-5-2", "4-3-3", "4-4-2", "4-5-1", "5-3-2", "5-4-1", "3-6-1", "5-2-3",
@@ -224,6 +224,7 @@ type Player = {
   availability_note: string | null;
   next_opponent: string | null;
   next_difficulty: number | null;
+  updated_at: string | null;
 };
 
 // Ids are interpolated into a PostgREST `in.(...)` filter below, so they must
@@ -1348,6 +1349,18 @@ serve(async (req) => {
       competition,
     );
 
+    // ------------------------------------------------------- data freshness ---
+    // Nothing here is fetched live: the rating reads the pool the sync last
+    // wrote. Prices and returns barely move between syncs, but availability
+    // does - a player ruled out at a Friday press conference is exactly the
+    // input that turns a captaincy to zero - so the age of the data is stated
+    // rather than left to be assumed current.
+    const dataAsOf = [...starters, ...bench]
+      .map((pl) => pl.updated_at)
+      .filter((d): d is string => Boolean(d))
+      .sort()
+      .pop() ?? null;
+
     // -------------------------------------------------- projected points ---
     const projections: Record<string, number> = {};
     for (const pl of [...starters, ...bench]) projections[pl.id] = projectedPoints(pl);
@@ -1697,6 +1710,7 @@ serve(async (req) => {
         // the armband counted twice - which is what a manager actually scores.
         projections,
         projected_points: projectedTotal,
+        data_as_of: dataAsOf,
         target_rating: TARGET_RATING,
         // Where the score lands if the optimised XI and the transfers are taken.
         projected_rating: projected.rating,

@@ -585,6 +585,20 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
                   </span>
                 </div>
               )}
+              {/* Nothing is fetched live - this reads the pool the sync last
+                  wrote - so the age of the data is on screen rather than
+                  assumed. Availability is what actually goes stale. */}
+              {result.data_as_of && (
+                <div className="mt-1 text-[10px] text-muted-foreground/70">
+                  {t('ucl.dataAsOf')}{' '}
+                  {new Date(result.data_as_of).toLocaleString(undefined, {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    day: 'numeric',
+                    month: 'short',
+                  })}
+                </div>
+              )}
               {result.target_gameweek != null && (
                 <div className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
                   {competition === 'EPL' ? t('ucl.gameweek') : t('ucl.matchday')}{' '}
