@@ -319,19 +319,30 @@ const Me = () => {
                 <button
                   key={c}
                   onClick={() => navigate(c === 'UCL' ? '/fantasy' : '/epl')}
-                  className="flex flex-col gap-1 rounded-xl bg-primary px-4 py-4 text-left transition-opacity hover:opacity-90"
+                  className="relative flex flex-col gap-1 overflow-hidden rounded-xl bg-primary px-4 py-4 text-left transition-opacity hover:opacity-90"
                 >
-                  <span className="font-sans text-[9.5px] font-bold uppercase tracking-[0.14em] text-black/70">
+                  {/* The crest is decoration, not information - the card already
+                      says which competition it is in words. So it sits behind
+                      the text at low opacity and is hidden from screen readers
+                      rather than read out as a second label. */}
+                  <img
+                    src={c === 'UCL' ? '/ucllogo.png' : '/epllogo.png'}
+                    alt=""
+                    aria-hidden="true"
+                    loading="lazy"
+                    className="pointer-events-none absolute -right-3 -top-2 h-20 w-20 object-contain opacity-20 mix-blend-luminosity"
+                  />
+                  <span className="relative font-sans text-[9.5px] font-bold uppercase tracking-[0.14em] text-black/70">
                     {COMPETITION_LABEL[c]}
                   </span>
-                  <span className="font-display text-[15px] uppercase leading-tight text-black">
+                  <span className="relative font-display text-[15px] uppercase leading-tight text-black">
                     {t('me.checkSquad')}
                   </span>
                   {/* Rating and breakdown never cost anything in either
                       competition - only the advice about a squad does - so what
                       this opens really is free, and saying so is what gets it
                       pressed. */}
-                  <span className="mt-0.5 inline-flex w-fit rounded-full bg-black/15 px-1.5 py-0.5 font-sans text-[9px] font-bold uppercase tracking-[0.1em] text-black/75">
+                  <span className="relative mt-0.5 inline-flex w-fit rounded-full bg-black/15 px-1.5 py-0.5 font-sans text-[9px] font-bold uppercase tracking-[0.1em] text-black/75">
                     {t('me.forFree')}
                   </span>
                 </button>
