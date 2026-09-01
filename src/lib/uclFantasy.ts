@@ -612,6 +612,8 @@ export interface AutofillResult {
   credits_remaining: number | null;
   /** What the squad costs, and what it was allowed to cost. */
   spend: number;
+  /** How many of the manager's own picks were kept. */
+  kept?: number;
   budget: number;
 }
 
@@ -626,9 +628,11 @@ export interface AutofillResult {
 export const autofillSquad = async (
   competition: Competition = 'UCL',
   horizon: Horizon = 'season',
+  /** Players to keep. Empty builds from nothing; non-empty fills the gaps. */
+  keep: string[] = [],
 ): Promise<AutofillResult> => {
   const { data, error } = await supabase.functions.invoke('ucl-rate-squad', {
-    body: { mode: 'autofill', competition, horizon },
+    body: { mode: 'autofill', competition, horizon, keep },
   });
   // supabase-js reports a non-2xx as `error` with the body still in `data`, so
   // the real reason - no prices published yet - has to be read from there.

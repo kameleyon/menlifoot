@@ -666,6 +666,15 @@ function autofillSquad(
   budget: number,
   horizon: Horizon = "season",
   competition = "EPL",
+  /**
+   * Players the manager has already chosen and wants kept.
+   *
+   * Empty means build from nothing. Non-empty is the auto-pick case: fill the
+   * gaps around what is already on the pitch, spending only what is left of
+   * the budget, and never move a player the manager picked deliberately -
+   * silently improving someone's own choices is not filling in for them.
+   */
+  keepIds: string[] = [],
 ) {
   const ev0 = (p: Player) => valueForHorizon(p, horizon);
   // No price means the player cannot be budgeted for, and someone who cannot
@@ -707,11 +716,31 @@ function autofillSquad(
   const squad: Player[] = [];
   const owned = new Set<string>();
   const perClub: Record<string, number> = {};
+
+  // Kept players go in first and are exempt from every swap below, so the
+  // budget the fill has to work with is whatever they left behind.
+  const keep = new Set(keepIds);
+  const byId = new Map(pool.map((p) => [p.id, p] as const));
+  const locked = new Set<number>();
+  for (const id of keep) {
+    const p = byId.get(id);
+    if (!p || owned.has(id)) continue;
+    // A kept squad can already be full in a position, or over the club cap if
+    // it arrived that way; either is the manager's business, not this
+    // function's, so it is honoured rather than corrected.
+    locked.add(squad.length);
+    squad.push(p);
+    owned.add(p.id);
+    perClub[p.team] = (perClub[p.team] ?? 0) + 1;
+  }
+
   for (const pos of POSITIONS) {
     const cheapest = [...byPos[pos]].sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
-    let need = SQUAD_COMPOSITION[pos];
+    let need = SQUAD_COMPOSITION[pos] - squad.filter((p) => p.position === pos).length;
+    if (need <= 0) continue;
     for (const p of cheapest) {
       if (need === 0) break;
+      if (owned.has(p.id)) continue;
       if ((perClub[p.team] ?? 0) >= MAX_PER_CLUB) continue;
       squad.push(p);
       owned.add(p.id);
@@ -757,6 +786,7 @@ function autofillSquad(
     let move: { at: number; incoming: Player; gain: number } | null = null;
 
     for (let i = 0; i < squad.length; i++) {
+      if (locked.has(i)) continue;
       const outgoing = squad[i];
       for (const cand of byPos[outgoing.position].slice(0, CANDIDATES_PER_POSITION)) {
         if (owned.has(cand.id)) continue;
@@ -809,6 +839,7 @@ function autofillSquad(
       null;
 
     for (let i = 0; i < squad.length; i++) {
+      if (locked.has(i)) continue;
       const out = squad[i];
       for (const down of cheapestByPos[out.position]) {
         if (down.id === out.id || owned.has(down.id)) continue;
@@ -818,7 +849,7 @@ function autofillSquad(
         if (freed <= 0) continue;
 
         for (let j = 0; j < squad.length; j++) {
-          if (j === i) continue;
+          if (j === i || locked.has(j)) continue;
           const sold = squad[j];
           for (const up of byPos[sold.position].slice(0, PAIRED_UPGRADE_DEPTH)) {
             if (up.id === down.id || owned.has(up.id)) continue;
@@ -893,6 +924,7 @@ serve(async (req) => {
       usedChips: rawUsedChips = [],
       mode: rawMode = "rate",
       horizon: rawHorizon = "season",
+      keep: rawKeep = [],
       skipNarrative: rawSkipNarrative = false,
     } = await req.json();
 
@@ -978,11 +1010,19 @@ serve(async (req) => {
       // most in the round about to be played, which is a different squad - it
       // will happily buy a modest player with the easiest fixture of the week.
       const horizon: Horizon = rawHorizon === "gameweek" ? "gameweek" : "season";
+      // Auto-pick keeps what the manager already chose; the plain autofill
+      // starts from nothing. Ids are validated as uuids for the same reason
+      // every other id here is - they reach a PostgREST filter.
+      const keepIds: string[] = Array.isArray(rawKeep)
+        ? rawKeep.filter((id: unknown): id is string => isUuid(id))
+        : [];
+
       const filled = autofillSquad(
         (poolRows ?? []) as unknown as Player[],
         SQUAD_BUDGET,
         horizon,
         competition,
+        keepIds,
       );
       if (!filled) {
         return new Response(
@@ -1058,6 +1098,7 @@ serve(async (req) => {
           spend: filled.spend,
           budget: SQUAD_BUDGET,
           horizon,
+          kept: keepIds.length,
           target_gameweek: autofillGw ?? null,
           cost: isFree ? 0 : UNLOCK_PRICES.autofill,
           credits_remaining: autofillCredits,

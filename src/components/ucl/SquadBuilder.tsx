@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, X, Star, Shield, Zap, CheckCircle2, Wand2, Loader2, CalendarDays } from 'lucide-react';
+import { Search, X, Star, Shield, Zap, CheckCircle2, Wand2, Loader2, CalendarDays, Sparkles } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -239,11 +239,22 @@ const SquadBuilder = ({
    * editable state as anything picked by hand, so a manager can take the
    * shape and change the two players they disagree about.
    */
-  const runAutofill = async (horizon: Horizon) => {
+  /**
+   * Fill the squad.
+   *
+   * `keepMine` is the difference between the two buttons. Auto pick completes
+   * a squad around the players already on the pitch and never moves them;
+   * best-squad starts from nothing. A manager half way through picking wants
+   * the gaps filled, not their work replaced.
+   */
+  const runAutofill = async (horizon: Horizon, keepMine = false) => {
     setAutofilling(horizon);
     setAutofillError(null);
     try {
-      const filled = await autofillSquad(competition, horizon);
+      const keep = keepMine
+        ? ([...starters, ...bench].map((s) => s.player_id).filter(Boolean) as string[])
+        : [];
+      const filled = await autofillSquad(competition, horizon, keep);
       setFormation(filled.squad.formation);
       setStarters(filled.squad.starters);
       setBench(filled.squad.bench);
@@ -390,6 +401,26 @@ const SquadBuilder = ({
             "Best squad" is the side to hold; "best this round" will happily buy
             a modest player with the easiest fixture of the week and is a
             different squad - roughly half the picks change. */}
+        {/* Offered first, because on a part-built squad it is the one a manager
+            wants: it fills the gaps and leaves their own picks alone. Hidden on
+            an empty pitch, where it would do exactly what Best squad does. */}
+        {[...starters, ...bench].some((s) => s.player_id) && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => runAutofill('season', true)}
+            disabled={autofilling !== null || submitting}
+            className="h-11 w-full gap-2"
+          >
+            {autofilling ? (
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4 shrink-0" />
+            )}
+            <span className="truncate text-xs">{t('ucl.autoPick')}</span>
+          </Button>
+        )}
+
         <div className="grid grid-cols-2 gap-2">
           {([
             { horizon: 'season' as Horizon, icon: Wand2, label: t('ucl.autofillSeason') },
