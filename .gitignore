@@ -31,3 +31,6 @@ public/logoblack.png
 # playwright test artifacts
 .playwright-mcp/
 public/menlifoottotal.png
+
+# Local log from the UEFA sync scheduled task.
+uefa-sync.log

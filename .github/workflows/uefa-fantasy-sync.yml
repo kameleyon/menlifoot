@@ -1,29 +1,32 @@
 # Refresh the Champions League player pool from UEFA's fantasy feed.
 #
-# This runs here rather than in the nightly Supabase cron because Akamai
-# refuses that runtime: every season id fails at the connection layer from
-# Supabase's egress, while the identical request returns 200 from a browser,
-# from Node on a laptop, and from a GitHub runner. The edge function still does
-# all the mapping and merging - this job only performs the HTTP request it
-# cannot.
+# NOT SCHEDULED, and it will fail on a GitHub-hosted runner. Kept because it
+# works the moment a self-hosted runner exists, and because a deleted workflow
+# takes the reason with it.
 #
-# Setup, once:
-#   Settings -> Secrets and variables -> Actions -> New repository secret
-#     VITE_SUPABASE_URL              https://<ref>.supabase.co
-#     VITE_SUPABASE_PUBLISHABLE_KEY  the publishable/anon key
+# UEFA answers a browser and an ordinary connection, and drops requests from
+# data centres. The Supabase edge function fails at the connection layer for
+# every season id; a GitHub-hosted run hung for 81 seconds and was killed. The
+# feed is fine and the season id is right - the caller is being refused, and no
+# header will change that, because the judgement is on the network and the TLS
+# fingerprint.
 #
-# Both are public values that already ship in the built frontend, so this adds
-# no exposure. The sync function does its own writing with the service role key
-# it holds server-side; nothing privileged is stored here.
+# The live schedule is a Windows scheduled task on a machine UEFA will talk to:
+#     scripts/install-uefa-task.ps1     registers it for 06:05 daily
+#     scripts/push-uefa-players.cmd     what the task runs
+#
+# To use this workflow instead, add a self-hosted runner on an ordinary
+# connection, change runs-on below to match its label, and restore the schedule.
+#
+# Secrets, if you do:
+#   VITE_SUPABASE_URL              https://<ref>.supabase.co
+#   VITE_SUPABASE_PUBLISHABLE_KEY  the publishable/anon key
+# Both already ship in the built frontend, so neither adds exposure.
 name: UEFA fantasy sync
 
 on:
-  schedule:
-    # 06:00 UTC daily. Matchdays finish around 21:00 UTC, so this lands after
-    # UEFA has settled points and repriced, and before anyone in Europe or the
-    # Americas is picking a team.
-    - cron: '0 6 * * *'
-  # So a matchday can be picked up straight away without waiting for the clock.
+  # Manual only. A daily run against a blocked network is a failure notice
+  # every morning that says nothing new.
   workflow_dispatch:
 
 # One at a time: two overlapping pushes would race on the same rows.

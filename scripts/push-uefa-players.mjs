@@ -55,14 +55,51 @@ if (!supabaseUrl || !supabaseKey) {
   process.exit(1);
 }
 
-const feed = await fetch(FEED, {
-  headers: {
-    'User-Agent':
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-    Accept: 'application/json',
-    Referer: 'https://gaming.uefa.com/en/uclfantasy',
-  },
-});
+/**
+ * Fetch the feed, with a bounded wait and one retry.
+ *
+ * Akamai does not answer refused clients, it drops them, so the failure mode
+ * is a hang rather than a status code - a GitHub run sat for 81 seconds and
+ * reported nothing useful. The timeout turns that into a message, and the
+ * retry covers an ordinary blip without hiding a block: a blocked network
+ * fails both attempts identically.
+ */
+const REQUEST_TIMEOUT_MS = 20_000;
+
+async function fetchFeed() {
+  let lastError = null;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const abort = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+    try {
+      const res = await fetch(FEED, {
+        signal: abort,
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+          Accept: 'application/json',
+          Referer: 'https://gaming.uefa.com/en/uclfantasy',
+        },
+      });
+      return res;
+    } catch (err) {
+      lastError = err;
+      console.error(`attempt ${attempt}: ${err?.name ?? 'Error'} - ${err?.message ?? err}`);
+    }
+  }
+  console.error(
+    [
+      '',
+      'Could not reach the UEFA feed. This is what a blocked client looks like:',
+      'UEFA answers a browser and an ordinary connection, and drops requests from',
+      'data centres - Supabase edge functions, and GitHub-hosted runners.',
+      'Run this from a machine on an ordinary connection, or point a self-hosted',
+      'runner at it. The feed itself is fine; the caller is being refused.',
+    ].join('\n'),
+  );
+  throw lastError ?? new Error('uefa feed unreachable');
+}
+
+const feed = await fetchFeed();
 if (!feed.ok) {
   console.error(`UEFA feed returned HTTP ${feed.status}. If this is a 404 the season id has ` +
     `moved on - open the fantasy site and read the number out of any feeds/ URL it loads.`);
