@@ -397,29 +397,36 @@ const SquadBuilder = ({
           on an empty pitch it is the fastest thing a manager can do, and the
           budget it has to respect is the next thing they will look at. */}
       <div className="space-y-2">
-        {/* Two different questions, so two buttons rather than a hidden setting.
-            "Best squad" is the side to hold; "best this round" will happily buy
-            a modest player with the easiest fixture of the week and is a
-            different squad - roughly half the picks change. */}
-        {/* Offered first, because on a part-built squad it is the one a manager
-            wants: it fills the gaps and leaves their own picks alone. Hidden on
-            an empty pitch, where it would do exactly what Best squad does. */}
-        {[...starters, ...bench].some((s) => s.player_id) && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => runAutofill('season', true)}
-            disabled={autofilling !== null || submitting}
-            className="h-11 w-full gap-2"
-          >
-            {autofilling ? (
-              <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-            ) : (
-              <Sparkles className="h-4 w-4 shrink-0" />
-            )}
-            <span className="truncate text-xs">{t('ucl.autoPick')}</span>
-          </Button>
-        )}
+        {/* Auto pick fills whatever is empty and leaves the rest alone, so on
+            an empty pitch it fills all fifteen and on a part-built one it
+            completes the squad around the manager's own choices.
+
+            Always shown. It used to appear only once a player had been picked,
+            on the reasoning that an empty squad made it identical to Best
+            squad - which was true and beside the point: it hid the button at
+            the exact moment someone would look for it, on an empty pitch. A
+            control that only appears once you no longer need it is not a
+            control. */}
+        <Button
+          type="button"
+          onClick={() => runAutofill('season', true)}
+          disabled={autofilling !== null || submitting}
+          className="h-12 w-full gap-2 text-sm font-semibold"
+        >
+          {autofilling ? (
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+          ) : (
+            <Sparkles className="h-4 w-4 shrink-0" />
+          )}
+          {t('ucl.autoPick')}
+        </Button>
+
+        {/* Two different questions, so two buttons rather than a hidden
+            setting. "Best squad" is the side to hold; "best this round" will
+            happily buy a modest player with the easiest fixture of the week and
+            is a different squad - roughly half the picks change. Both replace
+            the whole squad, which is why they sit below Auto pick rather than
+            beside it. */}
 
         <div className="grid grid-cols-2 gap-2">
           {([
@@ -432,7 +439,7 @@ const SquadBuilder = ({
               variant="outline"
               onClick={() => runAutofill(horizon)}
               disabled={autofilling !== null || submitting}
-              className="h-11 w-full gap-2 px-2"
+              className="h-10 w-full gap-2 px-2"
             >
               {autofilling === horizon ? (
                 <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
