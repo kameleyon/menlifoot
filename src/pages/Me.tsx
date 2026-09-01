@@ -183,10 +183,19 @@ const Me = () => {
    */
   type Tab = 'activity' | 'orders' | 'preferences';
   const [tab, setTab] = useState<Tab | null>(null);
-  const TABS: { id: Tab; label: string; Icon: typeof Clock }[] = [
-    { id: 'activity', label: t('me.activity'), Icon: Clock },
-    { id: 'orders', label: t('me.orders'), Icon: ShoppingBag },
-    { id: 'preferences', label: t('me.preferences'), Icon: Settings },
+  /**
+   * `label` names the section; `short` is what fits in the pill.
+   *
+   * Measured rather than guessed: the column is 640px wide and the row inside
+   * it 600px, and the five full labels come to roughly that - close enough
+   * that the real font tipped them over and wrapped "ORDER HISTORY" across two
+   * lines. The short set leaves about a third of the row spare, which survives
+   * a wider font and a longer translation.
+   */
+  const TABS: { id: Tab; label: string; short: string; Icon: typeof Clock }[] = [
+    { id: 'activity', label: t('me.activity'), short: t('me.activity'), Icon: Clock },
+    { id: 'orders', label: t('me.orders'), short: t('me.ordersShort'), Icon: ShoppingBag },
+    { id: 'preferences', label: t('me.preferences'), short: t('me.preferencesShort'), Icon: Settings },
   ];
 
   return (
@@ -250,13 +259,13 @@ const Me = () => {
                 away below the small breakpoint: four labels in French or
                 Haitian Creole will not sit across a phone, and an icon that
                 stays put beats a label that wraps into a second row. */}
-            {/* One scrolling line. The labels used to hide below the sm
-                breakpoint, which guessed at the wrong thing: the constraint is
-                this 640px column, not the viewport, so just above 640px the
-                labels came back and wrapped mid-word inside a container that
-                could not hold them. Nothing wraps now; the row scrolls when it
-                has to. */}
-            <div className="no-scrollbar -mx-1 mb-3 flex items-center gap-1.5 overflow-x-auto px-1 pb-0.5">
+            {/* One line that always fits, so nothing scrolls out of reach.
+                Icons alone on a phone - five of them are 194px, comfortable on
+                any handset - and short labels from sm up, where the row is
+                600px and the short set needs about 430. Letting it scroll
+                instead was worse than the wrapping it fixed: the admin and sign
+                out pills simply left the screen. */}
+            <div className="mb-3 flex flex-wrap items-center gap-1.5">
               {TABS.map((tb) => {
                 const Icon = tb.Icon;
                 return (
@@ -265,14 +274,14 @@ const Me = () => {
                     onClick={() => setTab((cur) => (cur === tb.id ? null : tb.id))}
                     title={tb.label}
                     aria-label={tb.label}
-                    className={`flex flex-none items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.06em] transition-colors ${
+                    className={`flex flex-none items-center gap-1 whitespace-nowrap rounded-full p-1.5 sm:gap-1.5 sm:px-2.5 sm:py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.06em] transition-colors ${
                       tab === tb.id
                         ? 'bg-primary text-primary-foreground'
                         : 'border border-white/[0.14] text-foreground/60 hover:border-primary/50 hover:text-primary'
                     }`}
                   >
-                    <Icon className="h-3 w-3 flex-none" />
-                    <span>{tb.label}</span>
+                    <Icon className="h-3.5 w-3.5 flex-none" />
+                    <span className="hidden sm:inline">{tb.short}</span>
                   </button>
                 );
               })}
@@ -295,10 +304,10 @@ const Me = () => {
                 }}
                 title={t('me.adminPanel')}
                 aria-label={t('me.adminPanel')}
-                className="flex flex-none items-center gap-1 whitespace-nowrap rounded-full bg-primary px-2.5 py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.06em] text-black transition-opacity hover:opacity-90"
+                className="flex flex-none items-center gap-1 whitespace-nowrap rounded-full bg-primary p-1.5 sm:gap-1.5 sm:px-2.5 sm:py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.06em] text-black transition-opacity hover:opacity-90"
               >
-                <ShieldCheck className="h-3 w-3 flex-none" />
-                <span>{t('me.adminPanel')}</span>
+                <ShieldCheck className="h-3.5 w-3.5 flex-none" />
+                <span className="hidden sm:inline">{t('me.adminShort')}</span>
               </button>
 
               {/* Sign out sits with admin because both are ways out of this
@@ -311,10 +320,10 @@ const Me = () => {
                 }}
                 title={t('me.signOut')}
                 aria-label={t('me.signOut')}
-                className="flex flex-none items-center gap-1 whitespace-nowrap rounded-full bg-primary px-2.5 py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.06em] text-black transition-opacity hover:opacity-90"
+                className="flex flex-none items-center gap-1 whitespace-nowrap rounded-full bg-primary p-1.5 sm:gap-1.5 sm:px-2.5 sm:py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.06em] text-black transition-opacity hover:opacity-90"
               >
-                <LogOut className="h-3 w-3 flex-none" />
-                <span>{t('me.signOut')}</span>
+                <LogOut className="h-3.5 w-3.5 flex-none" />
+                <span className="hidden sm:inline">{t('me.signOut')}</span>
               </button>
             </div>
 
