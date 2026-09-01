@@ -250,7 +250,13 @@ const Me = () => {
                 away below the small breakpoint: four labels in French or
                 Haitian Creole will not sit across a phone, and an icon that
                 stays put beats a label that wraps into a second row. */}
-            <div className="mb-3 flex items-center gap-1.5">
+            {/* One scrolling line. The labels used to hide below the sm
+                breakpoint, which guessed at the wrong thing: the constraint is
+                this 640px column, not the viewport, so just above 640px the
+                labels came back and wrapped mid-word inside a container that
+                could not hold them. Nothing wraps now; the row scrolls when it
+                has to. */}
+            <div className="no-scrollbar -mx-1 mb-3 flex items-center gap-1.5 overflow-x-auto px-1 pb-0.5">
               {TABS.map((tb) => {
                 const Icon = tb.Icon;
                 return (
@@ -259,14 +265,14 @@ const Me = () => {
                     onClick={() => setTab((cur) => (cur === tb.id ? null : tb.id))}
                     title={tb.label}
                     aria-label={tb.label}
-                    className={`flex items-center gap-1 rounded-full px-2.5 py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.06em] transition-colors ${
+                    className={`flex flex-none items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.06em] transition-colors ${
                       tab === tb.id
                         ? 'bg-primary text-primary-foreground'
                         : 'border border-white/[0.14] text-foreground/60 hover:border-primary/50 hover:text-primary'
                     }`}
                   >
                     <Icon className="h-3 w-3 flex-none" />
-                    <span className="hidden sm:inline">{tb.label}</span>
+                    <span>{tb.label}</span>
                   </button>
                 );
               })}
@@ -289,10 +295,10 @@ const Me = () => {
                 }}
                 title={t('me.adminPanel')}
                 aria-label={t('me.adminPanel')}
-                className="flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.06em] text-black transition-opacity hover:opacity-90"
+                className="flex flex-none items-center gap-1 whitespace-nowrap rounded-full bg-primary px-2.5 py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.06em] text-black transition-opacity hover:opacity-90"
               >
                 <ShieldCheck className="h-3 w-3 flex-none" />
-                <span className="hidden sm:inline">{t('me.adminPanel')}</span>
+                <span>{t('me.adminPanel')}</span>
               </button>
 
               {/* Sign out sits with admin because both are ways out of this
@@ -305,46 +311,61 @@ const Me = () => {
                 }}
                 title={t('me.signOut')}
                 aria-label={t('me.signOut')}
-                className="flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.06em] text-black transition-opacity hover:opacity-90"
+                className="flex flex-none items-center gap-1 whitespace-nowrap rounded-full bg-primary px-2.5 py-1 font-sans text-[10px] font-semibold uppercase tracking-[0.06em] text-black transition-opacity hover:opacity-90"
               >
                 <LogOut className="h-3 w-3 flex-none" />
-                <span className="hidden sm:inline">{t('me.signOut')}</span>
+                <span>{t('me.signOut')}</span>
               </button>
             </div>
 
             {/* Solid gold, and the biggest thing on the page. These are what
                 the page is for, and as faint outlines nobody saw them. */}
-            <div className="grid grid-cols-2 gap-2.5">
+            {/* Stacked on a phone, side by side from sm up. Two cards sharing
+                a narrow screen left each one too cramped to read as the main
+                thing on the page, which is what they are. */}
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               {(['UCL', 'EPL'] as const).map((c) => (
                 <button
                   key={c}
                   onClick={() => navigate(c === 'UCL' ? '/fantasy' : '/epl')}
-                  className="relative flex flex-col gap-1 overflow-hidden rounded-xl bg-primary px-4 py-4 text-left transition-opacity hover:opacity-90"
+                  className="relative flex items-center gap-3 overflow-hidden rounded-2xl bg-primary px-4 py-4 text-left transition-transform hover:-translate-y-0.5"
                 >
                   {/* The crest is decoration, not information - the card already
                       says which competition it is in words. So it sits behind
                       the text at low opacity and is hidden from screen readers
                       rather than read out as a second label. */}
+                  {/* A soft wash off the top-left, so flat gold does not read
+                      as a solid block. */}
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/25 to-transparent"
+                  />
+
+                  <div className="relative flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="font-sans text-[9.5px] font-bold uppercase tracking-[0.14em] text-black/60">
+                      {COMPETITION_LABEL[c]}
+                    </span>
+                    <span className="font-display text-[17px] uppercase leading-tight text-black">
+                      {t('me.checkSquad')}
+                    </span>
+                    {/* Rating and breakdown never cost anything in either
+                        competition - only the advice about a squad does - so
+                        what this opens really is free, and saying so is what
+                        gets it pressed. */}
+                    <span className="mt-1 inline-flex w-fit items-center rounded-full bg-black/20 px-2 py-0.5 font-sans text-[9px] font-bold uppercase tracking-[0.12em] text-black/80">
+                      {t('me.forFree')}
+                    </span>
+                  </div>
+
+                  {/* The crest gets its own space rather than hiding behind the
+                      words, where it was unreadable and in the way at once. */}
                   <img
                     src={c === 'UCL' ? '/ucllogo.png' : '/epllogo.png'}
                     alt=""
                     aria-hidden="true"
                     loading="lazy"
-                    className="pointer-events-none absolute -right-3 -top-2 h-20 w-20 object-contain opacity-20 mix-blend-luminosity"
+                    className="pointer-events-none relative h-14 w-14 flex-none object-contain opacity-75 mix-blend-multiply"
                   />
-                  <span className="relative font-sans text-[9.5px] font-bold uppercase tracking-[0.14em] text-black/70">
-                    {COMPETITION_LABEL[c]}
-                  </span>
-                  <span className="relative font-display text-[15px] uppercase leading-tight text-black">
-                    {t('me.checkSquad')}
-                  </span>
-                  {/* Rating and breakdown never cost anything in either
-                      competition - only the advice about a squad does - so what
-                      this opens really is free, and saying so is what gets it
-                      pressed. */}
-                  <span className="relative mt-0.5 inline-flex w-fit rounded-full bg-black/15 px-1.5 py-0.5 font-sans text-[9px] font-bold uppercase tracking-[0.1em] text-black/75">
-                    {t('me.forFree')}
-                  </span>
                 </button>
               ))}
             </div>
