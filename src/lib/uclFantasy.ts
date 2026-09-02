@@ -98,6 +98,10 @@ export interface Suggestion {
   upgrade?: number | null;
   /** The same improvement in expected points, which is what gets shown. */
   points_gain?: number | null;
+  /** Points the game deducts for this transfer, once the free ones are used. */
+  transfer_cost?: number | null;
+  /** What is left after that deduction - the number that actually decides it. */
+  net_gain?: number | null;
   /** True only for the clearest upgrades, so the badge stays meaningful. */
   recommended?: boolean;
 }
@@ -156,6 +160,10 @@ export interface RatingResult {
   projected_points?: number | null;
   /** When the player data behind this rating was last synced. */
   data_as_of?: string | null;
+  /** Where the projected total comes from, so the bench can be seen. */
+  projection_parts?: { starters: number; armband: number; bench: number } | null;
+  /** What the competition allows and charges for transfers this round. */
+  transfer_rules?: { free: number; cost_per_extra: number; all_free: boolean } | null;
   competition?: Competition;
   free?: boolean;
   planned_chip?: string | null;

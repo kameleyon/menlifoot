@@ -588,6 +588,21 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
               {/* Nothing is fetched live - this reads the pool the sync last
                   wrote - so the age of the data is on screen rather than
                   assumed. Availability is what actually goes stale. */}
+              {/* Where the total comes from. The bench line is the point: in
+                  the Champions League it is a real part of the score, because
+                  a substitute who plays later can replace a starter who has
+                  already blanked. */}
+              {result.projection_parts && (
+                <div className="mt-1.5 flex items-center justify-center gap-2 text-[10px] text-muted-foreground">
+                  <span>{result.projection_parts.starters} {t('ucl.fromXi')}</span>
+                  <span className="text-muted-foreground/40">+</span>
+                  <span>{result.projection_parts.armband} {t('ucl.fromArmband')}</span>
+                  <span className="text-muted-foreground/40">+</span>
+                  <span className={result.projection_parts.bench > 0 ? 'text-primary' : ''}>
+                    {result.projection_parts.bench} {t('ucl.fromBench')}
+                  </span>
+                </div>
+              )}
               {result.data_as_of && (
                 <div className="mt-1 text-[10px] text-muted-foreground/70">
                   {t('ucl.dataAsOf')}{' '}
@@ -862,8 +877,17 @@ const FantasyUCL = ({ competition = 'UCL' }: Props) => {
                             0.141 tells a manager nothing; "+2.3 pts" is the
                             same fact in the units they think in. */}
                         {s.points_gain != null && s.points_gain > 0 && (
-                          <span className="shrink-0 font-display text-sm text-primary">
-                            +{s.points_gain.toFixed(1)}
+                          <span className="shrink-0 text-right leading-tight">
+                            <span className="block font-display text-sm text-primary">
+                              +{(s.net_gain ?? s.points_gain).toFixed(1)}
+                            </span>
+                            {/* Only worth saying when the game charged for it.
+                                A free transfer has nothing to explain. */}
+                            {s.transfer_cost != null && s.transfer_cost > 0 && (
+                              <span className="block text-[9px] text-muted-foreground">
+                                {s.points_gain.toFixed(1)} − {s.transfer_cost}
+                              </span>
+                            )}
                           </span>
                         )}
                         {s.recommended && (

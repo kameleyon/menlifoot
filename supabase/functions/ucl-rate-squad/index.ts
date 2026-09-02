@@ -72,6 +72,35 @@ const UNLOCK_PRICES = {
   autofill: 1,
 } as const;
 
+/**
+ * The rules that differ between the two games.
+ *
+ * Taken from UEFA's own feeds and rule text rather than assumed from the
+ * Premier League game, which is what this function used to do for both.
+ *
+ * `subsWithinRound` is the important one. A Champions League round runs
+ * Tuesday to Thursday and UEFA turns that into a tactic in their own words:
+ * "Start with players who play on Tuesday. If they don't get a good score, sub
+ * them off before Wednesday's matches." A bench player who kicks off later
+ * than a starter is a live option on that starter. The Premier League locks
+ * the side at the first kick-off, so there the bench only covers absences.
+ *
+ * `freeTransfers` and `transferCost` are what the game charges for changing
+ * the squad. UEFA templates the allowance per matchday rather than publishing
+ * it as a constant - it becomes unlimited before the play-offs, the round of
+ * 16 and the quarter-finals - so this is the league-phase figure and the one
+ * to revisit when the knockout rounds arrive.
+ */
+const COMPETITION_RULES: Record<
+  string,
+  { subsWithinRound: boolean; freeTransfers: number; transferCost: number }
+> = {
+  UCL: { subsWithinRound: true, freeTransfers: 2, transferCost: 4 },
+  EPL: { subsWithinRound: false, freeTransfers: 1, transferCost: 4 },
+};
+
+const rulesFor = (competition: string) => COMPETITION_RULES[competition] ?? COMPETITION_RULES.EPL;
+
 const MAX_TRANSFERS = 5;
 
 /**
@@ -201,7 +230,8 @@ const MIN_RECOMMENDED_POINTS = 1.0;
 
 const PLAYER_FIELDS =
   "id,name,display_name,team,position,price,total_points,form,minutes,availability," +
-  "availability_note,next_opponent,next_difficulty,starts,points_per_game,ict_index,updated_at";
+  "availability_note,next_opponent,next_difficulty,next_kickoff,starts,points_per_game," +
+  "ict_index,updated_at";
 
 const VALID_FORMATIONS = new Set([
   "3-4-3", "3-5-2", "4-3-3", "4-4-2", "4-5-1", "5-3-2", "5-4-1", "3-6-1", "5-2-3",
@@ -224,6 +254,8 @@ type Player = {
   availability_note: string | null;
   next_opponent: string | null;
   next_difficulty: number | null;
+  /** When this player's next match starts. Orders a squad within a round. */
+  next_kickoff: string | null;
   updated_at: string | null;
 };
 
@@ -495,6 +527,109 @@ const projectedPoints = (p: Player): number => {
 
   return Math.max(0, Number(expected.toFixed(1)));
 };
+
+/**
+ * Spread of a single player's score in a single match, in points.
+ *
+ * Fantasy returns are lumpy - a blank, a goal, a haul - and the substitution
+ * option below is worth nothing without some idea of that spread: if every
+ * player scored exactly his expectation there would never be a reason to use
+ * the bench. Around three points matches what a mid-priced player's
+ * match-to-match scores actually look like.
+ */
+const SCORE_SPREAD = 3;
+
+/** Standard normal CDF, via the error function. */
+const normalCdf = (z: number): number => {
+  // Abramowitz and Stegun 7.1.26, which is ample for a points projection.
+  const t = 1 / (1 + 0.3275911 * Math.abs(z) / Math.SQRT2);
+  const y =
+    1 -
+    ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t +
+      0.254829592) *
+      t *
+      Math.exp(-(z * z) / 2);
+  return z >= 0 ? 0.5 * (1 + y) : 0.5 * (1 - y);
+};
+
+const normalPdf = (z: number): number => Math.exp(-(z * z) / 2) / Math.sqrt(2 * Math.PI);
+
+/**
+ * What the option to swap one player for another is worth, in points.
+ *
+ * A manager who can watch Tuesday's match before deciding does not get the
+ * better of the two players - they get the better of the two OUTCOMES, which
+ * is worth strictly more. For two independent normals with the same spread
+ * that is a closed form, and the gain over simply keeping the starter is
+ *
+ *     E[max(A, B)] - E[A]
+ *
+ * The shape is worth knowing: the option is worth most when the two are evenly
+ * matched, and tends to zero when the starter is far better - which is right,
+ * because nobody benches a certainty.
+ */
+const swapOptionValue = (starter: number, benched: number): number => {
+  const theta = SCORE_SPREAD * Math.SQRT2;
+  const d = (starter - benched) / theta;
+  const expectedMax =
+    starter * normalCdf(d) + benched * normalCdf(-d) + theta * normalPdf(d);
+  return Math.max(0, expectedMax - starter);
+};
+
+/**
+ * What the bench is worth, in points.
+ *
+ * Two separate things, and only the first exists in the Premier League game:
+ *
+ *   - Cover. A starter who does not play is replaced automatically, so the
+ *     bench is worth the chance of that happening times what the replacement
+ *     returns.
+ *   - Choice. In the Champions League a bench player who kicks off later than
+ *     a starter can be brought on after that starter has played and scored
+ *     badly. That is an option, not a certainty, and it is priced as one.
+ *
+ * Bench players are matched to starters greedily, best first, and each is used
+ * once - a substitute cannot cover two absences.
+ */
+function benchValue(
+  starters: Player[],
+  bench: Player[],
+  projections: Record<string, number>,
+  allowSubsWithinRound: boolean,
+): number {
+  const available = bench
+    .filter((b) => b.position !== "GK" || starters.some((st) => st.position === "GK"))
+    .sort((a, b) => (projections[b.id] ?? 0) - (projections[a.id] ?? 0));
+
+  const used = new Set<string>();
+  let total = 0;
+
+  for (const st of starters) {
+    // Same position only. A cross-position substitution has to leave a legal
+    // shape, and claiming value from a swap the game might refuse would
+    // overstate every bench.
+    const partner = available.find((b) => !used.has(b.id) && b.position === st.position);
+    if (!partner) continue;
+    used.add(partner.id);
+
+    const startingChance = availabilityScore(st);
+    const benchPoints = projections[partner.id] ?? 0;
+
+    // Cover: the starter does not appear and this player comes on instead.
+    total += (1 - startingChance) * benchPoints;
+
+    // Choice: only when the game allows a swap mid-round, only when the
+    // substitute plays after the starter, and only in the branch where the
+    // starter actually played - there is nothing to react to otherwise.
+    if (allowSubsWithinRound && st.next_kickoff && partner.next_kickoff) {
+      if (Date.parse(partner.next_kickoff) > Date.parse(st.next_kickoff)) {
+        total += startingChance * swapOptionValue(projections[st.id] ?? 0, benchPoints);
+      }
+    }
+  }
+
+  return total;
+}
 
 /**
  * Score a squad, 0-100.
@@ -960,6 +1095,19 @@ serve(async (req) => {
       0,
       Math.min(MAX_TRANSFERS, Math.floor(Number(rawTransferCount) || 0)),
     );
+
+    /**
+     * What the game charges for changing the squad.
+     *
+     * Free transfers are per matchday, and anything beyond them costs points -
+     * which means a transfer worth less than the charge is a loss however
+     * attractive it looks. Wildcard and Limitless both suspend the charge for
+     * the round they are played, so under either the whole shortlist is free.
+     */
+    const compRules = rulesFor(competition);
+    const transfersAreFree =
+      String(rawChip) === "Wildcard" || String(rawChip) === "Limitless";
+    const freeTransfers = transfersAreFree ? MAX_TRANSFERS : compRules.freeTransfers;
     const cost = isFree
       ? 0
       : (requested.has("optimisation") ? UNLOCK_PRICES.optimisation : 0) +
@@ -1450,11 +1598,23 @@ serve(async (req) => {
             : 0))
       : 0;
 
-    // Bench Boost is the only time the bench scores, which is why a squad
-    // playing it should be judged on all fifteen rather than eleven.
+    /**
+     * What the bench adds.
+     *
+     * Bench Boost scores all fifteen outright, so there is no substitution to
+     * value - every player counts already. Otherwise the bench is worth cover
+     * for absences plus, in the Champions League, the option to react between
+     * match days.
+     *
+     * Treating the bench as worth nothing was the single biggest error in the
+     * Champions League projection: UEFA's own advice is to start Tuesday
+     * players and sub them off before Wednesday if they blank, which makes
+     * four substitutes an active part of the score rather than reserves.
+     */
+    const rules = rulesFor(competition);
     const benchPoints = boostingBench
       ? bench.reduce((t, pl) => t + (projections[pl.id] ?? 0), 0)
-      : 0;
+      : benchValue(starters, bench, projections, rules.subsWithinRound);
 
     const projectedTotal = Number(
       (starters.reduce((t, pl) => t + projections[pl.id], 0) + armband + benchPoints).toFixed(1),
@@ -1549,6 +1709,10 @@ serve(async (req) => {
               content:
                 `You are a UEFA Champions League Fantasy analyst writing in ${langName}. ` +
                 "The rating and breakdown are already final — never dispute or restate a different number. " +
+                `This competition allows ${freeTransfers} free transfer(s) this round and deducts ` +
+                `${compRules.transferCost} points for each one beyond that, so a move worth less than ` +
+                "the charge is a loss - say so plainly when that is the case rather than " +
+                "recommending it anyway. " +
                 "If you give a figure for how much a transfer gains, use the option's " +
                 "points_gain verbatim and never the upgrade score or a number you " +
                 "worked out yourself from the per-game averages: those averages are " +
@@ -1694,18 +1858,30 @@ serve(async (req) => {
               })
               .map((sg: Record<string, unknown>, i: number) => {
                 const pair = playersFor(String(sg.out ?? ""), String(sg.in ?? ""));
+                // What this transfer costs. The first few each round are
+                // free; past that the game deducts points, so a move worth
+                // less than the charge loses points however good it looks.
+                const costsPoints = i >= freeTransfers;
+                const pointsCost = costsPoints ? compRules.transferCost : 0;
+                const gross = Number(sg.points_gain ?? 0);
+                const net = Number((gross - pointsCost).toFixed(1));
                 return {
                   ...sg,
+                  transfer_cost: pointsCost,
+                  net_gain: net,
                   // Top two, a gain clear enough to be worth acting on, and the
                   // plain numbers not pointing the other way. A marginal
                   // upgrade badged "recommended" is how a manager gets talked
                   // into a pointless hit; one the write-up itself argues
                   // against is worse, because it teaches them not to trust the
                   // badge at all.
+                  // Judged on what is left after the charge. A transfer that
+                  // gains two points and costs four is a loss, and badging it
+                  // recommended is how a manager is talked into one.
                   recommended:
                     i < 2 &&
                     Number(sg.upgrade ?? 0) >= STRONG_UPGRADE &&
-                    Number(sg.points_gain ?? 0) >= MIN_RECOMMENDED_POINTS &&
+                    net >= MIN_RECOMMENDED_POINTS &&
                     (pair ? returnsSupportSwap(pair.incoming, pair.out) : false),
                 };
               });
@@ -1797,6 +1973,13 @@ serve(async (req) => {
         // the armband counted twice - which is what a manager actually scores.
         projections,
         projected_points: projectedTotal,
+        // Broken out so a manager can see where the total comes from, and so
+        // the bench contribution is arguable rather than buried.
+        projection_parts: {
+          starters: Number(starters.reduce((t, pl) => t + projections[pl.id], 0).toFixed(1)),
+          armband: Number(armband.toFixed(1)),
+          bench: Number(benchPoints.toFixed(1)),
+        },
         data_as_of: dataAsOf,
         target_rating: TARGET_RATING,
         // Where the score lands if the optimised XI and the transfers are taken.
@@ -1823,6 +2006,12 @@ serve(async (req) => {
         chips_available: remainingChips,
         chips_used: usedChips,
         prices: { ...UNLOCK_PRICES, max_transfers: MAX_TRANSFERS },
+        transfer_rules: {
+          free: freeTransfers,
+          cost_per_extra: compRules.transferCost,
+          // True while a chip suspends the charge for this round.
+          all_free: transfersAreFree,
+        },
         credits_remaining: creditsRemaining,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
