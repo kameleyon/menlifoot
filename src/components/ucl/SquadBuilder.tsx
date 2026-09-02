@@ -109,7 +109,14 @@ const SquadBuilder = ({
   // moment a player changes it is describing something that is no longer on
   // the pitch.
   const [autofilled, setAutofilled] = useState<
-    { rating: number; spend: number; budget: number; horizon: Horizon; gameweek: number | null } | null
+    {
+      rating: number;
+      spend: number;
+      budget: number;
+      horizon: Horizon;
+      gameweek: number | null;
+      points: number | null;
+    } | null
   >(null);
   const [picking, setPicking] = useState<{ index: number; onBench: boolean; position: Position } | null>(
     null,
@@ -265,6 +272,7 @@ const SquadBuilder = ({
         budget: filled.budget,
         horizon,
         gameweek: filled.target_gameweek,
+        points: filled.projected_points ?? null,
       });
     } catch (err) {
       // The one failure that is expected rather than broken: UEFA publishes
@@ -457,6 +465,9 @@ const SquadBuilder = ({
           <div className="rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-center">
             <div className="font-display text-sm text-primary">
               {t('ucl.autofillRates')} {autofilled.rating}/100
+              {autofilled.points != null && (
+                <> · {autofilled.points} {t('ucl.predictedPoints')}</>
+              )}
             </div>
             <div className="text-[11px] text-muted-foreground">
               {formatPrice(autofilled.spend)} / {formatPrice(autofilled.budget)}

@@ -831,20 +831,33 @@ function autofillSquad(
   const cache = new Map(priced.map((p) => [p.id, ev0(p)] as const));
   const ev = (p: Player) => cache.get(p.id) ?? 0;
 
+  // The same points the rating reports, cached alongside, so the search can be
+  // scored in the units the answer is given in.
+  const pointsCache: Record<string, number> = {};
+  for (const p of priced) pointsCache[p.id] = projectedPoints(p);
+  const subsWithinRound = rulesFor(competition).subsWithinRound;
+
   /**
-   * What the climb maximises.
+   * What the climb maximises: the points the squad is expected to score.
    *
-   * The XI carries almost all of the rating, so a bench place is worth having
-   * but worth much less than a starting one. Weighting the fifteen equally
-   * spends the budget on substitutes who never play.
+   * This used to weight every bench place at a flat quarter, which is roughly
+   * right for the Premier League and wrong for the Champions League, where a
+   * substitute kicking off after a starter is a live option on him rather than
+   * a reserve. Scoring the search with the same bench model the rating uses
+   * means the optimiser now buys the later kick-off on purpose, instead of
+   * treating all four substitutes as interchangeable ballast.
+   *
+   * It also removes a mismatch worth avoiding on its own: the search and the
+   * number reported afterwards are now the same function, so the squad it
+   * settles on is the squad that scores best rather than one a proxy liked.
    */
   const objective = (sq: Player[]) => {
     const best = optimiseXi(sq, ev);
     if (!best) return -Infinity;
-    const starting = best.xi.reduce((t, p) => t + ev(p), 0);
-    const benched = best.benchOut.reduce((t, p) => t + ev(p), 0);
-    const cap = best.captain ? captaincyValue(best.captain) : 0;
-    return starting + BENCH_WEIGHT * benched + 0.5 * cap;
+    const starting = best.xi.reduce((t, p) => t + (pointsCache[p.id] ?? 0), 0);
+    const armband = best.captain ? (pointsCache[best.captain.id] ?? 0) : 0;
+    const benchWorth = benchValue(best.xi, best.benchOut, pointsCache, subsWithinRound);
+    return starting + armband + benchWorth;
   };
 
   // --- cheapest legal squad -------------------------------------------------
@@ -890,33 +903,28 @@ function autofillSquad(
   if (spend > budget) return null;
 
   /**
-   * The real rating of a squad, as the manager will see it.
+   * Keep the best squad the search has actually stood on.
    *
-   * The climb steers by `objective`, a cheap proxy summing expected value -
-   * fast enough for the tens of thousands of trials below, but not the same
-   * function as the rating. The paired pass proved the gap matters: it found a
-   * squad the proxy preferred and the rating scored a point lower. So every
-   * squad the search settles on is checked against the actual scorer, and the
-   * best of those is what gets returned. Cheap, because it runs once per
-   * accepted move rather than once per trial.
+   * This used to track by rating, because the climb steered by a proxy that
+   * was not the rating and the two could disagree. The objective is now the
+   * projected points - the same function the answer is reported in - so the
+   * thing worth keeping is the best of those. A squad that scores more points
+   * is the better squad; the rating is a separate judgement of quality and is
+   * reported alongside rather than optimised against.
    */
-  const ratingOf = (sq: Player[]) => {
-    const xi = optimiseXi(sq, ev);
-    return xi ? scoreSquad(xi.xi, xi.benchOut, xi.captain, competition).rating : -1;
-  };
-
   let bestSquad = squad.slice();
-  let bestRating = ratingOf(squad);
+  let bestScore = -Infinity;
   const remember = () => {
-    const r = ratingOf(squad);
-    if (r > bestRating) {
-      bestRating = r;
+    const v = objective(squad);
+    if (v > bestScore) {
+      bestScore = v;
       bestSquad = squad.slice();
     }
   };
 
   // --- climb ----------------------------------------------------------------
   let score = objective(squad);
+  remember();
   for (let step = 0; step < MAX_CLIMB_STEPS; step++) {
     let move: { at: number; incoming: Player; gain: number } | null = null;
 
@@ -1216,6 +1224,22 @@ serve(async (req) => {
       });
 
       const scored = scoreSquad(filled.xi, filled.bench, filled.captain, competition);
+
+      // What this squad is expected to score, by the same model the rating
+      // path uses - the optimiser now maximises exactly this, so reporting it
+      // says what was actually optimised for.
+      const fillProjections: Record<string, number> = {};
+      for (const pl of [...filled.xi, ...filled.bench]) {
+        fillProjections[pl.id] = projectedPoints(pl);
+      }
+      const fillRules = rulesFor(competition);
+      const fillTotal = Number(
+        (
+          filled.xi.reduce((t, pl) => t + fillProjections[pl.id], 0) +
+          (filled.captain ? fillProjections[filled.captain.id] : 0) +
+          benchValue(filled.xi, filled.bench, fillProjections, fillRules.subsWithinRound)
+        ).toFixed(1),
+      );
       // The vice is the next best captain in the XI, so a late withdrawal does
       // not fall to whoever happens to sort first.
       const vice = [...filled.xi]
@@ -1246,6 +1270,7 @@ serve(async (req) => {
           spend: filled.spend,
           budget: SQUAD_BUDGET,
           horizon,
+          projected_points: fillTotal,
           kept: keepIds.length,
           target_gameweek: autofillGw ?? null,
           cost: isFree ? 0 : UNLOCK_PRICES.autofill,

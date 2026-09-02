@@ -622,6 +622,8 @@ export interface AutofillResult {
   spend: number;
   /** How many of the manager's own picks were kept. */
   kept?: number;
+  /** Expected points for this squad - what the optimiser maximised. */
+  projected_points?: number | null;
   budget: number;
 }
 
